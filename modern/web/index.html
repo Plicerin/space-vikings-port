@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Space Vikings</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #000000;
+        --bg-deep: #000000;
+        --panel: #000000;
+        --panel-strong: #000000;
+        --line: #000000;
+        --line-strong: #000000;
+        --text: #ffffff;
+        --text-dim: #aaaaaa;
+        --glow: none;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background:
+          radial-gradient(circle at top, rgba(18, 58, 120, 0.24), transparent 35%),
+          radial-gradient(circle at bottom, rgba(0, 177, 198, 0.14), transparent 28%),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+        color: var(--text);
+        height: 100%;
+        font-family: "Consolas", "Cascadia Mono", "SFMono-Regular", ui-monospace, monospace;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(rgba(0, 0, 0, 0) 23px, rgba(32, 146, 225, 0.08) 24px),
+          linear-gradient(90deg, rgba(0, 0, 0, 0) 23px, rgba(32, 146, 225, 0.05) 24px);
+        background-size: 24px 24px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent 92%);
+      }
+      #container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        padding: 20px 20px 16px;
+        gap: 14px;
+        justify-content: center;
+      }
+      #viewport {
+        position: relative;
+        display: block;
+        line-height: 0;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid rgba(58, 104, 255, 0.22);
+        background:
+          radial-gradient(circle at center, rgba(8, 18, 42, 0.45), rgba(1, 5, 15, 0.96)),
+          #000;
+        box-shadow: var(--glow);
+        isolation: isolate;
+      }
+      #viewport::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0 1px,
+          rgba(0, 0, 0, 0.18) 1px,
+          rgba(0, 0, 0, 0.18) 2px
+        );
+        mix-blend-mode: multiply;
+        z-index: 3;
+      }
+      #viewport::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        box-shadow: inset 0 0 120px rgba(20, 20, 80, 0.26), inset 0 0 8px rgba(80, 120, 255, 0.45);
+        z-index: 4;
+      }
+      #stage {
+        display: block;
+        background: #000;
+        flex: 1;
+        min-height: 0;
+        max-width: 100%;
+        aspect-ratio: 280 / 192;
+        image-rendering: pixelated;
+        width: 100%;
+        touch-action: none;
+      }
+      #cpu-panel { display: none; }
+      .panel-header {
+        font-weight: bold;
+        font-size: 0.72rem;
+        letter-spacing: 0.18em;
+        white-space: nowrap;
+        opacity: 0.78;
+      }
+      #cpu-status {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 0.98rem;
+        font-weight: bold;
+      }
+      #copy-log-btn {
+        background: var(--line-strong);
+        color: #000;
+        border: none;
+        padding: 12px 18px;
+        font-size: 0.88rem;
+        font-family: inherit;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 0 22px rgba(24, 227, 240, 0.18);
+      }
+      #copy-log-btn:hover {
+        background: #ffffff;
+      }
+      #copy-log-btn:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+      }
+      #copy-log-btn:active {
+        transform: translateY(1px);
+      }
+      #touch-controls {
+        width: min(100%, 1100px);
+        display: none;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+      }
+      .touch-cluster {
+        background:
+          linear-gradient(180deg, rgba(7, 22, 44, 0.88), rgba(2, 12, 28, 0.96));
+        border: 1px solid rgba(80, 180, 255, 0.48);
+        border-radius: 18px;
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+        box-shadow: inset 0 0 0 1px rgba(104, 214, 255, 0.08);
+      }
+      .touch-cluster .label {
+        color: var(--text-dim);
+        font-size: 0.82rem;
+        letter-spacing: 0.08em;
+        margin-bottom: 2px;
+        text-align: center;
+        opacity: 0.95;
+      }
+      .touch-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .touch-control {
+        border: 1px solid #4db6ff;
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(9, 43, 72, 0.92), rgba(7, 33, 55, 0.96));
+        color: #00faff;
+        min-height: 72px;
+        padding: 10px 8px;
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1.05;
+        text-align: center;
+        user-select: none;
+        cursor: pointer;
+        touch-action: none;
+        overflow-wrap: anywhere;
+        box-shadow: inset 0 0 0 1px rgba(126, 216, 255, 0.08);
+      }
+      .touch-control:active {
+        background: rgba(0, 90, 140, 0.9);
+      }
+      @media (max-width: 840px), (hover: none) and (pointer: coarse) {
+        body {
+          overflow: auto;
+        }
+        #container {
+          justify-content: flex-start;
+          padding: 18px 16px 22px;
+          gap: 18px;
+        }
+        #viewport {
+          width: min(100%, 560px);
+          border-radius: 20px;
+        }
+        #stage {
+          width: 100%;
+          max-height: min(54vh, 360px);
+        }
+        #cpu-panel {
+          width: 100%;
+          padding: 12px 14px;
+          gap: 10px;
+          align-items: stretch;
+          flex-wrap: wrap;
+        }
+        #touch-controls {
+          display: grid;
+          width: 100%;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+        .touch-cluster:last-child {
+          grid-column: 1 / -1;
+        }
+        .touch-cluster {
+          padding: 12px;
+        }
+        .touch-cluster .label {
+          font-size: 0.8rem;
+        }
+        .touch-control {
+          min-height: 66px;
+          font-size: clamp(0.76rem, 3.8vw, 0.95rem);
+          padding: 8px 6px;
+        }
+        .panel-header {
+          font-size: 0.65rem;
+          letter-spacing: 0.14em;
+        }
+        #cpu-status {
+          min-width: 0;
+          font-size: 0.88rem;
+        }
+        #copy-log-btn {
+          width: 100%;
+          font-size: 0.82rem;
+          padding: 11px 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <div id="viewport">
+        <canvas id="stage"></canvas>
+      </div>
+      <div id="touch-controls" aria-label="Touch game controls">
+        <div class="touch-cluster">
+          <div class="label">MOVE</div>
+          <div class="touch-row">
+            <span></span>
+            <button class="touch-control" data-code="ArrowUp" data-hold="1">▲</button>
+            <span></span>
+          </div>
+          <div class="touch-row">
+            <button class="touch-control" data-code="ArrowLeft" data-hold="1">◀</button>
+            <span></span>
+            <button class="touch-control" data-code="ArrowRight" data-hold="1">▶</button>
+          </div>
+          <div class="touch-row">
+            <span></span>
+            <button class="touch-control" data-code="ArrowDown" data-hold="1">▼</button>
+            <span></span>
+          </div>
+        </div>
+        <div class="touch-cluster">
+          <div class="label">FIRE / POWER</div>
+          <div class="touch-row">
+            <button class="touch-control" data-code="1">SPD-</button>
+            <button class="touch-control" data-code="3">SPD--</button>
+            <button class="touch-control" data-code=" ">FIRE</button>
+          </div>
+          <div class="touch-row">
+            <button class="touch-control" data-code="2">SPD+</button>
+            <button class="touch-control" data-code="4">SPD++</button>
+            <button class="touch-control" data-code="W">LASER</button>
+          </div>
+        </div>
+        <div class="touch-cluster">
+          <div class="label">SYSTEMS</div>
+          <div class="touch-row">
+            <button class="touch-control" data-code="A">AUTO</button>
+            <button class="touch-control" data-code="B">COND</button>
+            <button class="touch-control" data-code="S">SHLD</button>
+          </div>
+          <div class="touch-row">
+            <button class="touch-control" data-code="R">RADAR</button>
+            <button class="touch-control" data-code="H">HYPER</button>
+            <button class="touch-control" data-code="O">ORBIT</button>
+          </div>
+          <div class="touch-row">
+            <button class="touch-control" data-code="C">COM</button>
+            <span></span>
+            <button class="touch-control" data-code="Escape">MENU</button>
+          </div>
+        </div>
+      </div>
+      <div id="cpu-panel">
+        <div class="panel-header">CPU PILOT STATUS</div>
+        <div id="cpu-status">WAITING...</div>
+        <button id="copy-log-btn">COPY GAME LOG</button>
+      </div>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

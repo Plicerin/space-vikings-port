@@ -1,0 +1,3399 @@
+[
+  {
+    "planet": 0,
+    "recordCount": 10,
+    "unknownAt": "0024",
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 01"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      }
+    ]
+  },
+  {
+    "planet": 1,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 40 1F 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 00 00"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 00 00"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 30 F8"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 30 F8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 60 F0"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 60 F0"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 90 E8"
+      }
+    ]
+  },
+  {
+    "planet": 2,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 3,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 00 00"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 00 00"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 D0 07"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 A0 0F"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 A0 0F"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 70 17"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 70 17"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 A0 0F"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 00 00"
+      }
+    ]
+  },
+  {
+    "planet": 4,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 48 F4 00 00 28 23"
+      },
+      {
+        "offset": "0055",
+        "opcode": "02",
+        "bytes": "02 3C F6 00 00 70 17"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 70 17"
+      },
+      {
+        "offset": "0063",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 A0 0F"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 D0 07"
+      },
+      {
+        "offset": "0071",
+        "opcode": "02",
+        "bytes": "02 28 F1 00 00 00 00"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 10 F5 00 00 18 FC"
+      },
+      {
+        "offset": "007F",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 30 F8"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 C0 F9 00 00 48 F4"
+      },
+      {
+        "offset": "008D",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 60 F0"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 90 E8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "02",
+        "bytes": "02 64 19 00 00 9C E6"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 78 1E 00 00 C0 E0"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "02",
+        "bytes": "02 78 1E 00 00 CC DE"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 64 19 00 00 B8 D9"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "02",
+        "bytes": "02 64 19 00 00 F0 D8"
+      }
+    ]
+  },
+  {
+    "planet": 5,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 28 23"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 D8 DC 00 00 D0 20"
+      },
+      {
+        "offset": "0055",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 98 21"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 28 23"
+      },
+      {
+        "offset": "0063",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 1C 25"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 28 23"
+      },
+      {
+        "offset": "0071",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 60 22"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 64 00 00 00 40 1F"
+      },
+      {
+        "offset": "007F",
+        "opcode": "02",
+        "bytes": "02 84 03 00 00 64 19"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 4C 04 00 00 C8 19"
+      },
+      {
+        "offset": "008D",
+        "opcode": "02",
+        "bytes": "02 B8 0B 00 00 40 1F"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 58 1B 00 00 8C 23"
+      },
+      {
+        "offset": "009B",
+        "opcode": "02",
+        "bytes": "02 28 23 00 00 34 21"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 C4 22"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 4C 04 00 00 C8 19"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 E8 03 00 00 70 17"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "02",
+        "bytes": "02 B6 03 00 00 A0 0F"
+      }
+    ]
+  },
+  {
+    "planet": 6,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 48 F4 00 00 28 23"
+      },
+      {
+        "offset": "0055",
+        "opcode": "02",
+        "bytes": "02 3C F6 00 00 70 17"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 70 17"
+      },
+      {
+        "offset": "0063",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 A0 0F"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 D0 07"
+      },
+      {
+        "offset": "0071",
+        "opcode": "02",
+        "bytes": "02 28 F1 00 00 00 00"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 10 F5 00 00 18 FC"
+      },
+      {
+        "offset": "007F",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 30 F8"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 C0 F9 00 00 48 F4"
+      },
+      {
+        "offset": "008D",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 60 F0"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 90 E8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "02",
+        "bytes": "02 64 19 00 00 9C E6"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 78 1E 00 00 C0 E0"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "02",
+        "bytes": "02 78 1E 00 00 CC DE"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 64 19 00 00 B8 D9"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "02",
+        "bytes": "02 64 19 00 00 F0 D8"
+      }
+    ]
+  },
+  {
+    "planet": 7,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 8,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 9,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 10,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 11,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 18 FC 00 00 8C 23"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 34 21"
+      },
+      {
+        "offset": "0055",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 00 19"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 44 16"
+      },
+      {
+        "offset": "0063",
+        "opcode": "02",
+        "bytes": "02 E8 03 00 00 A0 0F"
+      },
+      {
+        "offset": "006A",
+        "opcode": "01",
+        "bytes": "01 50 FB 00 00 E4 0C"
+      },
+      {
+        "offset": "0071",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 D8 0E"
+      },
+      {
+        "offset": "0078",
+        "opcode": "01",
+        "bytes": "01 84 EA 00 00 A0 0F"
+      },
+      {
+        "offset": "007F",
+        "opcode": "02",
+        "bytes": "02 84 EA 00 00 A8 16"
+      },
+      {
+        "offset": "0086",
+        "opcode": "01",
+        "bytes": "01 84 EA 00 00 0C 17"
+      },
+      {
+        "offset": "008D",
+        "opcode": "02",
+        "bytes": "02 78 EC 00 00 78 1E"
+      },
+      {
+        "offset": "0094",
+        "opcode": "01",
+        "bytes": "01 40 ED 00 00 DC 1E"
+      },
+      {
+        "offset": "009B",
+        "opcode": "02",
+        "bytes": "02 28 F1 00 00 08 20"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "01",
+        "bytes": "01 04 F7 00 00 C4 22"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 28 23"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "01",
+        "bytes": "01 E8 03 00 00 A0 0F"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "02",
+        "bytes": "02 60 09 00 00 F0 0A"
+      }
+    ]
+  },
+  {
+    "planet": 12,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 18 FC 00 00 8C 23"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 34 21"
+      },
+      {
+        "offset": "0055",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 00 19"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 44 16"
+      },
+      {
+        "offset": "0063",
+        "opcode": "02",
+        "bytes": "02 E8 03 00 00 A0 0F"
+      },
+      {
+        "offset": "006A",
+        "opcode": "01",
+        "bytes": "01 50 FB 00 00 E4 0C"
+      },
+      {
+        "offset": "0071",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 D8 0E"
+      },
+      {
+        "offset": "0078",
+        "opcode": "01",
+        "bytes": "01 84 EA 00 00 A0 0F"
+      },
+      {
+        "offset": "007F",
+        "opcode": "02",
+        "bytes": "02 84 EA 00 00 A8 16"
+      },
+      {
+        "offset": "0086",
+        "opcode": "01",
+        "bytes": "01 84 EA 00 00 0C 17"
+      },
+      {
+        "offset": "008D",
+        "opcode": "02",
+        "bytes": "02 78 EC 00 00 78 1E"
+      },
+      {
+        "offset": "0094",
+        "opcode": "01",
+        "bytes": "01 40 ED 00 00 DC 1E"
+      },
+      {
+        "offset": "009B",
+        "opcode": "02",
+        "bytes": "02 28 F1 00 00 08 20"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "01",
+        "bytes": "01 04 F7 00 00 C4 22"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 28 23"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "01",
+        "bytes": "01 E8 03 00 00 A0 0F"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "02",
+        "bytes": "02 60 09 00 00 F0 0A"
+      }
+    ]
+  },
+  {
+    "planet": 13,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 20 D1 00 00 E0 2E"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 E0 2E 00 00 E0 2E"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 E0 2E 00 00 20 D1"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 20 D1 00 00 20 D1"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 20 D1 00 00 E0 2E"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 8B DB 00 00 E0 2E"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 8B DB 00 00 20 D1"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 F6 E5 00 00 E0 2E"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 F6 E5 00 00 20 D1"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 E0 2E"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 20 D1"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 CB FA 00 00 E0 2E"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 CB FA 00 00 20 D1"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 35 05 00 00 E0 2E"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 35 05 00 00 20 D1"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 E0 2E"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 20 D1"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 0A 1A 00 00 E0 2E"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 0A 1A 00 00 20 D1"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 75 24 00 00 E0 2E"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 75 24 00 00 20 D1"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 20 D1 00 00 75 24"
+      }
+    ]
+  },
+  {
+    "planet": 14,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 15,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 C8 00 40 1F"
+      },
+      {
+        "offset": "0055",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 70 17"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 C0 E0 FA 00 A0 0F"
+      },
+      {
+        "offset": "0063",
+        "opcode": "02",
+        "bytes": "02 C0 E0 C8 00 D0 07"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 00 00"
+      },
+      {
+        "offset": "0071",
+        "opcode": "02",
+        "bytes": "02 C0 E0 96 00 30 F8"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 60 F0"
+      },
+      {
+        "offset": "007F",
+        "opcode": "02",
+        "bytes": "02 C0 E0 4B 00 90 E8"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 C0 E0 C8 00 C0 E0"
+      },
+      {
+        "offset": "008D",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0094",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "009B",
+        "opcode": "02",
+        "bytes": "02 90 E8 64 00 40 1F"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 90 E8 C8 00 70 17"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 A0 0F"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 90 E8 C8 00 D0 07"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 00 00"
+      }
+    ]
+  },
+  {
+    "planet": 16,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 17,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 18,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 F0 D8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 F0 D8"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 19,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 C0 E0 00 00 10 27"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 F0 D8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "01",
+        "bytes": "01 90 E8 00 00 10 27"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 F0 D8"
+      },
+      {
+        "offset": "0063",
+        "opcode": "01",
+        "bytes": "01 60 F0 00 00 10 27"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 60 F0 00 00 F0 D8"
+      },
+      {
+        "offset": "0071",
+        "opcode": "01",
+        "bytes": "01 30 F8 00 00 10 27"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 30 F8 00 00 F0 D8"
+      },
+      {
+        "offset": "007F",
+        "opcode": "01",
+        "bytes": "01 00 00 00 00 10 27"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 00 00 00 00 F0 D8"
+      },
+      {
+        "offset": "008D",
+        "opcode": "01",
+        "bytes": "01 D0 07 00 00 10 27"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 D0 07 00 00 F0 D8"
+      },
+      {
+        "offset": "009B",
+        "opcode": "01",
+        "bytes": "01 A0 0F 00 00 10 27"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 A0 0F 00 00 90 E8"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "01",
+        "bytes": "01 70 17 00 00 10 27"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 70 17 00 00 60 F0"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "01",
+        "bytes": "01 40 1F 00 00 10 27"
+      }
+    ]
+  },
+  {
+    "planet": 20,
+    "recordCount": 32,
+    "unknownAt": null,
+    "records": [
+      {
+        "offset": "0000",
+        "opcode": "0E",
+        "bytes": "0E 8C 7E 00 22"
+      },
+      {
+        "offset": "0005",
+        "opcode": "0F",
+        "bytes": "0F 80 3E FF 7F 45 25"
+      },
+      {
+        "offset": "000C",
+        "opcode": "04",
+        "bytes": "04 00"
+      },
+      {
+        "offset": "000E",
+        "opcode": "07",
+        "bytes": "07 52"
+      },
+      {
+        "offset": "0010",
+        "opcode": "07",
+        "bytes": "07 50"
+      },
+      {
+        "offset": "0012",
+        "opcode": "07",
+        "bytes": "07 57"
+      },
+      {
+        "offset": "0014",
+        "opcode": "07",
+        "bytes": "07 54"
+      },
+      {
+        "offset": "0016",
+        "opcode": "08",
+        "bytes": "08 01"
+      },
+      {
+        "offset": "0018",
+        "opcode": "09",
+        "bytes": "09 01"
+      },
+      {
+        "offset": "001A",
+        "opcode": "05",
+        "bytes": "05 00 00 00 00 00 00 00 00 00"
+      },
+      {
+        "offset": "0024",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "002B",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 10 27"
+      },
+      {
+        "offset": "0032",
+        "opcode": "02",
+        "bytes": "02 10 27 00 00 F0 D8"
+      },
+      {
+        "offset": "0039",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 F0 D8"
+      },
+      {
+        "offset": "0040",
+        "opcode": "02",
+        "bytes": "02 F0 D8 00 00 10 27"
+      },
+      {
+        "offset": "0047",
+        "opcode": "01",
+        "bytes": "01 F0 D8 00 00 60 F0"
+      },
+      {
+        "offset": "004E",
+        "opcode": "02",
+        "bytes": "02 D8 DC 00 00 30 F8"
+      },
+      {
+        "offset": "0055",
+        "opcode": "02",
+        "bytes": "02 74 DC 00 00 50 FB"
+      },
+      {
+        "offset": "005C",
+        "opcode": "02",
+        "bytes": "02 CC DE 00 00 18 FC"
+      },
+      {
+        "offset": "0063",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 7C FC"
+      },
+      {
+        "offset": "006A",
+        "opcode": "02",
+        "bytes": "02 88 E1 00 00 00 00"
+      },
+      {
+        "offset": "0071",
+        "opcode": "02",
+        "bytes": "02 A8 E4 00 00 6C 07"
+      },
+      {
+        "offset": "0078",
+        "opcode": "02",
+        "bytes": "02 24 E1 00 00 D0 07"
+      },
+      {
+        "offset": "007F",
+        "opcode": "02",
+        "bytes": "02 A8 E4 00 00 D0 07"
+      },
+      {
+        "offset": "0086",
+        "opcode": "02",
+        "bytes": "02 E0 E3 00 00 AC 0D"
+      },
+      {
+        "offset": "008D",
+        "opcode": "02",
+        "bytes": "02 C0 E0 00 00 A0 0F"
+      },
+      {
+        "offset": "0094",
+        "opcode": "02",
+        "bytes": "02 50 E2 00 00 04 10"
+      },
+      {
+        "offset": "009B",
+        "opcode": "02",
+        "bytes": "02 50 E2 00 00 30 11"
+      },
+      {
+        "offset": "00A2",
+        "opcode": "02",
+        "bytes": "02 0C E5 00 00 A0 0F"
+      },
+      {
+        "offset": "00A9",
+        "opcode": "02",
+        "bytes": "02 C8 E7 00 00 A0 0F"
+      },
+      {
+        "offset": "00B0",
+        "opcode": "02",
+        "bytes": "02 64 E7 00 00 D8 0E"
+      },
+      {
+        "offset": "00B7",
+        "opcode": "02",
+        "bytes": "02 90 E8 00 00 80 0C"
+      }
+    ]
+  }
+]
