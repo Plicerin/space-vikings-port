@@ -1,5 +1,4 @@
 export {
-  reentryScene,
   orbitScene,
   exScene,
   dmgScene,

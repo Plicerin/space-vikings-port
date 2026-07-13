@@ -1,38 +1,6 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 
-export async function reentryScene(
-  ctx: SceneContext,
-  scenes: SceneManager,
-): Promise<void> {
-  const { hires, state, audio } = ctx;
-  setScene('reentry');
-
-  // RE.bas
-  // POKE 38210,1 then BLOAD PLANET # currentSystem, then RUN STARSHIP SIMULATOR.
-  state.atmosphere = true;
-  state.inOrbit = false;
-
-  // The BASIC overlay does not rewrite the live XYZ bytes the way ORBIT.bas
-  // does; it keeps the current simulator state and switches into atmospheric
-  // mode. Preserve current position/orientation here and only mark the mode.
-  glog('init', `reentry pos=(${state.x},${state.y},${state.z}) heading=${state.heading} planet=${state.planetIndex}`);
-
-  audio.beep(440, 200);
-  const frames = state.commanderMode ? 4 : 18;
-  for (let i = 0; i < frames; i++) {
-    hires.hgr();
-    drawBackdropStars(hires, 17 + i * 3);
-    drawReentryBands(hires, i);
-    drawHorizonArc(hires, 104 + Math.sin(i * 0.25) * 2, 44 + i * 0.4);
-    hires.hcolor(3);
-    hires.text('REENTRY SEQUENCE START', 10, 7);
-    await wait(state.commanderMode ? 60 : 90);
-  }
-
-  return scenes.run('starshipSimulator');
-}
-
 export async function orbitScene(
   ctx: SceneContext,
   scenes: SceneManager,
@@ -205,58 +173,6 @@ function drawBackdropStars(hires: SceneContext['hires'], seed: number): void {
     const y = Math.round((seed * 11 + i * 29) % 124);
     if ((i + seed) % 5 === 0) continue;
     hires.hplot(x, y);
-  }
-}
-
-function drawReentryBands(hires: SceneContext['hires'], frame: number): void {
-  hires.hcolor(5);
-  for (let y = 18; y < 124; y += 5) {
-    const bend = Math.sin((y * 0.08) + frame * 0.22) * 6;
-    hires.line(0, y, 279, y + bend);
-  }
-}
-
-function drawOrbitalBands(hires: SceneContext['hires'], frame: number): void {
-  hires.hcolor(6);
-  for (let x = 0; x < 280; x += 8) {
-    const wave = Math.sin((x * 0.06) + frame * 0.28) * 3;
-    hires.line(x, 20 + wave, x, 118 - wave);
-  }
-}
-
-function drawHorizonArc(
-  hires: SceneContext['hires'],
-  centerY: number,
-  radius: number,
-): void {
-  hires.hcolor(3);
-  let prevX = 0;
-  let prevY = centerY;
-  for (let x = 0; x <= 279; x += 4) {
-    const dx = (x - 140) / radius;
-    const y = centerY + Math.round(Math.max(-12, Math.min(12, dx * dx * 7 - 8)));
-    if (x > 0) hires.line(prevX, prevY, x, y);
-    prevX = x;
-    prevY = y;
-  }
-}
-
-function drawOrbitRing(
-  hires: SceneContext['hires'],
-  cx: number,
-  cy: number,
-  radius: number,
-): void {
-  hires.hcolor(3);
-  let prevX = cx + radius;
-  let prevY = cy;
-  for (let i = 1; i <= 48; i++) {
-    const a = (i / 48) * Math.PI * 2;
-    const x = Math.round(cx + Math.cos(a) * radius * 1.8);
-    const y = Math.round(cy + Math.sin(a) * radius * 0.9);
-    hires.line(prevX, prevY, x, y);
-    prevX = x;
-    prevY = y;
   }
 }
 
