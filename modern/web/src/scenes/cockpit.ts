@@ -64,8 +64,6 @@ const SOL_PRESENTATION_STARS: Array<[number, number]> = [
 
 type Point2 = { x: number; y: number };
 
-const planetCloudCache = new Map<string, Point2[]>();
-
 function wrap(v: number): number {
   if (v < W2) return W1;
   if (v > W1) return W2;
@@ -1072,6 +1070,8 @@ function drawPlanetFallback(
   drawPlanetPointCloud(hires, cx, cy, radius, 1, 0.72);
 }
 
+let planetRotationTime = 0;
+
 function drawPlanetPointCloud(
   hires: import('../engine/hires').Hires,
   cx: number,
@@ -1081,14 +1081,10 @@ function drawPlanetPointCloud(
   yScale = 0.68,
 ): void {
   const r = Math.max(3, Math.round(radius));
-  const yaw = seed * 0.57;
+  planetRotationTime += 0.015;
+  const yaw = seed * 0.57 + planetRotationTime * 0.4;
   const pitch = -0.22 + (seed % 3) * 0.12;
-  const key = `spaceSphere:${seed}:${r}:${Math.round(yScale * 100)}`;
-  let points = planetCloudCache.get(key);
-  if (!points) {
-    points = buildProjectedSphereCloud(r, Math.max(3, Math.round(r * yScale)), yaw, pitch, true);
-    planetCloudCache.set(key, points);
-  }
+  const points = buildProjectedSphereCloud(r, Math.max(3, Math.round(r * yScale)), yaw, pitch, true);
 
   hires.hcolor(3);
   for (const point of points) {
@@ -1409,8 +1405,8 @@ function drawApproachPlanetPointCloud(
   cx: number,
   cy: number,
   left: number,
-  top: number,
   right: number,
+  top: number,
   bottom: number,
   seed: number,
   sweep: number,
@@ -1422,14 +1418,9 @@ function drawApproachPlanetPointCloud(
   const rx = radius;
   const ry = radius;
   const yawStep = Math.round(sweep * 0.08);
-  const yaw = seed * 0.61 + yawStep * 0.08;
+  const yaw = seed * 0.61 + yawStep * 0.08 + planetRotationTime * 0.2;
   const pitch = -0.34;
-  const key = `approachSphere:${seed}:${rx}:${ry}:${yawStep}`;
-  let points = planetCloudCache.get(key);
-  if (!points) {
-    points = buildProjectedSphereCloud(rx, ry, yaw, pitch, false);
-    planetCloudCache.set(key, points);
-  }
+  const points = buildProjectedSphereCloud(rx, ry, yaw, pitch, false);
 
   for (const point of points) {
     const x = cx + point.x;
