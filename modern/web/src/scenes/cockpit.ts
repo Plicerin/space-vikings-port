@@ -1070,9 +1070,9 @@ function drawPlanetFallback(
   drawPlanetPointCloud(hires, cx, cy, radius, 1, 0.72);
 }
 
-let planetRotationTime = 0;
+export let planetRotationTime = 0;
 
-function drawPlanetPointCloud(
+export function drawPlanetPointCloud(
   hires: import('../engine/hires').Hires,
   cx: number,
   cy: number,
@@ -1400,7 +1400,7 @@ function drawBombardmentSourceBitmap(
   drawBitmap(hires, bitmap, destX, destY, scale, bounds);
 }
 
-function drawApproachPlanetPointCloud(
+export function drawApproachPlanetPointCloud(
   hires: import('../engine/hires').Hires,
   cx: number,
   cy: number,
