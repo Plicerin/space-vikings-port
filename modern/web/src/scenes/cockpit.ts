@@ -388,8 +388,16 @@ const enemy = spawnEnemy(state);
         }
       }
 
-      if (state.speed > 0 && state.energy > 0 && Math.random() < 0.02) {
-        state.energy = Math.max(0, state.energy - 1);
+      if (state.energy > 0) {
+        const speedDrain = state.speed * 0.008 * dt;
+        const shieldDrain = state.shieldsOn ? 0.5 * dt : 0;
+        state.energy -= speedDrain + shieldDrain;
+        if (state.inOrbit) state.energy += 2 * dt;
+        state.energy = Math.max(0, Math.min(2000, state.energy));
+        if (state.energy <= 0 && state.shieldsOn) {
+          state.shieldsOn = false;
+          glog('energy', 'shields dropped — no energy');
+        }
       }
 
       return {
@@ -831,7 +839,8 @@ const enemy = spawnEnemy(state);
     clearPendingConquestCollection(state, state.planetIndex);
     state.planetVitalityLimit = 100;
   }
-  if (state.missilesRemaining < 2) return;
+  if (state.missilesRemaining < 2 || state.energy < 15) return;
+  state.energy = Math.max(0, state.energy - 15);
   glog('fire', `missile missiles=${state.missilesRemaining}`);
   const fwd = forwardVector(pitchRad, headingRad);
       const startPos = v3add(v3(state.x, state.y, state.z), v3scale(fwd, 100));
@@ -858,7 +867,8 @@ const enemy = spawnEnemy(state);
     clearPendingConquestCollection(state, state.planetIndex);
     state.planetVitalityLimit = 100;
   }
-  if (!state.laserOperational || state.damage.laserPct < 10) return;
+  if (!state.laserOperational || state.damage.laserPct < 10 || state.energy < 3) return;
+  state.energy = Math.max(0, state.energy - 3);
   glog('fire', `laser`);
   laserBolts.push({
         x1: 90, y1: 123, x2: 136, y2: 60,
