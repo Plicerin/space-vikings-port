@@ -502,6 +502,38 @@ const enemy = spawnEnemy(state);
         if (state.antiFighterTurrets === 3 && Math.random() < dt * 3) {
           onFighterDestroyed(i);
           fighters.splice(i, 1);
+          continue;
+        }
+
+        if (Math.random() < dt * 2) {
+          f.firing = true;
+          const spreadX = (Math.random() - 0.5) * 28;
+          const spreadY = (Math.random() - 0.5) * 16;
+          laserBolts.push({
+            x1: f.screenX, y1: f.screenY,
+            x2: 140 + spreadX, y2: 60 + spreadY,
+            age: 0.1,
+          });
+          audio.beep(1200, 30);
+
+          const dx = f.screenX - 140;
+          const dy = f.screenY - 60;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 50) {
+            state.damage.shieldsPct -= 0.5 + Math.random() * 2;
+            state.damage.shieldsPct = Math.max(0, state.damage.shieldsPct);
+            if (!state.shieldsOn || state.damage.shieldsPct <= 10) {
+              state.damage.hullPct -= Math.random() * 3;
+              state.damage.hullPct = Math.max(0, state.damage.hullPct);
+              if (state.damage.hullPct <= 0) next = 'playerDeath';
+            }
+            if (!state.damage.pendingUpdate) {
+              state.damage.pendingUpdate = true;
+            }
+            flashes.push({ timer: 0.08, type: 'hit' });
+          }
+        } else {
+          f.firing = false;
         }
       }
     }
