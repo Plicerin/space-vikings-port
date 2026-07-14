@@ -50,40 +50,6 @@ export async function orbitScene(
   return scenes.run('starshipSimulator');
 }
 
-export async function exScene(
-  ctx: SceneContext,
-  scenes: SceneManager,
-): Promise<void> {
-  const { hires, state, audio } = ctx;
-  setScene('ex');
-  glog('destroy', 'enemy ship explosion (EX)');
-  for (let frame = 0; frame < 18; frame++) {
-    hires.hgr();
-    drawBackdropStars(hires, 53 + frame * 5);
-    drawExplosionBurst(hires, 140, 60, frame, 1);
-    audio.beep(80 + frame * 8, 12);
-    await wait(30);
-  }
-  for (let frame = 0; frame < 10; frame++) {
-    hires.hgr();
-    drawBackdropStars(hires, 121 + frame * 3);
-    drawExplosionBurst(hires, 140, 60, 18 + frame, 2);
-    await wait(24);
-  }
-
-  // EX.bas:30 — POKE 38205,0 (enemy gone), POKE EN,127 (debris loaded)
-  // EX.bas:56 — F = PEEK(38207)/2: POKE 38207,F (halve enemy count)
-  state.shipKind = 0;
-  state.shipVitality = 0;
-  state.enemyShips = Math.floor(state.enemyShips / 2);
-  if (state.enemyShips === 0) {
-    state.planets[state.planetIndex].defender = 0;
-  }
-
-  // EX.bas:60 — RUN STARSHIP SIMULATOR (return to cockpit)
-  return scenes.run('starshipSimulator');
-}
-
 export async function playerDeathScene(
   ctx: SceneContext,
   scenes: SceneManager,
