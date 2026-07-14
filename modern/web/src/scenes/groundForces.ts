@@ -255,10 +255,41 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
     }
   }
 
+  function drawBattleFX(vp: number, sp: number, round: number): void {
+    hires.hcolor(3);
+    hires.line(10, 84, 270, 84);
+    hires.hcolor(1);
+    for (let i = 0; i < 20; i++) {
+      const gx = 10 + (round * 13 + i * 37) % 260;
+      const gy = 86 + (round * 7 + i * 23) % 34;
+      hires.hplot(gx, gy);
+    }
+    hires.hcolor(5);
+    for (let i = 0; i < 1 + (round % 3); i++) {
+      const ex = 20 + (round * 41 + i * 97) % 240;
+      const ey = 87 + (round * 19 + i * 53) % 30;
+      hires.line(ex - 2, ey, ex + 2, ey);
+      hires.line(ex, ey - 2, ex, ey + 2);
+    }
+    const pct = Math.min(100, Math.round((vp / Math.max(1, sp)) * 100));
+    hires.hcolor(1);
+    hires.line(60, 118, 220, 118);
+    hires.line(60, 118, 60, 123);
+    hires.line(220, 118, 220, 123);
+    const fill = Math.round((pct / 100) * 150);
+    const barColor = pct >= 80 ? 5 : pct >= 40 ? 6 : 1;
+    hires.hcolor(barColor);
+    for (let y = 119; y <= 122; y++) hires.line(61, y, 61 + fill, y);
+    hires.hcolor(3);
+    hires.text('SURRENDER', 31, 15);
+    hires.text(`${pct}%`, 32, 16);
+  }
+
   let sp = state.planetVitalityLimit;
   let vp = state.planetVitality;
 
   for (let round = 0; round < 200; round++) {
+    drawBattleFX(vp, sp, round);
     let x: number;
     const vic = Math.random() * (10 * tech);
 
