@@ -731,10 +731,28 @@ const enemy = spawnEnemy(state);
     }
 
     function renderFighters() {
+      const shapeTable = enemyTable;
+      const useSprites = shapeTable && shapeTable.shapes.length >= 2;
+
       for (const f of fighters) {
-        hires.hcolor(1);
         const fx = Math.round(f.screenX);
         const fy = Math.round(f.screenY);
+
+        if (useSprites) {
+          const shapeIdx = f.shapeIdx;
+          const spriteIndex = shapeIdx === 8 ? 1 : shapeIdx === 9 ? 2 : 1;
+          if (spriteIndex < shapeTable!.shapes.length) {
+            shapeR.rot = shapeIdx === 8 ? 0 : shapeIdx === 9 ? 12 : 52;
+            shapeR.scale = 0.55;
+            const anchorX = fx;
+            const anchorY = fy;
+            hires.hcolor(3);
+            shapeR.draw(shapeTable!, spriteIndex, anchorX, anchorY);
+            continue;
+          }
+        }
+
+        hires.hcolor(1);
         if (f.shapeIdx === 8) {
           hires.line(fx - 3, fy, fx + 3, fy);
         } else if (f.shapeIdx === 9) {
