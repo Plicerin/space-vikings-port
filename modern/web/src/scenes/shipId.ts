@@ -2,22 +2,26 @@ import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 import { getShipModelInfo } from '../engine/shipModels';
 
-const SHIP_INFO: Record<number, { name: string; lines: string[] }> = {
+const SHIP_INFO: Record<number, { name: string; threat: string; lines: string[] }> = {
   0: {
     name: 'NONE',
+    threat: 'NONE',
     lines: ['THERE IS NO', 'STARSHIP IN', 'THIS SYSTEM.'],
   },
   1: {
     name: getShipModelInfo(1)?.name ?? 'SPACE LAB',
-    lines: ['AND OBSERVATORY', 'MINIMUM WEAPONS', 'AND ARMOR.'],
+    threat: 'LOW',
+    lines: ['OBSERVATORY/LAB', 'MINIMAL WEAPONS', 'WEAK ARMOR'],
   },
   3: {
     name: getShipModelInfo(3)?.name ?? 'LIGHT CRUISER',
-    lines: ['WITH LASERS,', 'MISSILES AND', 'FIGHTER COVER.'],
+    threat: 'MODERATE',
+    lines: ['LASER ARMED', 'MISSILE BATTERIES', 'FIGHTER COVER'],
   },
   4: {
     name: getShipModelInfo(4)?.name ?? 'HEAVY CRUISER',
-    lines: ['WITH PHOTON', 'MISSILES AND', 'HEAVY LASERS.', '20-40 FIGHTERS'],
+    threat: 'HIGH',
+    lines: ['PHOTON MISSILES', 'HEAVY LASERS', '20-40 FIGHTERS'],
   },
 };
 
@@ -57,6 +61,51 @@ const SHIP_WIREFRAMES: Record<number, number[][]> = {
   ],
 };
 
+function drawWireframe(hires: import('../engine/hires').Hires, wireframes: number[][], angle: number): void {
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+
+  for (const row of wireframes) {
+    let ox = 78;
+    let oy = 38;
+    let px = 0;
+    let py = 0;
+    let i = 0;
+    let first = true;
+
+    while (i < row.length) {
+      const c = row[i];
+      if (c === 77) { ox = 78; oy += 56; first = true; i++; continue; }
+      if (c === 127) { i++; continue; }
+      const x = row[i + 1];
+      const y = row[i + 2];
+      const z = row[i + 3];
+      const rx = x * cosA + z * sinA;
+      const rz = -x * sinA + z * cosA;
+      const sx = ox - rx * 2;
+      const sy = oy - y * 2 + rz * 0.5;
+
+      if (c === 1) {
+        hires.hplot(sx, sy);
+        px = sx; py = sy;
+        first = false;
+      } else if (c === 2) {
+        if (first) { hires.hplot(sx, sy); first = false; }
+        else hires.hplotTo(sx, sy);
+        px = sx; py = sy;
+      }
+      i += 3;
+    }
+  }
+}
+
+const PLANET_NAMES = [
+  'MERCURY', 'VENUS', 'EARTH', 'MARS', 'JUPITER',
+  'SATURN', 'URANUS', 'NEPTUNE', 'PLUTO', 'ALPHA',
+  'BETA', 'GAMMA', 'DELTA', 'EPSILON', 'ZETA',
+  'ETA', 'THETA', 'IOTA', 'KAPPA', 'LAMBDA',
+];
+
 export async function shipIdScene(
   ctx: SceneContext,
   scenes: SceneManager,
@@ -66,56 +115,67 @@ export async function shipIdScene(
 
   const requestedKind = parseShipKindParam(new URLSearchParams(window.location.search).get('ship'));
   const kind = requestedKind ?? (state.planets[state.planetIndex]?.defender || 0);
-
-  hires.hgr();
-
-  hires.hcolor(1);
-  hires.line(1, 1, 161, 1);
-  hires.line(161, 1, 161, 123);
-  hires.line(161, 123, 1, 123);
-  hires.line(1, 123, 1, 1);
-
-  for (let j = 7; j <= 161; j += 5) hires.line(j, 1, j, 123);
-  for (let j = 5; j <= 123; j += 5) hires.line(1, j, 161, j);
-
-  const wireframes = SHIP_WIREFRAMES[kind];
-  if (wireframes) {
-    hires.hcolor(3);
-    let ox = 80;
-    let oy = 40;
-
-    for (const row of wireframes) {
-      let i = 0;
-      while (i < row.length) {
-        const c = row[i];
-        if (c === 77) { ox = 80; oy += 60; i++; continue; }
-        if (c === 127) { i++; continue; }
-        const x = row[i + 1];
-        const y = row[i + 2];
-        const sx = ox - x * 2;
-        const sy = oy - y * 2;
-        if (c === 1) hires.hplot(sx, sy);
-        else if (c === 2) hires.hplotTo(sx, sy);
-        i += 3;
-      }
-    }
-  }
-
   const info = SHIP_INFO[kind] || SHIP_INFO[0];
-  hires.hcolor(3);
-  hires.text('-SHIP I.D.-', 25, 1);
+  const wireframes = SHIP_WIREFRAMES[kind];
+  const planetName = PLANET_NAMES[state.planetIndex] ?? `SYSTEM ${state.planetIndex + 1}`;
 
-  let row = 4;
-  hires.text(info.name, 25, row);
-  row += 2;
-  for (const line of info.lines) {
-    hires.text(line, 25, row);
-    row += 2;
-  }
+  glog('shipId', `identified ship kind=${kind} name=${info.name} at ${planetName}`);
 
-  glog('shipId', `identified ship kind=${kind} name=${info.name}`);
+  await new Promise<void>(resolve => {
+    let lastTime = performance.now();
+    let angle = 0;
 
-  await input.waitForKey();
+    const frame = (now: number) => {
+      const dt = Math.min(now - lastTime, 50);
+      lastTime = now;
+      angle += dt * 0.0008;
+
+      hires.hgr();
+      hires.hcolor(1);
+      hires.line(1, 1, 161, 1);
+      hires.line(161, 1, 161, 123);
+      hires.line(161, 123, 1, 123);
+      hires.line(1, 123, 1, 1);
+
+      for (let j = 7; j <= 161; j += 5) hires.line(j, 1, j, 123);
+      for (let j = 5; j <= 123; j += 5) hires.line(1, j, 161, j);
+
+      if (wireframes) {
+        hires.hcolor(3);
+        drawWireframe(hires, wireframes, angle);
+      }
+
+      hires.hcolor(3);
+      hires.text('-SHIP I.D.-', 25, 1);
+
+      hires.hcolor(1);
+      hires.text(planetName, 25, 4);
+      hires.text(info.name, 25, 6);
+
+      hires.hcolor(5);
+      hires.text(`THREAT: ${info.threat}`, 25, 8);
+
+      hires.hcolor(1);
+      let row = 10;
+      for (const line of info.lines) {
+        hires.text(line, 25, row);
+        row += 2;
+      }
+
+      hires.hcolor(3);
+      hires.text('ANY KEY TO EXIT', 24, 21);
+
+      if (input.peekKey() !== 0) {
+        input.clearKey();
+        resolve();
+        return;
+      }
+      requestAnimationFrame(frame);
+    };
+
+    requestAnimationFrame(frame);
+  });
+
   return scenes.run('radar');
 }
 
