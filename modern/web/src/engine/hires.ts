@@ -271,6 +271,28 @@ export class Hires {
     }
 
     this.displayCtx.clearRect(0, 0, cw, ch);
-    this.displayCtx.drawImage(this.offscreen, 0, 0, cw, ch);
+
+    // The Apple II game content lives in the top-left 280×192 of the
+    // 560×384 offscreen buffer.  Source only that region and fill the
+    // display with correct aspect ratio (35:24).
+    const GW = 280;
+    const GH = 192;
+    const gameAspect = GW / GH;
+    const displayAspect = cw / ch;
+
+    let gw: number, gh: number, gx: number, gy: number;
+    if (displayAspect > gameAspect) {
+      gh = ch;
+      gw = Math.round(ch * gameAspect);
+      gx = Math.round((cw - gw) / 2);
+      gy = 0;
+    } else {
+      gw = cw;
+      gh = Math.round(cw / gameAspect);
+      gx = 0;
+      gy = Math.round((ch - gh) / 2);
+    }
+
+    this.displayCtx.drawImage(this.offscreen, 0, 0, GW, GH, gx, gy, gw, gh);
   }
 }
