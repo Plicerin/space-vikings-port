@@ -41,30 +41,15 @@ function boot(): void {
 
   const hires = new Hires(stage);
 
-  const stageEl = stage;
   const viewportEl = document.getElementById('viewport');
-  function fitCanvas(): void {
-    if (!viewportEl || !stageEl) return;
-    const vw = viewportEl.clientWidth;
-    const vh = viewportEl.clientHeight;
-    if (vw === 0 || vh === 0) return;
-    const ratio = 560 / 384;
-    let w: number, h: number;
-    if (vw / vh > ratio) {
-      h = vh;
-      w = h * ratio;
-    } else {
-      w = vw;
-      h = w / ratio;
-    }
-    stageEl.style.setProperty('width', Math.floor(w) + 'px', 'important');
-    stageEl.style.setProperty('height', Math.floor(h) + 'px', 'important');
-    console.log(`fitCanvas: viewport=${vw}x${vh} canvas=${Math.floor(w)}x${Math.floor(h)}`);
-  }
-  requestAnimationFrame(fitCanvas);
-  window.addEventListener('resize', () => requestAnimationFrame(fitCanvas));
+  const logSize = () => {
+    if (!viewportEl || !stage) return;
+    console.log(`viewport=${viewportEl.clientWidth}x${viewportEl.clientHeight} stage=${stage.clientWidth}x${stage.clientHeight}`);
+  };
+  requestAnimationFrame(logSize);
+  window.addEventListener('resize', () => requestAnimationFrame(logSize));
   if (viewportEl) {
-    const ro = new ResizeObserver(() => requestAnimationFrame(fitCanvas));
+    const ro = new ResizeObserver(() => requestAnimationFrame(logSize));
     ro.observe(viewportEl);
   }
   const input = new Input();
