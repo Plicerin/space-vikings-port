@@ -1,5 +1,5 @@
-const W = 280;
-const H = 192;
+const W = 560;
+const H = 384;
 
 const PALETTE: Record<number, string> = {
   0: '#000000',
@@ -228,7 +228,7 @@ export class Hires {
     for (let y = 0; y < H; y++) {
       const row = y * W;
       const scanDim = y % 2 === 0 ? 1.0 - scanAlpha : 1.0;
-      const cy = Math.abs(y - 96) / 96;
+      const cy = Math.abs(y - H / 2) / (H / 2);
       const glowDim = 1.0 + centerGlow * (1.0 - cy * cy);
 
       for (let x = 0; x < W; x++) {
