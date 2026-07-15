@@ -227,34 +227,35 @@ export class Hires {
   private dh = 0;
 
   present(): void {
-    if (!this.dirty) return;
-    this.dirty = false;
+    if (this.dirty) {
+      this.dirty = false;
 
-    const buf = this.buf;
-    const data = this.imageData.data;
-    const scanAlpha = 0.12;
-    const centerGlow = 0.06;
+      const buf = this.buf;
+      const data = this.imageData.data;
+      const scanAlpha = 0.12;
+      const centerGlow = 0.06;
 
-    for (let y = 0; y < H; y++) {
-      const row = y * W;
-      const scanDim = y % 2 === 0 ? 1.0 - scanAlpha : 1.0;
-      const cy = Math.abs(y - H / 2) / (H / 2);
-      const glowDim = 1.0 + centerGlow * (1.0 - cy * cy);
+      for (let y = 0; y < H; y++) {
+        const row = y * W;
+        const scanDim = y % 2 === 0 ? 1.0 - scanAlpha : 1.0;
+        const cy = Math.abs(y - H / 2) / (H / 2);
+        const glowDim = 1.0 + centerGlow * (1.0 - cy * cy);
 
-      for (let x = 0; x < W; x++) {
-        const argb = buf[row + x];
-        const i = (row + x) * 4;
-        const r = ((argb >> 16) & 0xff) * scanDim * glowDim;
-        const g = ((argb >> 8) & 0xff) * scanDim * glowDim;
-        const b = (argb & 0xff) * scanDim * glowDim;
-        data[i] = Math.min(255, Math.round(r));
-        data[i + 1] = Math.min(255, Math.round(g));
-        data[i + 2] = Math.min(255, Math.round(b));
-        data[i + 3] = 0xff;
+        for (let x = 0; x < W; x++) {
+          const argb = buf[row + x];
+          const i = (row + x) * 4;
+          const r = ((argb >> 16) & 0xff) * scanDim * glowDim;
+          const g = ((argb >> 8) & 0xff) * scanDim * glowDim;
+          const b = (argb & 0xff) * scanDim * glowDim;
+          data[i] = Math.min(255, Math.round(r));
+          data[i + 1] = Math.min(255, Math.round(g));
+          data[i + 2] = Math.min(255, Math.round(b));
+          data[i + 3] = 0xff;
+        }
       }
-    }
 
-    this.offCtx.putImageData(this.imageData, 0, 0);
+      this.offCtx.putImageData(this.imageData, 0, 0);
+    }
 
     const canvas = this.displayCtx.canvas;
     const rect = canvas.getBoundingClientRect();
