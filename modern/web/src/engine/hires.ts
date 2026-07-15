@@ -84,7 +84,9 @@ const TEXT_GLYPHS: Record<string, readonly number[]> = {
 };
 
 export class Hires {
-  private ctx: CanvasRenderingContext2D;
+  private displayCtx: CanvasRenderingContext2D;
+  private offscreen: HTMLCanvasElement;
+  private offCtx: CanvasRenderingContext2D;
   private colorArgb = 0xffffffff;
   private colorIndex = 3;
   penX = 0;
@@ -95,11 +97,16 @@ export class Hires {
   private dirty = true;
 
   constructor(canvas: HTMLCanvasElement) {
-    canvas.width = W;
-    canvas.height = H;
+    this.offscreen = document.createElement('canvas');
+    this.offscreen.width = W;
+    this.offscreen.height = H;
+    const offCtx = this.offscreen.getContext('2d')!;
+    offCtx.imageSmoothingEnabled = false;
+    this.offCtx = offCtx;
+
     const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
-    this.ctx = ctx;
+    this.displayCtx = ctx;
 
     this.buf = new Uint32Array(W * H);
     this.imageData = new ImageData(W, H);
@@ -216,6 +223,9 @@ export class Hires {
     this.dirty = true;
   }
 
+  private dw = 0;
+  private dh = 0;
+
   present(): void {
     if (!this.dirty) return;
     this.dirty = false;
@@ -244,6 +254,28 @@ export class Hires {
       }
     }
 
-    this.ctx.putImageData(this.imageData, 0, 0);
+    this.offCtx.putImageData(this.imageData, 0, 0);
+
+    const canvas = this.displayCtx.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const cw = Math.round(rect.width);
+    const ch = Math.round(rect.height);
+    if (cw < 1 || ch < 1) return;
+
+    if (cw !== this.dw || ch !== this.dh) {
+      canvas.width = cw;
+      canvas.height = ch;
+      this.dw = cw;
+      this.dh = ch;
+    }
+
+    const scale = Math.min(cw / W, ch / H);
+    const sw = Math.round(W * scale);
+    const sh = Math.round(H * scale);
+    const ox = Math.round((cw - sw) / 2);
+    const oy = Math.round((ch - sh) / 2);
+
+    this.displayCtx.clearRect(0, 0, cw, ch);
+    this.displayCtx.drawImage(this.offscreen, ox, oy, sw, sh);
   }
 }
