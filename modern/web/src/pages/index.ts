@@ -59,6 +59,7 @@ function boot(): void {
     }
     stageEl.style.setProperty('width', Math.floor(w) + 'px', 'important');
     stageEl.style.setProperty('height', Math.floor(h) + 'px', 'important');
+    console.log(`fitCanvas: viewport=${vw}x${vh} canvas=${Math.floor(w)}x${Math.floor(h)}`);
   }
   requestAnimationFrame(fitCanvas);
   window.addEventListener('resize', () => requestAnimationFrame(fitCanvas));
