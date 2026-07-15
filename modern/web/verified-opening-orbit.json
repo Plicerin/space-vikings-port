@@ -1,0 +1,24 @@
+{
+  "capturedAt": "2026-06-04T21:36:39.416Z",
+  "screenshotPath": "C:\\Users\\vrock\\OneDrive\\Documents\\Space Vikings Resurrected\\modern\\web\\verified-opening-orbit.png",
+  "verification": {
+    "reason": "matched opening-orbit state signature",
+    "state": {
+      "x": 700,
+      "y": 232,
+      "z": -6643,
+      "pitch": 244,
+      "bank": 3,
+      "heading": 0,
+      "speed": 120,
+      "energy": 63,
+      "shipKind": 3,
+      "atmosphere": 0,
+      "planet": 1,
+      "targetEnemy": 3,
+      "shieldFlag": 0,
+      "oldGameSentinel": 0
+    },
+    "htext": null
+  }
+}

@@ -1,0 +1,1562 @@
+[
+  {
+    "time": 3781.300000011921,
+    "wallTime": "2026-05-04T00:04:43.454Z",
+    "easternTime": "05/03/2026, 20:04:43 EDT",
+    "scene": "start",
+    "event": "start",
+    "detail": "new game"
+  },
+  {
+    "time": 3781.600000023842,
+    "wallTime": "2026-05-04T00:04:43.454Z",
+    "easternTime": "05/03/2026, 20:04:43 EDT",
+    "scene": "start",
+    "event": "start",
+    "detail": "planets surrendered: 1/20"
+  },
+  {
+    "time": 3781.800000011921,
+    "wallTime": "2026-05-04T00:04:43.455Z",
+    "easternTime": "05/03/2026, 20:04:43 EDT",
+    "scene": "instruments",
+    "event": "enter",
+    "detail": "instruments"
+  },
+  {
+    "time": 3782.900000035763,
+    "wallTime": "2026-05-04T00:04:43.456Z",
+    "easternTime": "05/03/2026, 20:04:43 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 3783.300000011921,
+    "wallTime": "2026-05-04T00:04:43.456Z",
+    "easternTime": "05/03/2026, 20:04:43 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 3783.5,
+    "wallTime": "2026-05-04T00:04:43.456Z",
+    "easternTime": "05/03/2026, 20:04:43 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(700,200,-7000) atm=false orbit=false"
+  },
+  {
+    "time": 4361.800000011921,
+    "wallTime": "2026-05-04T00:04:44.035Z",
+    "easternTime": "05/03/2026, 20:04:44 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "engaged"
+  },
+  {
+    "time": 4377.5,
+    "wallTime": "2026-05-04T00:04:44.050Z",
+    "easternTime": "05/03/2026, 20:04:44 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "plotting course to Alpha Centauri"
+  },
+  {
+    "time": 4377.700000047684,
+    "wallTime": "2026-05-04T00:04:44.050Z",
+    "easternTime": "05/03/2026, 20:04:44 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 4378.100000023842,
+    "wallTime": "2026-05-04T00:04:44.051Z",
+    "easternTime": "05/03/2026, 20:04:44 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 4378.400000035763,
+    "wallTime": "2026-05-04T00:04:44.051Z",
+    "easternTime": "05/03/2026, 20:04:44 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Alpha Centauri"
+  },
+  {
+    "time": 4991.600000023842,
+    "wallTime": "2026-05-04T00:04:44.664Z",
+    "easternTime": "05/03/2026, 20:04:44 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 4992.100000023842,
+    "wallTime": "2026-05-04T00:04:44.665Z",
+    "easternTime": "05/03/2026, 20:04:44 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Alpha Centauri dist=4.1"
+  },
+  {
+    "time": 6192.800000011921,
+    "wallTime": "2026-05-04T00:04:45.866Z",
+    "easternTime": "05/03/2026, 20:04:45 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 6193.900000035763,
+    "wallTime": "2026-05-04T00:04:45.867Z",
+    "easternTime": "05/03/2026, 20:04:45 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 6194.200000047684,
+    "wallTime": "2026-05-04T00:04:45.867Z",
+    "easternTime": "05/03/2026, 20:04:45 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(4310,297,-9215) atm=false orbit=false"
+  },
+  {
+    "time": 6210.100000023842,
+    "wallTime": "2026-05-04T00:04:45.883Z",
+    "easternTime": "05/03/2026, 20:04:45 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 6210.400000035763,
+    "wallTime": "2026-05-04T00:04:45.883Z",
+    "easternTime": "05/03/2026, 20:04:45 EDT",
+    "scene": "groundforces",
+    "event": "enter",
+    "detail": "groundforces"
+  },
+  {
+    "time": 6210.800000011921,
+    "wallTime": "2026-05-04T00:04:45.884Z",
+    "easternTime": "05/03/2026, 20:04:45 EDT",
+    "scene": "groundForces",
+    "event": "enter",
+    "detail": "groundForces"
+  },
+  {
+    "time": 6211.5,
+    "wallTime": "2026-05-04T00:04:45.884Z",
+    "easternTime": "05/03/2026, 20:04:45 EDT",
+    "scene": "groundForces",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 24799.900000035763,
+    "wallTime": "2026-05-04T00:05:04.473Z",
+    "easternTime": "05/03/2026, 20:05:04 EDT",
+    "scene": "groundForces",
+    "event": "attack",
+    "detail": "defeat - troops lost"
+  },
+  {
+    "time": 27804.80000001192,
+    "wallTime": "2026-05-04T00:05:07.478Z",
+    "easternTime": "05/03/2026, 20:05:07 EDT",
+    "scene": "com",
+    "event": "enter",
+    "detail": "com"
+  },
+  {
+    "time": 27805.400000035763,
+    "wallTime": "2026-05-04T00:05:07.478Z",
+    "easternTime": "05/03/2026, 20:05:07 EDT",
+    "scene": "com",
+    "event": "commander",
+    "detail": "service before bombardment: Sol"
+  },
+  {
+    "time": 27805.600000023842,
+    "wallTime": "2026-05-04T00:05:07.478Z",
+    "easternTime": "05/03/2026, 20:05:07 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 27805.700000047684,
+    "wallTime": "2026-05-04T00:05:07.478Z",
+    "easternTime": "05/03/2026, 20:05:07 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 27806.100000023842,
+    "wallTime": "2026-05-04T00:05:07.479Z",
+    "easternTime": "05/03/2026, 20:05:07 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Sol"
+  },
+  {
+    "time": 28420.80000001192,
+    "wallTime": "2026-05-04T00:05:08.094Z",
+    "easternTime": "05/03/2026, 20:05:08 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 28421.200000047684,
+    "wallTime": "2026-05-04T00:05:08.094Z",
+    "easternTime": "05/03/2026, 20:05:08 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Sol dist=4.1"
+  },
+  {
+    "time": 29556.80000001192,
+    "wallTime": "2026-05-04T00:05:09.230Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 29557.100000023842,
+    "wallTime": "2026-05-04T00:05:09.230Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 29557.30000001192,
+    "wallTime": "2026-05-04T00:05:09.230Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(3855,-70,8425) atm=false orbit=false"
+  },
+  {
+    "time": 29562.400000035763,
+    "wallTime": "2026-05-04T00:05:09.235Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "repair/restock at Sol credits=10000->7500"
+  },
+  {
+    "time": 29562.600000023842,
+    "wallTime": "2026-05-04T00:05:09.235Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "plotting course to Alpha Centauri"
+  },
+  {
+    "time": 29562.80000001192,
+    "wallTime": "2026-05-04T00:05:09.236Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 29562.900000035763,
+    "wallTime": "2026-05-04T00:05:09.236Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 29563.200000047684,
+    "wallTime": "2026-05-04T00:05:09.236Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Alpha Centauri"
+  },
+  {
+    "time": 30179.100000023842,
+    "wallTime": "2026-05-04T00:05:09.852Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 30179.5,
+    "wallTime": "2026-05-04T00:05:09.852Z",
+    "easternTime": "05/03/2026, 20:05:09 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Alpha Centauri dist=4.1"
+  },
+  {
+    "time": 31309.100000023842,
+    "wallTime": "2026-05-04T00:05:10.982Z",
+    "easternTime": "05/03/2026, 20:05:10 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 31309.5,
+    "wallTime": "2026-05-04T00:05:10.982Z",
+    "easternTime": "05/03/2026, 20:05:10 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 31309.700000047684,
+    "wallTime": "2026-05-04T00:05:10.982Z",
+    "easternTime": "05/03/2026, 20:05:10 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(-4258,3631,9972) atm=false orbit=false"
+  },
+  {
+    "time": 31326.5,
+    "wallTime": "2026-05-04T00:05:10.999Z",
+    "easternTime": "05/03/2026, 20:05:10 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 31326.80000001192,
+    "wallTime": "2026-05-04T00:05:11.000Z",
+    "easternTime": "05/03/2026, 20:05:11 EDT",
+    "scene": "groundforces",
+    "event": "enter",
+    "detail": "groundforces"
+  },
+  {
+    "time": 31327,
+    "wallTime": "2026-05-04T00:05:11.000Z",
+    "easternTime": "05/03/2026, 20:05:11 EDT",
+    "scene": "groundForces",
+    "event": "enter",
+    "detail": "groundForces"
+  },
+  {
+    "time": 31327.400000035763,
+    "wallTime": "2026-05-04T00:05:11.000Z",
+    "easternTime": "05/03/2026, 20:05:11 EDT",
+    "scene": "groundForces",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 49301.90000003576,
+    "wallTime": "2026-05-04T00:05:28.975Z",
+    "easternTime": "05/03/2026, 20:05:28 EDT",
+    "scene": "groundForces",
+    "event": "attack",
+    "detail": "defeat - troops lost"
+  },
+  {
+    "time": 52303.700000047684,
+    "wallTime": "2026-05-04T00:05:31.976Z",
+    "easternTime": "05/03/2026, 20:05:31 EDT",
+    "scene": "com",
+    "event": "enter",
+    "detail": "com"
+  },
+  {
+    "time": 52304,
+    "wallTime": "2026-05-04T00:05:31.977Z",
+    "easternTime": "05/03/2026, 20:05:31 EDT",
+    "scene": "com",
+    "event": "commander",
+    "detail": "service before bombardment: Sol"
+  },
+  {
+    "time": 52304.10000002384,
+    "wallTime": "2026-05-04T00:05:31.977Z",
+    "easternTime": "05/03/2026, 20:05:31 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 52304.10000002384,
+    "wallTime": "2026-05-04T00:05:31.977Z",
+    "easternTime": "05/03/2026, 20:05:31 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 52304.30000001192,
+    "wallTime": "2026-05-04T00:05:31.977Z",
+    "easternTime": "05/03/2026, 20:05:31 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Sol"
+  },
+  {
+    "time": 52905.90000003576,
+    "wallTime": "2026-05-04T00:05:32.579Z",
+    "easternTime": "05/03/2026, 20:05:32 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 52906.200000047684,
+    "wallTime": "2026-05-04T00:05:32.579Z",
+    "easternTime": "05/03/2026, 20:05:32 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Sol dist=4.1"
+  },
+  {
+    "time": 54038.30000001192,
+    "wallTime": "2026-05-04T00:05:33.711Z",
+    "easternTime": "05/03/2026, 20:05:33 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 54038.60000002384,
+    "wallTime": "2026-05-04T00:05:33.711Z",
+    "easternTime": "05/03/2026, 20:05:33 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 54038.90000003576,
+    "wallTime": "2026-05-04T00:05:33.712Z",
+    "easternTime": "05/03/2026, 20:05:33 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(42,1098,-8080) atm=false orbit=false"
+  },
+  {
+    "time": 54042.60000002384,
+    "wallTime": "2026-05-04T00:05:33.715Z",
+    "easternTime": "05/03/2026, 20:05:33 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "repair/restock at Sol credits=7500->5000"
+  },
+  {
+    "time": 54042.80000001192,
+    "wallTime": "2026-05-04T00:05:33.716Z",
+    "easternTime": "05/03/2026, 20:05:33 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "plotting course to Alpha Centauri"
+  },
+  {
+    "time": 54042.80000001192,
+    "wallTime": "2026-05-04T00:05:33.716Z",
+    "easternTime": "05/03/2026, 20:05:33 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 54043,
+    "wallTime": "2026-05-04T00:05:33.716Z",
+    "easternTime": "05/03/2026, 20:05:33 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 54043.10000002384,
+    "wallTime": "2026-05-04T00:05:33.716Z",
+    "easternTime": "05/03/2026, 20:05:33 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Alpha Centauri"
+  },
+  {
+    "time": 54644.90000003576,
+    "wallTime": "2026-05-04T00:05:34.318Z",
+    "easternTime": "05/03/2026, 20:05:34 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 54645.30000001192,
+    "wallTime": "2026-05-04T00:05:34.318Z",
+    "easternTime": "05/03/2026, 20:05:34 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Alpha Centauri dist=4.1"
+  },
+  {
+    "time": 55766.5,
+    "wallTime": "2026-05-04T00:05:35.439Z",
+    "easternTime": "05/03/2026, 20:05:35 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 55766.80000001192,
+    "wallTime": "2026-05-04T00:05:35.440Z",
+    "easternTime": "05/03/2026, 20:05:35 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 55767,
+    "wallTime": "2026-05-04T00:05:35.440Z",
+    "easternTime": "05/03/2026, 20:05:35 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(9525,3263,9489) atm=false orbit=false"
+  },
+  {
+    "time": 55775.30000001192,
+    "wallTime": "2026-05-04T00:05:35.448Z",
+    "easternTime": "05/03/2026, 20:05:35 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 55775.40000003576,
+    "wallTime": "2026-05-04T00:05:35.448Z",
+    "easternTime": "05/03/2026, 20:05:35 EDT",
+    "scene": "groundforces",
+    "event": "enter",
+    "detail": "groundforces"
+  },
+  {
+    "time": 55775.60000002384,
+    "wallTime": "2026-05-04T00:05:35.448Z",
+    "easternTime": "05/03/2026, 20:05:35 EDT",
+    "scene": "groundForces",
+    "event": "enter",
+    "detail": "groundForces"
+  },
+  {
+    "time": 55775.80000001192,
+    "wallTime": "2026-05-04T00:05:35.449Z",
+    "easternTime": "05/03/2026, 20:05:35 EDT",
+    "scene": "groundForces",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 74598.40000003576,
+    "wallTime": "2026-05-04T00:05:54.271Z",
+    "easternTime": "05/03/2026, 20:05:54 EDT",
+    "scene": "groundForces",
+    "event": "attack",
+    "detail": "defeat - troops lost"
+  },
+  {
+    "time": 77604.10000002384,
+    "wallTime": "2026-05-04T00:05:57.277Z",
+    "easternTime": "05/03/2026, 20:05:57 EDT",
+    "scene": "com",
+    "event": "enter",
+    "detail": "com"
+  },
+  {
+    "time": 77604.5,
+    "wallTime": "2026-05-04T00:05:57.277Z",
+    "easternTime": "05/03/2026, 20:05:57 EDT",
+    "scene": "com",
+    "event": "commander",
+    "detail": "service before bombardment: Sol"
+  },
+  {
+    "time": 77604.70000004768,
+    "wallTime": "2026-05-04T00:05:57.277Z",
+    "easternTime": "05/03/2026, 20:05:57 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 77604.80000001192,
+    "wallTime": "2026-05-04T00:05:57.278Z",
+    "easternTime": "05/03/2026, 20:05:57 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 77605.10000002384,
+    "wallTime": "2026-05-04T00:05:57.278Z",
+    "easternTime": "05/03/2026, 20:05:57 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Sol"
+  },
+  {
+    "time": 78254,
+    "wallTime": "2026-05-04T00:05:57.927Z",
+    "easternTime": "05/03/2026, 20:05:57 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 78254.40000003576,
+    "wallTime": "2026-05-04T00:05:57.927Z",
+    "easternTime": "05/03/2026, 20:05:57 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Sol dist=4.1"
+  },
+  {
+    "time": 79379.90000003576,
+    "wallTime": "2026-05-04T00:05:59.053Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 79380.30000001192,
+    "wallTime": "2026-05-04T00:05:59.053Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 79380.40000003576,
+    "wallTime": "2026-05-04T00:05:59.053Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(-2770,-2929,-7370) atm=false orbit=false"
+  },
+  {
+    "time": 79391.40000003576,
+    "wallTime": "2026-05-04T00:05:59.064Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "repair/restock at Sol credits=5000->2500"
+  },
+  {
+    "time": 79391.60000002384,
+    "wallTime": "2026-05-04T00:05:59.064Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "plotting course to Alpha Centauri"
+  },
+  {
+    "time": 79391.70000004768,
+    "wallTime": "2026-05-04T00:05:59.064Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 79391.80000001192,
+    "wallTime": "2026-05-04T00:05:59.065Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 79391.90000003576,
+    "wallTime": "2026-05-04T00:05:59.065Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Alpha Centauri"
+  },
+  {
+    "time": 79995.40000003576,
+    "wallTime": "2026-05-04T00:05:59.668Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 79995.80000001192,
+    "wallTime": "2026-05-04T00:05:59.669Z",
+    "easternTime": "05/03/2026, 20:05:59 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Alpha Centauri dist=4.1"
+  },
+  {
+    "time": 81128.60000002384,
+    "wallTime": "2026-05-04T00:06:00.801Z",
+    "easternTime": "05/03/2026, 20:06:00 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 81129.70000004768,
+    "wallTime": "2026-05-04T00:06:00.803Z",
+    "easternTime": "05/03/2026, 20:06:00 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 81130.10000002384,
+    "wallTime": "2026-05-04T00:06:00.803Z",
+    "easternTime": "05/03/2026, 20:06:00 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(6502,-4541,-8128) atm=false orbit=false"
+  },
+  {
+    "time": 81144.60000002384,
+    "wallTime": "2026-05-04T00:06:00.817Z",
+    "easternTime": "05/03/2026, 20:06:00 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 81145.10000002384,
+    "wallTime": "2026-05-04T00:06:00.818Z",
+    "easternTime": "05/03/2026, 20:06:00 EDT",
+    "scene": "groundforces",
+    "event": "enter",
+    "detail": "groundforces"
+  },
+  {
+    "time": 81145.30000001192,
+    "wallTime": "2026-05-04T00:06:00.818Z",
+    "easternTime": "05/03/2026, 20:06:00 EDT",
+    "scene": "groundForces",
+    "event": "enter",
+    "detail": "groundForces"
+  },
+  {
+    "time": 81145.60000002384,
+    "wallTime": "2026-05-04T00:06:00.818Z",
+    "easternTime": "05/03/2026, 20:06:00 EDT",
+    "scene": "groundForces",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 98564.40000003576,
+    "wallTime": "2026-05-04T00:06:18.237Z",
+    "easternTime": "05/03/2026, 20:06:18 EDT",
+    "scene": "groundForces",
+    "event": "attack",
+    "detail": "defeat - troops lost"
+  },
+  {
+    "time": 101568,
+    "wallTime": "2026-05-04T00:06:21.241Z",
+    "easternTime": "05/03/2026, 20:06:21 EDT",
+    "scene": "com",
+    "event": "enter",
+    "detail": "com"
+  },
+  {
+    "time": 101568.30000001192,
+    "wallTime": "2026-05-04T00:06:21.241Z",
+    "easternTime": "05/03/2026, 20:06:21 EDT",
+    "scene": "com",
+    "event": "commander",
+    "detail": "service before bombardment: Sol"
+  },
+  {
+    "time": 101568.5,
+    "wallTime": "2026-05-04T00:06:21.241Z",
+    "easternTime": "05/03/2026, 20:06:21 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 101568.60000002384,
+    "wallTime": "2026-05-04T00:06:21.241Z",
+    "easternTime": "05/03/2026, 20:06:21 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 101568.70000004768,
+    "wallTime": "2026-05-04T00:06:21.242Z",
+    "easternTime": "05/03/2026, 20:06:21 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Sol"
+  },
+  {
+    "time": 102173.70000004768,
+    "wallTime": "2026-05-04T00:06:21.846Z",
+    "easternTime": "05/03/2026, 20:06:21 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 102174,
+    "wallTime": "2026-05-04T00:06:21.847Z",
+    "easternTime": "05/03/2026, 20:06:21 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Sol dist=4.1"
+  },
+  {
+    "time": 103294.10000002384,
+    "wallTime": "2026-05-04T00:06:22.967Z",
+    "easternTime": "05/03/2026, 20:06:22 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 103294.40000003576,
+    "wallTime": "2026-05-04T00:06:22.967Z",
+    "easternTime": "05/03/2026, 20:06:22 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 103294.70000004768,
+    "wallTime": "2026-05-04T00:06:22.967Z",
+    "easternTime": "05/03/2026, 20:06:22 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(177,-3853,-9220) atm=false orbit=false"
+  },
+  {
+    "time": 103306.40000003576,
+    "wallTime": "2026-05-04T00:06:22.979Z",
+    "easternTime": "05/03/2026, 20:06:22 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "repair/restock at Sol credits=2500->0"
+  },
+  {
+    "time": 103306.5,
+    "wallTime": "2026-05-04T00:06:22.979Z",
+    "easternTime": "05/03/2026, 20:06:22 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "plotting course to Alpha Centauri"
+  },
+  {
+    "time": 103306.60000002384,
+    "wallTime": "2026-05-04T00:06:22.979Z",
+    "easternTime": "05/03/2026, 20:06:22 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 103306.70000004768,
+    "wallTime": "2026-05-04T00:06:22.979Z",
+    "easternTime": "05/03/2026, 20:06:22 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 103306.80000001192,
+    "wallTime": "2026-05-04T00:06:22.980Z",
+    "easternTime": "05/03/2026, 20:06:22 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Alpha Centauri"
+  },
+  {
+    "time": 103910.10000002384,
+    "wallTime": "2026-05-04T00:06:23.583Z",
+    "easternTime": "05/03/2026, 20:06:23 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 103910.5,
+    "wallTime": "2026-05-04T00:06:23.583Z",
+    "easternTime": "05/03/2026, 20:06:23 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Alpha Centauri dist=4.1"
+  },
+  {
+    "time": 105035.80000001192,
+    "wallTime": "2026-05-04T00:06:24.709Z",
+    "easternTime": "05/03/2026, 20:06:24 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 105036.20000004768,
+    "wallTime": "2026-05-04T00:06:24.709Z",
+    "easternTime": "05/03/2026, 20:06:24 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 105036.40000003576,
+    "wallTime": "2026-05-04T00:06:24.709Z",
+    "easternTime": "05/03/2026, 20:06:24 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(815,2518,-8814) atm=false orbit=false"
+  },
+  {
+    "time": 105043.20000004768,
+    "wallTime": "2026-05-04T00:06:24.716Z",
+    "easternTime": "05/03/2026, 20:06:24 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 105043.5,
+    "wallTime": "2026-05-04T00:06:24.716Z",
+    "easternTime": "05/03/2026, 20:06:24 EDT",
+    "scene": "groundforces",
+    "event": "enter",
+    "detail": "groundforces"
+  },
+  {
+    "time": 105043.60000002384,
+    "wallTime": "2026-05-04T00:06:24.716Z",
+    "easternTime": "05/03/2026, 20:06:24 EDT",
+    "scene": "groundForces",
+    "event": "enter",
+    "detail": "groundForces"
+  },
+  {
+    "time": 105043.80000001192,
+    "wallTime": "2026-05-04T00:06:24.717Z",
+    "easternTime": "05/03/2026, 20:06:24 EDT",
+    "scene": "groundForces",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 124357.10000002384,
+    "wallTime": "2026-05-04T00:06:44.030Z",
+    "easternTime": "05/03/2026, 20:06:44 EDT",
+    "scene": "groundForces",
+    "event": "attack",
+    "detail": "defeat - troops lost"
+  },
+  {
+    "time": 127361.20000004768,
+    "wallTime": "2026-05-04T00:06:47.034Z",
+    "easternTime": "05/03/2026, 20:06:47 EDT",
+    "scene": "com",
+    "event": "enter",
+    "detail": "com"
+  },
+  {
+    "time": 127361.5,
+    "wallTime": "2026-05-04T00:06:47.034Z",
+    "easternTime": "05/03/2026, 20:06:47 EDT",
+    "scene": "com",
+    "event": "commander",
+    "detail": "service before bombardment: Sol"
+  },
+  {
+    "time": 127361.60000002384,
+    "wallTime": "2026-05-04T00:06:47.034Z",
+    "easternTime": "05/03/2026, 20:06:47 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 127361.80000001192,
+    "wallTime": "2026-05-04T00:06:47.035Z",
+    "easternTime": "05/03/2026, 20:06:47 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 127362.30000001192,
+    "wallTime": "2026-05-04T00:06:47.035Z",
+    "easternTime": "05/03/2026, 20:06:47 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Sol"
+  },
+  {
+    "time": 127971.90000003576,
+    "wallTime": "2026-05-04T00:06:47.645Z",
+    "easternTime": "05/03/2026, 20:06:47 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 127972.30000001192,
+    "wallTime": "2026-05-04T00:06:47.645Z",
+    "easternTime": "05/03/2026, 20:06:47 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Sol dist=4.1"
+  },
+  {
+    "time": 129098.10000002384,
+    "wallTime": "2026-05-04T00:06:48.771Z",
+    "easternTime": "05/03/2026, 20:06:48 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 129098.5,
+    "wallTime": "2026-05-04T00:06:48.771Z",
+    "easternTime": "05/03/2026, 20:06:48 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 129098.70000004768,
+    "wallTime": "2026-05-04T00:06:48.771Z",
+    "easternTime": "05/03/2026, 20:06:48 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(-2119,1472,-8708) atm=false orbit=false"
+  },
+  {
+    "time": 129106.40000003576,
+    "wallTime": "2026-05-04T00:06:48.779Z",
+    "easternTime": "05/03/2026, 20:06:48 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "repair/restock at Sol credits=0->0"
+  },
+  {
+    "time": 129106.70000004768,
+    "wallTime": "2026-05-04T00:06:48.779Z",
+    "easternTime": "05/03/2026, 20:06:48 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "plotting course to Alpha Centauri"
+  },
+  {
+    "time": 129106.80000001192,
+    "wallTime": "2026-05-04T00:06:48.780Z",
+    "easternTime": "05/03/2026, 20:06:48 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 129107,
+    "wallTime": "2026-05-04T00:06:48.780Z",
+    "easternTime": "05/03/2026, 20:06:48 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 129107.30000001192,
+    "wallTime": "2026-05-04T00:06:48.780Z",
+    "easternTime": "05/03/2026, 20:06:48 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Alpha Centauri"
+  },
+  {
+    "time": 129719,
+    "wallTime": "2026-05-04T00:06:49.392Z",
+    "easternTime": "05/03/2026, 20:06:49 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 129719.30000001192,
+    "wallTime": "2026-05-04T00:06:49.392Z",
+    "easternTime": "05/03/2026, 20:06:49 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Alpha Centauri dist=4.1"
+  },
+  {
+    "time": 130853.5,
+    "wallTime": "2026-05-04T00:06:50.526Z",
+    "easternTime": "05/03/2026, 20:06:50 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 130854,
+    "wallTime": "2026-05-04T00:06:50.527Z",
+    "easternTime": "05/03/2026, 20:06:50 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 130854.90000003576,
+    "wallTime": "2026-05-04T00:06:50.528Z",
+    "easternTime": "05/03/2026, 20:06:50 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(1287,-3595,-7511) atm=false orbit=false"
+  },
+  {
+    "time": 130873.30000001192,
+    "wallTime": "2026-05-04T00:06:50.546Z",
+    "easternTime": "05/03/2026, 20:06:50 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 130873.5,
+    "wallTime": "2026-05-04T00:06:50.546Z",
+    "easternTime": "05/03/2026, 20:06:50 EDT",
+    "scene": "groundforces",
+    "event": "enter",
+    "detail": "groundforces"
+  },
+  {
+    "time": 130873.70000004768,
+    "wallTime": "2026-05-04T00:06:50.546Z",
+    "easternTime": "05/03/2026, 20:06:50 EDT",
+    "scene": "groundForces",
+    "event": "enter",
+    "detail": "groundForces"
+  },
+  {
+    "time": 130874,
+    "wallTime": "2026-05-04T00:06:50.547Z",
+    "easternTime": "05/03/2026, 20:06:50 EDT",
+    "scene": "groundForces",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 149771.10000002384,
+    "wallTime": "2026-05-04T00:07:09.444Z",
+    "easternTime": "05/03/2026, 20:07:09 EDT",
+    "scene": "groundForces",
+    "event": "attack",
+    "detail": "defeat - troops lost"
+  },
+  {
+    "time": 152782.90000003576,
+    "wallTime": "2026-05-04T00:07:12.456Z",
+    "easternTime": "05/03/2026, 20:07:12 EDT",
+    "scene": "com",
+    "event": "enter",
+    "detail": "com"
+  },
+  {
+    "time": 152783.60000002384,
+    "wallTime": "2026-05-04T00:07:12.456Z",
+    "easternTime": "05/03/2026, 20:07:12 EDT",
+    "scene": "com",
+    "event": "commander",
+    "detail": "service before bombardment: Sol"
+  },
+  {
+    "time": 152783.90000003576,
+    "wallTime": "2026-05-04T00:07:12.457Z",
+    "easternTime": "05/03/2026, 20:07:12 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 152784,
+    "wallTime": "2026-05-04T00:07:12.457Z",
+    "easternTime": "05/03/2026, 20:07:12 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 152785.30000001192,
+    "wallTime": "2026-05-04T00:07:12.458Z",
+    "easternTime": "05/03/2026, 20:07:12 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Sol"
+  },
+  {
+    "time": 153399.40000003576,
+    "wallTime": "2026-05-04T00:07:13.072Z",
+    "easternTime": "05/03/2026, 20:07:13 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 153399.90000003576,
+    "wallTime": "2026-05-04T00:07:13.073Z",
+    "easternTime": "05/03/2026, 20:07:13 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Sol dist=4.1"
+  },
+  {
+    "time": 154532.10000002384,
+    "wallTime": "2026-05-04T00:07:14.205Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 154532.90000003576,
+    "wallTime": "2026-05-04T00:07:14.206Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 154533.40000003576,
+    "wallTime": "2026-05-04T00:07:14.206Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(-2631,1119,7293) atm=false orbit=false"
+  },
+  {
+    "time": 154544.40000003576,
+    "wallTime": "2026-05-04T00:07:14.217Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "repair/restock at Sol credits=0->0"
+  },
+  {
+    "time": 154544.60000002384,
+    "wallTime": "2026-05-04T00:07:14.217Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "plotting course to Alpha Centauri"
+  },
+  {
+    "time": 154544.80000001192,
+    "wallTime": "2026-05-04T00:07:14.218Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 154545,
+    "wallTime": "2026-05-04T00:07:14.218Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 154545.20000004768,
+    "wallTime": "2026-05-04T00:07:14.218Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Alpha Centauri"
+  },
+  {
+    "time": 155151,
+    "wallTime": "2026-05-04T00:07:14.824Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 155152.70000004768,
+    "wallTime": "2026-05-04T00:07:14.825Z",
+    "easternTime": "05/03/2026, 20:07:14 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Alpha Centauri dist=4.1"
+  },
+  {
+    "time": 156288,
+    "wallTime": "2026-05-04T00:07:15.961Z",
+    "easternTime": "05/03/2026, 20:07:15 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 156288.5,
+    "wallTime": "2026-05-04T00:07:15.961Z",
+    "easternTime": "05/03/2026, 20:07:15 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 156288.70000004768,
+    "wallTime": "2026-05-04T00:07:15.961Z",
+    "easternTime": "05/03/2026, 20:07:15 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(3046,3641,8842) atm=false orbit=false"
+  },
+  {
+    "time": 156305.80000001192,
+    "wallTime": "2026-05-04T00:07:15.979Z",
+    "easternTime": "05/03/2026, 20:07:15 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 156306,
+    "wallTime": "2026-05-04T00:07:15.979Z",
+    "easternTime": "05/03/2026, 20:07:15 EDT",
+    "scene": "groundforces",
+    "event": "enter",
+    "detail": "groundforces"
+  },
+  {
+    "time": 156306.20000004768,
+    "wallTime": "2026-05-04T00:07:15.979Z",
+    "easternTime": "05/03/2026, 20:07:15 EDT",
+    "scene": "groundForces",
+    "event": "enter",
+    "detail": "groundForces"
+  },
+  {
+    "time": 156306.60000002384,
+    "wallTime": "2026-05-04T00:07:15.979Z",
+    "easternTime": "05/03/2026, 20:07:15 EDT",
+    "scene": "groundForces",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 176313.40000003576,
+    "wallTime": "2026-05-04T00:07:35.986Z",
+    "easternTime": "05/03/2026, 20:07:35 EDT",
+    "scene": "groundForces",
+    "event": "attack",
+    "detail": "defeat - troops lost"
+  },
+  {
+    "time": 179326.80000001192,
+    "wallTime": "2026-05-04T00:07:39.000Z",
+    "easternTime": "05/03/2026, 20:07:39 EDT",
+    "scene": "com",
+    "event": "enter",
+    "detail": "com"
+  },
+  {
+    "time": 179327.20000004768,
+    "wallTime": "2026-05-04T00:07:39.000Z",
+    "easternTime": "05/03/2026, 20:07:39 EDT",
+    "scene": "com",
+    "event": "commander",
+    "detail": "service before bombardment: Sol"
+  },
+  {
+    "time": 179327.40000003576,
+    "wallTime": "2026-05-04T00:07:39.000Z",
+    "easternTime": "05/03/2026, 20:07:39 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 179327.5,
+    "wallTime": "2026-05-04T00:07:39.000Z",
+    "easternTime": "05/03/2026, 20:07:39 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 179327.80000001192,
+    "wallTime": "2026-05-04T00:07:39.001Z",
+    "easternTime": "05/03/2026, 20:07:39 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Sol"
+  },
+  {
+    "time": 179938.70000004768,
+    "wallTime": "2026-05-04T00:07:39.611Z",
+    "easternTime": "05/03/2026, 20:07:39 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 179939.30000001192,
+    "wallTime": "2026-05-04T00:07:39.612Z",
+    "easternTime": "05/03/2026, 20:07:39 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Sol dist=4.1"
+  },
+  {
+    "time": 181067.30000001192,
+    "wallTime": "2026-05-04T00:07:40.740Z",
+    "easternTime": "05/03/2026, 20:07:40 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 181067.70000004768,
+    "wallTime": "2026-05-04T00:07:40.740Z",
+    "easternTime": "05/03/2026, 20:07:40 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 181067.80000001192,
+    "wallTime": "2026-05-04T00:07:40.741Z",
+    "easternTime": "05/03/2026, 20:07:40 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(-9679,-2162,8295) atm=false orbit=false"
+  },
+  {
+    "time": 181087,
+    "wallTime": "2026-05-04T00:07:40.760Z",
+    "easternTime": "05/03/2026, 20:07:40 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "repair/restock at Sol credits=0->0"
+  },
+  {
+    "time": 181087.30000001192,
+    "wallTime": "2026-05-04T00:07:40.760Z",
+    "easternTime": "05/03/2026, 20:07:40 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "plotting course to Alpha Centauri"
+  },
+  {
+    "time": 181087.5,
+    "wallTime": "2026-05-04T00:07:40.760Z",
+    "easternTime": "05/03/2026, 20:07:40 EDT",
+    "scene": "galaxymap",
+    "event": "enter",
+    "detail": "galaxymap"
+  },
+  {
+    "time": 181087.60000002384,
+    "wallTime": "2026-05-04T00:07:40.760Z",
+    "easternTime": "05/03/2026, 20:07:40 EDT",
+    "scene": "galaxyMap",
+    "event": "enter",
+    "detail": "galaxyMap"
+  },
+  {
+    "time": 181087.80000001192,
+    "wallTime": "2026-05-04T00:07:40.761Z",
+    "easternTime": "05/03/2026, 20:07:40 EDT",
+    "scene": "galaxyMap",
+    "event": "commander",
+    "detail": "galaxy map target Alpha Centauri"
+  },
+  {
+    "time": 181694.5,
+    "wallTime": "2026-05-04T00:07:41.367Z",
+    "easternTime": "05/03/2026, 20:07:41 EDT",
+    "scene": "hyperdrive",
+    "event": "enter",
+    "detail": "hyperdrive"
+  },
+  {
+    "time": 181694.90000003576,
+    "wallTime": "2026-05-04T00:07:41.368Z",
+    "easternTime": "05/03/2026, 20:07:41 EDT",
+    "scene": "hyperdrive",
+    "event": "hyperdrive",
+    "detail": "jumping to Alpha Centauri dist=4.1"
+  },
+  {
+    "time": 182827.20000004768,
+    "wallTime": "2026-05-04T00:07:42.501Z",
+    "easternTime": "05/03/2026, 20:07:42 EDT",
+    "scene": "starshipsimulator",
+    "event": "enter",
+    "detail": "starshipsimulator"
+  },
+  {
+    "time": 182828.5,
+    "wallTime": "2026-05-04T00:07:42.501Z",
+    "easternTime": "05/03/2026, 20:07:42 EDT",
+    "scene": "cockpit",
+    "event": "enter",
+    "detail": "cockpit"
+  },
+  {
+    "time": 182828.60000002384,
+    "wallTime": "2026-05-04T00:07:42.501Z",
+    "easternTime": "05/03/2026, 20:07:42 EDT",
+    "scene": "cockpit",
+    "event": "init",
+    "detail": "pos=(6221,-764,8371) atm=false orbit=false"
+  },
+  {
+    "time": 182848.20000004768,
+    "wallTime": "2026-05-04T00:07:42.521Z",
+    "easternTime": "05/03/2026, 20:07:42 EDT",
+    "scene": "cockpit",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  },
+  {
+    "time": 182848.40000003576,
+    "wallTime": "2026-05-04T00:07:42.521Z",
+    "easternTime": "05/03/2026, 20:07:42 EDT",
+    "scene": "groundforces",
+    "event": "enter",
+    "detail": "groundforces"
+  },
+  {
+    "time": 182849.90000003576,
+    "wallTime": "2026-05-04T00:07:42.523Z",
+    "easternTime": "05/03/2026, 20:07:42 EDT",
+    "scene": "groundForces",
+    "event": "enter",
+    "detail": "groundForces"
+  },
+  {
+    "time": 182850.10000002384,
+    "wallTime": "2026-05-04T00:07:42.523Z",
+    "easternTime": "05/03/2026, 20:07:42 EDT",
+    "scene": "groundForces",
+    "event": "commander",
+    "detail": "assault Alpha Centauri"
+  }
+]

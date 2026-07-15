@@ -1,0 +1,142 @@
+[
+    {
+        "planet":  0,
+        "tech":  3,
+        "base":  2,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  1,
+        "tech":  3,
+        "base":  1,
+        "conquered":  100,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  2,
+        "tech":  3,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  3,
+        "tech":  3,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  4,
+        "tech":  0,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  0
+    },
+    {
+        "planet":  5,
+        "tech":  2,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  6,
+        "tech":  1,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  1
+    },
+    {
+        "planet":  7,
+        "tech":  4,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  4
+    },
+    {
+        "planet":  8,
+        "tech":  2,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  9,
+        "tech":  3,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  10,
+        "tech":  4,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  4
+    },
+    {
+        "planet":  11,
+        "tech":  0,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  0
+    },
+    {
+        "planet":  12,
+        "tech":  1,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  1
+    },
+    {
+        "planet":  13,
+        "tech":  4,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  4
+    },
+    {
+        "planet":  14,
+        "tech":  2,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  15,
+        "tech":  0,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  0
+    },
+    {
+        "planet":  16,
+        "tech":  3,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  17,
+        "tech":  3,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  18,
+        "tech":  3,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  3
+    },
+    {
+        "planet":  19,
+        "tech":  1,
+        "base":  0,
+        "conquered":  0,
+        "inferredDefender":  1
+    }
+]

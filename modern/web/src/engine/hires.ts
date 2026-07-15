@@ -269,13 +269,7 @@ export class Hires {
       this.dh = ch;
     }
 
-    const scale = Math.min(cw / W, ch / H);
-    const sw = Math.round(W * scale);
-    const sh = Math.round(H * scale);
-    const ox = Math.round((cw - sw) / 2);
-    const oy = Math.round((ch - sh) / 2);
-
     this.displayCtx.clearRect(0, 0, cw, ch);
-    this.displayCtx.drawImage(this.offscreen, ox, oy, sw, sh);
+    this.displayCtx.drawImage(this.offscreen, 0, 0, cw, ch);
   }
 }

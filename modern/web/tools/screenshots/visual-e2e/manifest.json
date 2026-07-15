@@ -1,0 +1,372 @@
+[
+  {
+    "title": "Cockpit flight with forward wireframe ship",
+    "url": "http://127.0.0.1:5180/?scene=starshipSimulator",
+    "path": "tools/screenshots/visual-e2e/01-cockpit-flight-wireframe.png",
+    "logTail": [
+      {
+        "time": 456.30000001192093,
+        "wallTime": "2026-06-09T05:05:11.567Z",
+        "easternTime": "06/09/2026, 01:05:11 EDT",
+        "scene": "starshipsimulator",
+        "event": "enter",
+        "detail": "starshipsimulator"
+      },
+      {
+        "time": 489.5,
+        "wallTime": "2026-06-09T05:05:11.600Z",
+        "easternTime": "06/09/2026, 01:05:11 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 489.60000002384186,
+        "wallTime": "2026-06-09T05:05:11.601Z",
+        "easternTime": "06/09/2026, 01:05:11 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(0,0,0) atm=false orbit=false"
+      }
+    ]
+  },
+  {
+    "title": "Cockpit hostile encounter with enemy ship and fighters",
+    "url": "http://127.0.0.1:5180/?scene=starshipSimulator&debug=hostile",
+    "path": "tools/screenshots/visual-e2e/02-cockpit-hostile-fighters.png",
+    "logTail": [
+      {
+        "time": 456.30000001192093,
+        "wallTime": "2026-06-09T05:05:11.567Z",
+        "easternTime": "06/09/2026, 01:05:11 EDT",
+        "scene": "starshipsimulator",
+        "event": "enter",
+        "detail": "starshipsimulator"
+      },
+      {
+        "time": 489.5,
+        "wallTime": "2026-06-09T05:05:11.600Z",
+        "easternTime": "06/09/2026, 01:05:11 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 489.60000002384186,
+        "wallTime": "2026-06-09T05:05:11.601Z",
+        "easternTime": "06/09/2026, 01:05:11 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(0,0,0) atm=false orbit=false"
+      },
+      {
+        "time": 65.5,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "starshipsimulator",
+        "event": "enter",
+        "detail": "starshipsimulator"
+      },
+      {
+        "time": 65.80000001192093,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 66,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(0,0,0) atm=false orbit=false"
+      }
+    ]
+  },
+  {
+    "title": "Planet approach / atmospheric bombardment view",
+    "url": "http://127.0.0.1:5180/?scene=starshipSimulator&debug=bombardment",
+    "path": "tools/screenshots/visual-e2e/03-planet-approach-bombardment.png",
+    "logTail": [
+      {
+        "time": 489.5,
+        "wallTime": "2026-06-09T05:05:11.600Z",
+        "easternTime": "06/09/2026, 01:05:11 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 489.60000002384186,
+        "wallTime": "2026-06-09T05:05:11.601Z",
+        "easternTime": "06/09/2026, 01:05:11 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(0,0,0) atm=false orbit=false"
+      },
+      {
+        "time": 65.5,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "starshipsimulator",
+        "event": "enter",
+        "detail": "starshipsimulator"
+      },
+      {
+        "time": 65.80000001192093,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 66,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(0,0,0) atm=false orbit=false"
+      },
+      {
+        "time": 53.89999997615814,
+        "wallTime": "2026-06-09T05:05:15.623Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "starshipsimulator",
+        "event": "enter",
+        "detail": "starshipsimulator"
+      },
+      {
+        "time": 54.09999996423721,
+        "wallTime": "2026-06-09T05:05:15.624Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 54.19999998807907,
+        "wallTime": "2026-06-09T05:05:15.624Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(1200,160,-600) atm=true orbit=false"
+      }
+    ]
+  },
+  {
+    "title": "Radar screen",
+    "url": "http://127.0.0.1:5180/?scene=radar",
+    "path": "tools/screenshots/visual-e2e/04-radar-screen.png",
+    "logTail": [
+      {
+        "time": 489.60000002384186,
+        "wallTime": "2026-06-09T05:05:11.601Z",
+        "easternTime": "06/09/2026, 01:05:11 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(0,0,0) atm=false orbit=false"
+      },
+      {
+        "time": 65.5,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "starshipsimulator",
+        "event": "enter",
+        "detail": "starshipsimulator"
+      },
+      {
+        "time": 65.80000001192093,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 66,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(0,0,0) atm=false orbit=false"
+      },
+      {
+        "time": 53.89999997615814,
+        "wallTime": "2026-06-09T05:05:15.623Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "starshipsimulator",
+        "event": "enter",
+        "detail": "starshipsimulator"
+      },
+      {
+        "time": 54.09999996423721,
+        "wallTime": "2026-06-09T05:05:15.624Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 54.19999998807907,
+        "wallTime": "2026-06-09T05:05:15.624Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(1200,160,-600) atm=true orbit=false"
+      },
+      {
+        "time": 58.90000003576279,
+        "wallTime": "2026-06-09T05:05:17.279Z",
+        "easternTime": "06/09/2026, 01:05:17 EDT",
+        "scene": "radar",
+        "event": "enter",
+        "detail": "radar"
+      }
+    ]
+  },
+  {
+    "title": "Galaxy map",
+    "url": "http://127.0.0.1:5180/?scene=galaxyMap",
+    "path": "tools/screenshots/visual-e2e/05-galaxy-map.png",
+    "logTail": [
+      {
+        "time": 65.80000001192093,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 66,
+        "wallTime": "2026-06-09T05:05:13.452Z",
+        "easternTime": "06/09/2026, 01:05:13 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(0,0,0) atm=false orbit=false"
+      },
+      {
+        "time": 53.89999997615814,
+        "wallTime": "2026-06-09T05:05:15.623Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "starshipsimulator",
+        "event": "enter",
+        "detail": "starshipsimulator"
+      },
+      {
+        "time": 54.09999996423721,
+        "wallTime": "2026-06-09T05:05:15.624Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 54.19999998807907,
+        "wallTime": "2026-06-09T05:05:15.624Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(1200,160,-600) atm=true orbit=false"
+      },
+      {
+        "time": 58.90000003576279,
+        "wallTime": "2026-06-09T05:05:17.279Z",
+        "easternTime": "06/09/2026, 01:05:17 EDT",
+        "scene": "radar",
+        "event": "enter",
+        "detail": "radar"
+      },
+      {
+        "time": 52.59999996423721,
+        "wallTime": "2026-06-09T05:05:18.465Z",
+        "easternTime": "06/09/2026, 01:05:18 EDT",
+        "scene": "galaxymap",
+        "event": "enter",
+        "detail": "galaxymap"
+      },
+      {
+        "time": 53.39999997615814,
+        "wallTime": "2026-06-09T05:05:18.465Z",
+        "easternTime": "06/09/2026, 01:05:18 EDT",
+        "scene": "galaxyMap",
+        "event": "enter",
+        "detail": "galaxyMap"
+      }
+    ]
+  },
+  {
+    "title": "Ground forces menu",
+    "url": "http://127.0.0.1:5180/?scene=groundForces",
+    "path": "tools/screenshots/visual-e2e/06-ground-forces-menu.png",
+    "logTail": [
+      {
+        "time": 53.89999997615814,
+        "wallTime": "2026-06-09T05:05:15.623Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "starshipsimulator",
+        "event": "enter",
+        "detail": "starshipsimulator"
+      },
+      {
+        "time": 54.09999996423721,
+        "wallTime": "2026-06-09T05:05:15.624Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "cockpit",
+        "event": "enter",
+        "detail": "cockpit"
+      },
+      {
+        "time": 54.19999998807907,
+        "wallTime": "2026-06-09T05:05:15.624Z",
+        "easternTime": "06/09/2026, 01:05:15 EDT",
+        "scene": "cockpit",
+        "event": "init",
+        "detail": "pos=(1200,160,-600) atm=true orbit=false"
+      },
+      {
+        "time": 58.90000003576279,
+        "wallTime": "2026-06-09T05:05:17.279Z",
+        "easternTime": "06/09/2026, 01:05:17 EDT",
+        "scene": "radar",
+        "event": "enter",
+        "detail": "radar"
+      },
+      {
+        "time": 52.59999996423721,
+        "wallTime": "2026-06-09T05:05:18.465Z",
+        "easternTime": "06/09/2026, 01:05:18 EDT",
+        "scene": "galaxymap",
+        "event": "enter",
+        "detail": "galaxymap"
+      },
+      {
+        "time": 53.39999997615814,
+        "wallTime": "2026-06-09T05:05:18.465Z",
+        "easternTime": "06/09/2026, 01:05:18 EDT",
+        "scene": "galaxyMap",
+        "event": "enter",
+        "detail": "galaxyMap"
+      },
+      {
+        "time": 49.90000003576279,
+        "wallTime": "2026-06-09T05:05:19.677Z",
+        "easternTime": "06/09/2026, 01:05:19 EDT",
+        "scene": "groundforces",
+        "event": "enter",
+        "detail": "groundforces"
+      },
+      {
+        "time": 50.60000002384186,
+        "wallTime": "2026-06-09T05:05:19.678Z",
+        "easternTime": "06/09/2026, 01:05:19 EDT",
+        "scene": "groundForces",
+        "event": "enter",
+        "detail": "groundForces"
+      }
+    ]
+  }
+]

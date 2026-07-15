@@ -1,0 +1,84 @@
+{
+  "capturedAt": "2026-06-04T21:43:45.689Z",
+  "screenshotPath": "C:\\Users\\vrock\\OneDrive\\Documents\\Space Vikings Resurrected\\modern\\web\\paused-opening-scene.png",
+  "state": {
+    "x": 700,
+    "y": 210,
+    "z": -6761,
+    "pitch": 248,
+    "bank": 6,
+    "heading": 255,
+    "speed": 120,
+    "energy": 63,
+    "shipKind": 3,
+    "atmosphere": 0,
+    "planet": 1,
+    "targetEnemy": 3,
+    "shieldFlag": 0,
+    "oldGameSentinel": 0
+  },
+  "memory": {
+    "planetVitalityLimit": {
+      "addr": 38150,
+      "value": 0
+    },
+    "shipVitality": {
+      "addr": 38152,
+      "value": 0
+    },
+    "planetVitality": {
+      "addr": 38160,
+      "value": 1
+    },
+    "shipDestructionLimit": {
+      "addr": 38204,
+      "value": 150
+    },
+    "shipKind": {
+      "addr": 38205,
+      "value": 3
+    },
+    "enemyShips": {
+      "addr": 38207,
+      "value": 30
+    },
+    "planetSurrendered": {
+      "addr": 38208,
+      "value": 1
+    },
+    "planetIndex": {
+      "addr": 38209,
+      "value": 1
+    },
+    "atmosphere": {
+      "addr": 38210,
+      "value": 0
+    },
+    "savedGameSentinel": {
+      "addr": 38391,
+      "value": 0
+    }
+  },
+  "planetState": {
+    "conquered": {
+      "addr": 38220,
+      "value": 100
+    },
+    "known": {
+      "addr": 38241,
+      "value": 1
+    },
+    "populationScale": {
+      "addr": 38262,
+      "value": 125
+    },
+    "tech": {
+      "addr": 38283,
+      "value": 3
+    },
+    "base": {
+      "addr": 38304,
+      "value": 1
+    }
+  }
+}
