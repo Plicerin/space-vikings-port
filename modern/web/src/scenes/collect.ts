@@ -13,12 +13,55 @@ function cap255(v: number): number {
   return Math.min(255, Math.round(v));
 }
 
+function saveSnapshot(state: import('../engine/gameState').GameState): import('../engine/gameState').GameState['loot'] {
+  return { ...state.loot };
+}
+
+function showDeltas(hires: import('../engine/hires').Hires, before: import('../engine/gameState').GameState['loot'], after: import('../engine/gameState').GameState['loot']): number {
+  const items: [string, number, number][] = [
+    ['PLATINUM', after.platinum - before.platinum, 10],
+    ['GOLD', after.gold - before.gold, 10],
+    ['SILVER', after.silver - before.silver, 20],
+    ['TITANIUM', after.titaniumKlb - before.titaniumKlb, 2],
+    ['COLLAPSIUM', after.collapsiumTons - before.collapsiumTons, 50],
+    ['STEEL', after.steelTons - before.steelTons, 0.5],
+    ['FISSIONABLES', after.fissionablesLb - before.fissionablesLb, 3],
+    ['ELECTRONICS', after.electronicCrates - before.electronicCrates, 25],
+    ['WEAPONS', after.weaponCrates - before.weaponCrates, 40],
+    ['FTR.PARTS', after.fighterPartCrates - before.fighterPartCrates, 30],
+    ['FOOD', after.luxuryFoodCases - before.luxuryFoodCases, 5],
+    ['WINE', after.wineCases - before.wineCases, 2],
+    ['ART', after.artUnits - before.artUnits, 100],
+  ];
+
+  hires.hcolor(3);
+  hires.text('LOOT GAINED', 15, 15);
+  hires.hcolor(1);
+
+  let r = 16;
+  let totalVal = 0;
+  for (const [name, delta, valPerUnit] of items) {
+    if (delta > 0) {
+      hires.text(`+${name} ${Math.round(delta)}`, 2, r);
+      const v = Math.round(delta * valPerUnit);
+      hires.text(`${v} CR`, 30, r);
+      totalVal += v;
+      r++;
+    }
+  }
+
+  hires.hcolor(5);
+  hires.text(`TOTAL: ${totalVal} CREDITS`, 14, r + 1);
+  return totalVal;
+}
+
 export async function collectScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input } = ctx;
   setScene('collect');
 
   const tech = state.planets[state.planetIndex].defender;
   const name = PLANET_NAMES[state.planetIndex];
+  const before = saveSnapshot(state);
 
   hires.hgr();
   hires.hcolor(1);
@@ -28,12 +71,9 @@ export async function collectScene(ctx: SceneContext, scenes: SceneManager): Pro
   hires.line(1, 110, 1, 1);
 
   hires.hcolor(3);
-  hires.text('LOOT COLLECTION', 4, 2);
+  hires.text('LOOT COLLECTION', 6, 2);
+
   hires.hcolor(1);
-
-  let j1 = 0;
-  let j2 = 0;
-
   if (tech === 0) {
     hires.text('PLANET IS NON-', 2, 4);
     hires.text('HABITABLE.', 2, 5);
@@ -45,43 +85,41 @@ export async function collectScene(ctx: SceneContext, scenes: SceneManager): Pro
     hires.text('LITTLE GOLD AND', 2, 6);
     hires.text('SILVER AND SOME', 2, 7);
     hires.text('WINES AND LIQUORS.', 2, 8);
-  state.loot.gold = cap255(state.loot.gold + Math.random() * 5);
-  state.loot.silver = cap255(state.loot.silver + Math.random() * 5);
-  state.loot.wineCases = cap255(state.loot.wineCases + Math.random() * 10);
+    state.loot.gold = cap255(state.loot.gold + Math.random() * 5);
+    state.loot.silver = cap255(state.loot.silver + Math.random() * 5);
+    state.loot.wineCases = cap255(state.loot.wineCases + Math.random() * 10);
   } else if (tech === 2) {
     hires.text('LIMITED ATOMIC STAGE.', 2, 4);
     hires.text('NO HIGH TECH PRODUCTS', 2, 5);
     hires.text('BUT ABUNDANCE OF', 2, 6);
     hires.text('OTHER GOODS, SIR!', 2, 7);
-    j1 = 0;
-    j2 = 10;
-    distributeLoot(state, j1, j2);
+    distributeLoot(state, 0, 10);
   } else if (tech === 3) {
     hires.text('SOPHISTICATED TECH.', 2, 4);
     hires.text("WE'LL GET PLENTY OF", 2, 5);
     hires.text('LOOT HERE, SIR!', 2, 6);
-    j1 = 10;
-    j2 = 7;
-    distributeLoot(state, j1, j2);
+    distributeLoot(state, 10, 7);
   } else if (tech >= 4) {
     hires.text('SUPERIOR TECHNOLOGY.', 2, 4);
     hires.text("WE'VE HIT IT BIG", 2, 5);
     hires.text('THIS TIME, SIR!!!', 2, 6);
-    j1 = 15;
-    j2 = 15;
-    distributeLoot(state, j1, j2);
+    distributeLoot(state, 15, 15);
   }
 
   hires.hcolor(3);
-  hires.text(`OPERATION ${name}`, 2, 12);
-  hires.text('IS A SUCCESS, SIR!', 2, 13);
+  hires.text(`OPERATION ${name}`, 4, 13);
+  hires.text('IS A SUCCESS, SIR!', 4, 14);
 
-  glog('collect', `tech=${tech} planet=${name}`);
+  const after = state.loot;
+  const total = showDeltas(hires, before, after);
+
+  glog('collect', `tech=${tech} planet=${name} value=${total}`);
   state.planets[state.planetIndex].looted = true;
   clearPendingConquestCollection(state, state.planetIndex);
 
   hires.hcolor(5);
   hires.text('PRESS ANY KEY...', 2, 20);
+
   if (state.commanderMode) {
     await new Promise(r => setTimeout(r, 60));
     return scenes.run('starshipSimulator');
