@@ -232,21 +232,19 @@ export class Hires {
 
       const buf = this.buf;
       const data = this.imageData.data;
-      const scanAlpha = 0.12;
       const centerGlow = 0.06;
 
       for (let y = 0; y < H; y++) {
         const row = y * W;
-        const scanDim = y % 2 === 0 ? 1.0 - scanAlpha : 1.0;
         const cy = Math.abs(y - H / 2) / (H / 2);
         const glowDim = 1.0 + centerGlow * (1.0 - cy * cy);
 
         for (let x = 0; x < W; x++) {
           const argb = buf[row + x];
           const i = (row + x) * 4;
-          const r = ((argb >> 16) & 0xff) * scanDim * glowDim;
-          const g = ((argb >> 8) & 0xff) * scanDim * glowDim;
-          const b = (argb & 0xff) * scanDim * glowDim;
+          const r = ((argb >> 16) & 0xff) * glowDim;
+          const g = ((argb >> 8) & 0xff) * glowDim;
+          const b = (argb & 0xff) * glowDim;
           data[i] = Math.min(255, Math.round(r));
           data[i + 1] = Math.min(255, Math.round(g));
           data[i + 2] = Math.min(255, Math.round(b));
@@ -293,6 +291,21 @@ export class Hires {
       gy = Math.round((ch - gh) / 2);
     }
 
+    // Smooth bilinear upscale — turns blocky pixels into a soft retro look
+    this.displayCtx.imageSmoothingEnabled = true;
+
     this.displayCtx.drawImage(this.offscreen, 0, 0, GW, GH, gx, gy, gw, gh);
+
+    // CRT bloom wash — soft glow over bright areas
+    this.displayCtx.globalCompositeOperation = 'screen';
+    this.displayCtx.drawImage(this.offscreen, 0, 0, GW, GH, gx, gy, gw, gh);
+    this.displayCtx.globalCompositeOperation = 'source-over';
+
+    // Display-resolution scanlines — always 1px every other row at the
+    // output pixel grid, so they stay crisp at any scale.
+    for (let sy = gy; sy < gy + gh; sy += 2) {
+      this.displayCtx.fillStyle = 'rgba(0,0,0,0.15)';
+      this.displayCtx.fillRect(gx, sy, gw, 1);
+    }
   }
 }
