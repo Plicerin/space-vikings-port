@@ -37,6 +37,7 @@ import {
   shouldPreferPlanetaryBombardment,
 } from '../engine/commander';
 import type { Shape } from '../engine/shapeTable';
+import { VectorRenderer } from '../engine/vectorRenderer';
 
 const STARS = makeStarfield(220, 30000);
 
@@ -195,6 +196,14 @@ if (displayShipKind >= 1) {
   })();
 }
 
+const viewport = document.getElementById('viewport');
+const stage = document.getElementById('stage') as HTMLCanvasElement | null;
+const vectorRenderer = new VectorRenderer(
+  viewport ?? document.body,
+  stage,
+);
+void vectorRenderer.loadShip(loader, displayShipKind);
+
 // H_D.bas initializes encounter thresholds on arrival. Do not fabricate
 // them from tech here; use explicit state values populated from extracted
 // original game state.
@@ -226,12 +235,14 @@ const enemy = spawnEnemy(state);
     let fireCooldown = 0;
   let transitionCooldown = 3;
   let showControls = false;
+  let vectorMode = false;
   const ai = new AIController();
 
     function runNextScene(): boolean {
       if (!next) return false;
       state.pitch = Math.round(((pitchRad / (Math.PI / 4)) * 128 + 128 + 256) % 256);
       state.heading = Math.round(((headingRad / (2 * Math.PI)) * 256 + 256) % 256);
+      vectorRenderer.destroy();
       cancelAnimationFrame(raf);
       const target = next;
       next = null;
@@ -359,6 +370,13 @@ const enemy = spawnEnemy(state);
           state.y = 3000;
         } else if (state.atmosphere) {
           state.y = 4500;
+        }
+      } else if (ch === 'V') {
+        vectorMode = !vectorMode;
+        if (vectorMode) {
+          vectorRenderer.show();
+        } else {
+          vectorRenderer.hide();
         }
       } else if (ch === ' ' && fireCooldown <= 0) {
         fireCooldown = FIRE_COOLDOWN_SECONDS;
@@ -576,6 +594,12 @@ const enemy = spawnEnemy(state);
     }
 
     function renderFrame(cam: Camera, dt: number) {
+      if (vectorMode) {
+        vectorRenderer.setEnemyPos(enemy.pos.x, enemy.pos.y, enemy.pos.z);
+        vectorRenderer.update(state, pitchRad, headingRad, enemy.alive);
+        return;
+      }
+
       hires.hgr();
 
       if (state.atmosphere) {
