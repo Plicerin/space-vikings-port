@@ -96,10 +96,7 @@
       #stage {
         display: block;
         background: #000;
-        width: 100%;
-        height: 100%;
         image-rendering: pixelated;
-        object-fit: contain;
         touch-action: none;
       }
       #cpu-panel { display: none; }
@@ -206,7 +203,8 @@
         }
         #stage {
           width: 100%;
-          height: 100%;
+          height: auto;
+          aspect-ratio: 35 / 24;
         }
         #cpu-panel {
           width: 100%;

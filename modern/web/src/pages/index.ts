@@ -39,6 +39,27 @@ function boot(): void {
   const stage = document.getElementById('stage') as HTMLCanvasElement | null;
   if (!stage) { console.error('missing #stage canvas'); return; }
 
+  const viewport = document.getElementById('viewport');
+  const stageEl = stage;
+  function fitCanvas(): void {
+    if (!viewport || !stageEl) return;
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+    const ratio = 560 / 384;
+    let w: number, h: number;
+    if (vw / vh > ratio) {
+      h = vh;
+      w = h * ratio;
+    } else {
+      w = vw;
+      h = w / ratio;
+    }
+    stageEl.style.width = Math.floor(w) + 'px';
+    stageEl.style.height = Math.floor(h) + 'px';
+  }
+  fitCanvas();
+  window.addEventListener('resize', fitCanvas);
+
   const hires = new Hires(stage);
   const input = new Input();
   const audio = new Audio();
