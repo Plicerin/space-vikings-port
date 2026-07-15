@@ -39,6 +39,8 @@ function boot(): void {
   const stage = document.getElementById('stage') as HTMLCanvasElement | null;
   if (!stage) { console.error('missing #stage canvas'); return; }
 
+  const hires = new Hires(stage);
+
   const stageEl = stage;
   const viewportEl = document.getElementById('viewport');
   function fitCanvas(): void {
@@ -55,17 +57,15 @@ function boot(): void {
       w = vw;
       h = w / ratio;
     }
-    stageEl.style.width = Math.floor(w) + 'px';
-    stageEl.style.height = Math.floor(h) + 'px';
+    stageEl.style.setProperty('width', Math.floor(w) + 'px', 'important');
+    stageEl.style.setProperty('height', Math.floor(h) + 'px', 'important');
   }
-  fitCanvas();
+  requestAnimationFrame(fitCanvas);
   window.addEventListener('resize', () => requestAnimationFrame(fitCanvas));
   if (viewportEl) {
     const ro = new ResizeObserver(() => requestAnimationFrame(fitCanvas));
     ro.observe(viewportEl);
   }
-
-  const hires = new Hires(stage);
   const input = new Input();
   const audio = new Audio();
   const loader = new Loader();
