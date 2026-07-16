@@ -4,6 +4,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import type { ShipBytecodeOp } from './shipBytecode';
+import { parseShipBytecode } from './shipBytecode';
 import type { GameState } from './gameState';
 import type { Loader } from './loader';
 
@@ -109,39 +110,65 @@ function buildShipModel(ops: ShipBytecodeOp[]): THREE.Group {
   return group;
 }
 
+function createLatitudeLoop(radius: number, latitude: number, segments: number): THREE.BufferGeometry {
+  const points: THREE.Vector3[] = [];
+  const bandRadius = Math.cos(latitude) * radius;
+  const height = Math.sin(latitude) * radius;
+  for (let i = 0; i <= segments; i++) {
+    const t = (i / segments) * Math.PI * 2;
+    points.push(new THREE.Vector3(Math.cos(t) * bandRadius, height, Math.sin(t) * bandRadius));
+  }
+  return new THREE.BufferGeometry().setFromPoints(points);
+}
+
+function createMeridianLoop(radius: number, longitude: number, segments: number): THREE.BufferGeometry {
+  const points: THREE.Vector3[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = (i / segments) * Math.PI * 2;
+    points.push(new THREE.Vector3(
+      Math.cos(t) * radius,
+      Math.sin(t) * radius * Math.cos(longitude),
+      Math.sin(t) * radius * Math.sin(longitude),
+    ));
+  }
+  return new THREE.BufferGeometry().setFromPoints(points);
+}
+
 function createPlanetModel(): THREE.Group {
   const group = new THREE.Group();
+  const lineMat = (color: number, opacity: number) => createVectorLineMaterial(color, opacity);
 
-  const surfaceMat = new THREE.MeshBasicMaterial({
-    color: 0x87e6ff,
-    transparent: true,
-    opacity: 0.18,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const surface = new THREE.Mesh(new THREE.SphereGeometry(4.35, 20, 14), surfaceMat);
-  group.add(surface);
-
-  const rimMat = new THREE.MeshBasicMaterial({
-    color: 0x67d4ff,
-    transparent: true,
-    opacity: 0.08,
-    depthWrite: false,
-    side: THREE.BackSide,
-    blending: THREE.AdditiveBlending,
-  });
-  const rim = new THREE.Mesh(new THREE.SphereGeometry(4.88, 20, 14), rimMat);
-  group.add(rim);
-
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: 0x6fd8ff,
-    transparent: true,
-    opacity: 0.022,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(5.15, 18, 12), glowMat);
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(5.0, 18, 12),
+    new THREE.MeshBasicMaterial({
+      color: 0x6fd8ff, transparent: true, opacity: 0.04,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    }),
+  );
   group.add(glow);
+
+  const latitudes = [-0.78, -0.42, -0.08, 0.3, 0.66];
+  for (const lat of latitudes) {
+    const geo = createLatitudeLoop(4.0, lat, 36);
+    group.add(new THREE.Line(geo, lineMat(0xf6fbff, 0.6)));
+    group.add(new THREE.Line(geo, lineMat(0x67d4ff, 0.12)));
+  }
+
+  const meridians = [0, Math.PI / 3, (Math.PI * 2) / 3, Math.PI];
+  for (const lon of meridians) {
+    const geo = createMeridianLoop(3.9, lon, 36);
+    group.add(new THREE.Line(geo, lineMat(0xf6fbff, 0.5)));
+    group.add(new THREE.Line(geo, lineMat(0x67d4ff, 0.1)));
+  }
+
+  const equator = createLatitudeLoop(4.1, 0, 48);
+  group.add(new THREE.Line(equator, lineMat(0xf6fbff, 0.8)));
+
+  const ringGeo = createLatitudeLoop(7.0, 0, 48);
+  const ring = new THREE.Line(ringGeo, lineMat(0xffab57, 0.3));
+  ring.rotation.x = 0.62;
+  ring.rotation.z = -0.45;
+  group.add(ring);
 
   return group;
 }
@@ -227,7 +254,7 @@ export class VectorRenderer {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x000000, 0.0035);
 
-    this.camera = new THREE.PerspectiveCamera(55, 280 / 192, 0.1, 500);
+    this.camera = new THREE.PerspectiveCamera(55, 280 / 192, 0.1, 3000);
     this.camera.rotation.order = 'YXZ';
 
     const ambient = new THREE.AmbientLight(0xcde6ff, 0.65);
@@ -281,7 +308,6 @@ export class VectorRenderer {
     if (shipKind === 0) return;
     try {
       const json = await loader.json<{ bytes: number[] }>(`data/shapes/ship-${shipKind}-bytecode.json`);
-      const { parseShipBytecode } = await import('./shipBytecode');
       this.activeShipOps = parseShipBytecode(json.bytes);
     } catch {
       this.activeShipOps = null;
@@ -320,8 +346,12 @@ export class VectorRenderer {
 
     this.planetModel.position.set(0, 0, 0);
     const planetDist = this.camera.position.length();
-    const planetScale = Math.max(0.3, Math.min(8, 160 / Math.max(0.1, planetDist)));
-    this.planetModel.scale.setScalar(planetScale);
+    const planetTooClose = planetDist < 8;
+    this.planetModel.visible = !planetTooClose;
+    if (!planetTooClose) {
+      const planetScale = Math.max(0.05, Math.min(4, 50 / planetDist));
+      this.planetModel.scale.setScalar(planetScale);
+    }
 
     if (enemyAlive && this.activeShipOps) {
       const modelNeedsRebuild = this.enemyShipGroup.children.length === 0;
