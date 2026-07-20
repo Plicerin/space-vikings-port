@@ -88,6 +88,7 @@ export async function reentryScene(
 
   state.atmosphere = true;
   state.inOrbit = false;
+  state.heading = 20;
 
   glog('init', `reentry pos=(${state.x},${state.y},${state.z}) heading=${state.heading} planet=${state.planetIndex}`);
 

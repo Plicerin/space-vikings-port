@@ -43,38 +43,14 @@ function renderOrbitView(hires: Hires, state: GameState, planetIndex: number): v
   hires.text(`ENERGY: ${state.energy}`, 2, 16);
 
   hires.hcolor(3);
-  hires.text('O-DESCEND  H-HYPERDRIVE  R-RADAR', 1, 24);
-  hires.text('ESC-RETURN', 1, 25);
-}
-
-function keyToAction(key: number, state: GameState): string | null {
-  const ch = String.fromCharCode(key & 0x7f).toLowerCase();
-  if (ch === 'o') return 'descend';
-  if (ch === 'h') return 'hyperdrive';
-  if (ch === 'r') return 'radar';
-  if (key === 0x9b) return 'return'; // escape
-  return null;
-}
-
-function applyAction(action: string, state: GameState): void {
-  if (action === 'descend') {
-    state.atmosphere = true;
-    state.y = Math.max(200, state.y - 200);
-    glog('orbit', 'descending into atmosphere');
-  } else if (action === 'hyperdrive') {
-    glog('orbit', 'hyperdrive engaged');
-  } else if (action === 'radar') {
-    glog('orbit', 'radar scan');
-  } else {
-    glog('orbit', 'return to flight');
-  }
+  hires.text('ORBITAL INSERTION', 11, 24);
 }
 
 export async function orbitScene(
   ctx: SceneContext,
   scenes: SceneManager,
 ): Promise<void> {
-  const { hires, state, input } = ctx;
+  const { hires, state } = ctx;
   setScene('orbit');
 
   state.atmosphere = false;
@@ -84,34 +60,14 @@ export async function orbitScene(
   state.z = 208 + (7 * 256);
   state.heading = 190;
 
-  if (state.shipKind === 0) {
-    state.shipKind = 3;
-    state.enemyShips = Math.max(state.enemyShips, 30);
-  } else if ((state.shipKind as number) === 2) {
+  if ((state.shipKind as number) === 2) {
     state.shipKind = 3;
   }
 
   glog('init', `orbit pos=(${state.x},${state.y},${state.z}) heading=${state.heading} ship=${state.shipKind}`);
 
-  let done = false;
+  renderOrbitView(hires, state, state.planetIndex);
+  await new Promise(r => setTimeout(r, 1200));
 
-  while (!done) {
-    renderOrbitView(hires, state, state.planetIndex);
-
-    const k = input.peekKey();
-    if (k !== 0) {
-      input.clearKey();
-      const action = keyToAction(k, state);
-      if (action) {
-        applyAction(action, state);
-        done = true;
-      }
-    }
-
-    if (!done) {
-      await new Promise(r => setTimeout(r, 50));
-    }
-  }
-
-  scenes.run('starshipSimulator');
+  return scenes.run('starshipSimulator');
 }

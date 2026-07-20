@@ -134,6 +134,22 @@ export const EXTRACTED_ARRIVAL_STATE_BY_PLANET: Partial<Record<number, Extracted
   },
 } as const;
 
+export function getFallbackArrivalState(planetIndex: number): ExtractedArrivalState {
+  const record = EXTRACTED_LIVE_PLANET_TABLE.find((entry) => entry.planet === planetIndex);
+  const shipKind = (record?.inferredDefender ?? 0) as 0 | 1 | 3 | 4;
+  const hostile = shipKind !== 0 && planetIndex !== 0;
+
+  return {
+    planetIndex,
+    planetVitalityLimit: hostile ? 100 : 0,
+    shipDestructionLimit: hostile ? 150 : 0,
+    shipKind,
+    enemyShips: hostile ? 30 : 0,
+    planetSurrendered: false,
+    atmosphere: false,
+  };
+}
+
 export const OPENING_NEW_GAME_STATE = {
   // START.bas:190-195 initializes the new-game simulator position before
   // RUN INSTRUMENTS / STARSHIP SIMULATOR.

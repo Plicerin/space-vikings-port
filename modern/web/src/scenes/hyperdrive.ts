@@ -1,7 +1,7 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { log as glog } from '../engine/gameLog';
 import { clearPendingConquestCollection } from '../engine/commander';
-import { EXTRACTED_ARRIVAL_STATE_BY_PLANET } from '../engine/extractedOriginalData';
+import { EXTRACTED_ARRIVAL_STATE_BY_PLANET, getFallbackArrivalState } from '../engine/extractedOriginalData';
 
 interface WarpLine {
   angle: number;
@@ -159,20 +159,14 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   state.planetSurrendered = state.planets[state.planetIndex]?.surrendered ?? false;
   clearPendingConquestCollection(state, sourcePlanet);
 
-  const extractedArrival = EXTRACTED_ARRIVAL_STATE_BY_PLANET[state.planetIndex];
-  if (extractedArrival) {
-    state.planetVitalityLimit = extractedArrival.planetVitalityLimit;
-    state.shipDestructionLimit = extractedArrival.shipDestructionLimit;
-    state.shipKind = extractedArrival.shipKind;
-    state.enemyShips = extractedArrival.enemyShips;
-    state.planetSurrendered = extractedArrival.planetSurrendered;
-    state.atmosphere = extractedArrival.atmosphere;
-  } else {
-    state.planetVitalityLimit = 0;
-    state.shipDestructionLimit = 0;
-    state.shipKind = 0;
-    state.enemyShips = 0;
-  }
+  const arrivalState = EXTRACTED_ARRIVAL_STATE_BY_PLANET[state.planetIndex]
+    ?? getFallbackArrivalState(state.planetIndex);
+  state.planetVitalityLimit = arrivalState.planetVitalityLimit;
+  state.shipDestructionLimit = arrivalState.shipDestructionLimit;
+  state.shipKind = arrivalState.shipKind;
+  state.enemyShips = arrivalState.enemyShips;
+  state.planetSurrendered = arrivalState.planetSurrendered;
+  state.atmosphere = arrivalState.atmosphere;
 
   state.planets[state.planetIndex].visited = true;
 
@@ -184,8 +178,8 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   } while (Math.abs(z) < 7000);
   state.z = z;
   state.heading = Math.floor(Math.random() * 256);
-  state.pitch = 128;
-  state.bank = 128;
+  state.pitch = 0;
+  state.bank = 0;
 
   state.energy = Math.max(0, state.energy - Math.ceil(distance));
 

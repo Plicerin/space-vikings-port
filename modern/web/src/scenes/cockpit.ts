@@ -37,7 +37,7 @@ import {
   shouldPreferPlanetaryBombardment,
 } from '../engine/commander';
 import type { Shape } from '../engine/shapeTable';
-import { VectorRenderer } from '../engine/vectorRenderer';
+import { VectorRenderer, type VectorOverlayData } from '../engine/vectorRenderer';
 
 const STARS = makeStarfield(220, 30000);
 
@@ -595,8 +595,17 @@ const enemy = spawnEnemy(state);
 
     function renderFrame(cam: Camera, dt: number) {
       if (vectorMode) {
-        vectorRenderer.setEnemyPos(enemy.pos.x, enemy.pos.y, enemy.pos.z);
-        vectorRenderer.update(state, pitchRad, headingRad, enemy.alive);
+        vectorRenderer.setAtmosphere(state.atmosphere);
+        const overlay: VectorOverlayData = {
+          projectiles: projectiles.map(p => ({ x: p.x, y: p.y, z: p.z })),
+          laserBolts: laserBolts.map(b => ({ x1: b.x1, y1: b.y1, x2: b.x2, y2: b.y2, age: b.age })),
+          fighters: fighters.map(f => ({ screenX: f.screenX, screenY: f.screenY, shapeIdx: f.shapeIdx })),
+          flashes: flashes.map(fl => ({ timer: fl.timer, type: fl.type })),
+          surrenderMsgTimer,
+          enemyAlive: enemy.alive,
+          enemyPos: { x: enemy.pos.x, y: enemy.pos.y, z: enemy.pos.z },
+        };
+        vectorRenderer.render(state, pitchRad, headingRad, dt, showControls, overlay);
         return;
       }
 
@@ -1620,7 +1629,10 @@ hires.text('H/DRIVE', 13, 22);
   hires.text(pd, 34, 23);
 
   // Combat info line
-  if (state.enemyShips > 0 && !state.atmosphere) {
+  if (state.autopilot) {
+    hires.hcolor(5);
+    hires.text('AUTO ACTIVE - PRESS A TO DISABLE', 4, 1);
+  } else if (state.enemyShips > 0 && !state.atmosphere) {
     hires.hcolor(5);
     hires.text(`ENEMY:${state.enemyShips}`, 1, 1);
   }
