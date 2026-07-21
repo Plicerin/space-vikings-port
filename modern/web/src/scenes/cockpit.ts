@@ -340,7 +340,15 @@ const enemy = spawnEnemy(state);
         state.speed = Math.min(120, state.speed + 15);
       } else if (ch === 'A') {
         state.autopilot = !state.autopilot;
-        state.commanderMode = state.autopilot;
+        if (!state.autopilot) {
+          state.commanderMode = false;
+        }
+        glog('autopilot', state.autopilot ? 'engaged' : 'disengaged');
+      } else if (ch === 'P') {
+        state.commanderMode = !state.commanderMode;
+        if (state.commanderMode) {
+          state.autopilot = true;
+        }
         glog('commander', state.commanderMode ? 'engaged' : 'disengaged');
       } else if (ch === 'W') {
         state.weaponMode = state.weaponMode === 'missile' ? 'laser' : 'missile';
@@ -1629,9 +1637,12 @@ hires.text('H/DRIVE', 13, 22);
   hires.text(pd, 34, 23);
 
   // Combat info line
-  if (state.autopilot) {
+  if (state.commanderMode) {
     hires.hcolor(5);
-    hires.text('AUTO ACTIVE - PRESS A TO DISABLE', 4, 1);
+    hires.text('BOT ACTIVE - PRESS P TO DISABLE', 5, 1);
+  } else if (state.autopilot) {
+    hires.hcolor(5);
+    hires.text('AUTOPILOT ACTIVE - PRESS A TO DISABLE', 1, 1);
   } else if (state.enemyShips > 0 && !state.atmosphere) {
     hires.hcolor(5);
     hires.text(`ENEMY:${state.enemyShips}`, 1, 1);
@@ -1671,6 +1682,7 @@ function drawControlsOverlay(hires: import('../engine/hires').Hires): void {
   ];
   const right: [string, string][] = [
     ['C', 'COMMAND MODE'],
+    ['P', 'BOT / COMMANDER'],
     ['R', 'RADAR'],
     ['H', 'HYPERDRIVE'],
     ['O', 'ORBIT/DESCEND'],
