@@ -789,6 +789,75 @@ byte, so the stray clock had not been perturbing them - but nothing guaranteed t
 
 ---
 
+## Ship render parity
+
+`probe_shipgolden.mjs` takes ship-only renders from the original, and `ship_parity.mjs`
+compares the port against them.
+
+### Isolating the ship
+
+The replayed renderer draws the whole scene, planet and ship together, while the port draws
+only a ship. So each state is rendered **twice**: once normally, and once with a single
+`$7F` written at `$7879`, which is an empty model - SHIP # 0 on the disk is exactly that one
+byte. Every pixel present in the first and absent in the second belongs to the ship.
+
+The isolation is clean: across the whole sweep, no state had a single pixel present *only*
+in the no-ship render, so blanking the model removes the ship and disturbs nothing else.
+
+### What the disk does
+
+| state | ship pixels | extent |
+| --- | --- | --- |
+| Z -6401 | 126 | x 94-133, y 74-85 |
+| Z -5500 | 294 | x 74-129, y 79-97 |
+| Z -4500 | 408 | x 34-119, y 97-123 |
+| Z -3600 | 0 | passed it |
+| heading 4 / 8 / 12 | 138 / 154 / 196 | slides left: x94 -> x72 -> x46 -> x18 |
+| heading 250 / 246 | 122 / 158 | slides right: x128, x150 |
+| pitch 4 / 8 | 118 / 142 | rises: y74 -> y53 -> y32 |
+| pitch 250 | 150 | falls: y104 |
+
+Range grows it, heading slides it sideways, pitch slides it vertically. That is a world-space
+perspective projection, and it is what the port has to match.
+
+### What the port does
+
+`projectShipBytecode()` centres the model on its own bounds, rotates it by
+`COCKPIT_SHIP_WIREFRAME_VIEW` - **yaw -1.05, pitch -0.27, roll 0.05**, a fixed three-quarter
+view - projects at a focal length of 280, and then **rescales so the larger of width and
+height fills a span the caller passes in**. The caller also passes the screen centre.
+
+So the port does not compute placement or size at all. In the cockpit both come from a
+distance heuristic. Nothing in it projects world coordinates.
+
+### Measured
+
+Handing the port the disk's own centre and span - asking only "is the shape right, given
+where and how big it should be?" - gives:
+
+**Mean shape agreement 12.1%** (intersection over union), over 11 states.
+
+The width matches, because it was handed over. The height is the port's own, and it is
+wrong by a consistent factor:
+
+| | z-6401 | z-5500 | z-4500 | h4 | h8 | h12 | h250 | h246 | p4 | p8 | p250 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| disk h | 12 | 19 | 27 | 12 | 12 | 13 | 12 | 13 | 12 | 13 | 13 |
+| port h | 29 | 41 | 61 | 27 | 31 | 31 | 27 | 29 | 29 | 29 | 27 |
+| ratio | 2.42 | 2.16 | 2.26 | 2.25 | 2.58 | 2.38 | 2.25 | 2.23 | 2.42 | 2.23 | 2.08 |
+
+**The port's ship is on average 2.30x as tall as the disk's at the same width**, and the
+spread is narrow (2.08 to 2.58). That is the fixed three-quarter view: it shows the model
+from above and to one side, where the disk at these ranges is looking at it nearly edge-on
+from the cockpit, so the disk's ship is wide and flat.
+
+This is not a matter of tuning the view angles. The disk's aspect changes with the ship's
+position; a fixed view cannot follow it. Matching it needs the world projection, which means
+deriving the transform in `$6000` - identified as far as its multiply, its clipper and its
+trig, but not its geometry.
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -807,6 +876,10 @@ byte, so the stray clock had not been perturbing them - but nothing guaranteed t
 - What `CALL 38402` (TRANLIT.OBJ0) draws into the gauge boxes.
 - The projection in `$6000`: how the model bytecode at `$7879` becomes screen coordinates.
   The multiply, the clipper and the trig are identified; the transform around them is not.
+  This is now the one thing standing between the port and correct ship rendering - see
+  "Ship render parity" above. It can be probed rather than read: the replay harness will
+  render any ship state on demand, so the transform can be characterised by moving one
+  input at a time.
 - What state `$6000` needs before it will draw. Snapshot and replay sidesteps the question
   rather than answering it.
 - What opcodes 1, 2 and 3 mean in the ship bytecode. 1 behaves as a move and 2 as a line,
