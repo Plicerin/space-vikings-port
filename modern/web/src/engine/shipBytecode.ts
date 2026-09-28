@@ -74,6 +74,14 @@ const FOCAL_LENGTH = 280;
 export function parseShipBytecode(bytes: number[]): ShipBytecodeOp[] {
   const ops: ShipBytecodeOp[] = [];
 
+  // $7F ends a model - SHIP # 0 on the disk is that one byte and nothing else - and it
+  // falls through to the 'unknown' branch below, which stops the walk. That terminator is
+  // the only thing needed to know where a model ends.
+  //
+  // There used to be an isPlausibleVector() guard here that broke out of the loop on any
+  // vertex with z outside -10000..-500. Ship models sit around z -3500 so it never fired
+  // for them, but PLANET # 0 - the star table, the same bytecode - spans -10000..+10000,
+  // and the guard threw away all 195 of its points at the first star.
   for (let offset = 0; offset < bytes.length;) {
     const opcode = bytes[offset] ?? 0;
     if (opcode === 4 && offset + 1 < bytes.length) {
@@ -91,9 +99,6 @@ export function parseShipBytecode(bytes: number[]): ShipBytecodeOp[] {
       const x = decodeSignedWord(bytes[offset + 1], bytes[offset + 2]);
       const y = decodeSignedWord(bytes[offset + 3], bytes[offset + 4]);
       const z = decodeSignedWord(bytes[offset + 5], bytes[offset + 6]);
-      if (!isPlausibleVector(x, y, z)) {
-        break;
-      }
       ops.push({
         kind: 'vector',
         opcode,
@@ -329,11 +334,6 @@ function pushContour(
   contours.push({ points, fill: fill && closed });
 }
 
-function isPlausibleVector(x: number, y: number, z: number): boolean {
-  if (z >= -500 || z <= -10000) return false;
-  if (Math.abs(x) > 4000 || Math.abs(y) > 4000) return false;
-  return true;
-}
 
 
 // ---------------------------------------------------------------------
@@ -438,7 +438,13 @@ export function drawShipWorld(hires: Hires, projection: ShipWorldProjection): vo
   for (const s of projection.segments) {
     hires.line(Math.round(s.from.x), Math.round(s.from.y), Math.round(s.to.x), Math.round(s.to.y));
   }
+  // A lone point is two pixels wide on the disk, not one. probe_project.mjs put a single
+  // vertex through the real renderer 54 times and it came back as a 2-pixel blob every
+  // time, at x and x+1 on the same row. Plotting one pixel left the starfield at half the
+  // original's density - 142 pixels against 278.
   for (const p of projection.dots) {
-    hires.hplot(Math.round(p.x), Math.round(p.y));
+    const x = Math.round(p.x), y = Math.round(p.y);
+    hires.hplot(x, y);
+    hires.hplot(x + 1, y);
   }
 }

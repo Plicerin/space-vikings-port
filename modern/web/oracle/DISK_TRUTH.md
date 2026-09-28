@@ -967,6 +967,88 @@ not the transform.
 
 ---
 
+## Planets, and what PLANET # 0 actually is
+
+### PLANET # 0 is the starfield
+
+START line 100 BLOADs PLANET # 0 to `$7300`. Its first 36 bytes are a header - including
+the ship's own state at offsets 27-35 (`$731B-$7323`) - and from offset 36 it is **195
+opcode-0 records, exactly filling the file** (36 + 195 x 7 = 1401). Opcode 0 is a lone
+point. Their coordinates span +/-10000 in all three axes.
+
+That is the star table. It is the same bytecode the ship models use, so the port's existing
+parser and world projection handle it unchanged.
+
+The numbered files are a different thing entirely: PLANET # 1, 5, 13 and 20 are opcode
+1/2/3 line work with **y at 0** and x and z spanning +/-10000 - ground wireframes, drawn
+flat, for approach rather than a body seen from space.
+
+### Isolating it
+
+The ship was isolated by writing `$7F` over its model at `$7879`. The planet cannot be, and
+the experiment says why: writing `$7F` at offset 36 (`$7324`) blanks **the entire scene**,
+ship included, because the renderer walks one object list and an empty one makes it bail
+before it ever reaches `$7879`. Offsets past the first terminator change nothing.
+
+So the stars are simply what is drawn with the ship blanked - the reverse of the ship case.
+
+### Measured
+
+| state | disk px | port px | exact | within 1px | disk extent | port extent |
+| --- | --- | --- | --- | --- | --- | --- |
+| z -6401 | 278 | 276 | 42.8% | 96% | x82-155, y32-99 | x84-154, y33-99 |
+| z -5000 | 274 | 275 | 36.9% | 96% | x66-159, y24-109 | x67-159, y24-109 |
+| z -3000 | 232 | 232 | 30.0% | 88% | x10-171, y0-122 | x11-171, y0-122 |
+| z 0 | 10 | 10 | 53.8% | 90% | x8-173, y9-106 | x8-174, y9-106 |
+| heading +8 | 274 | 274 | 44.6% | 97% | x32-227, y31-100 | x33-228, y31-100 |
+| heading -8 | 278 | 280 | 50.0% | 99% | x28-197, y32-110 | x28-198, y33-110 |
+| pitch +8 | 196 | 195 | 44.8% | 99% | x82-155, y0-57 | x83-155, y0-57 |
+| pitch -8 | 210 | 208 | 45.1% | 97% | x82-155, y15-123 | x82-155, y15-123 |
+
+The pixel counts agree to within a couple throughout, and so do the extents.
+
+**Mean 37.5% exact, 91.2% within one pixel** over 12 states.
+
+Exact overlap is much lower here than for ships and that is expected: a point has one pixel
+to get right, so a sub-pixel error costs the whole star, where a line keeps most of itself.
+The within-one-pixel figure is the meaningful one, and the extents agree to a pixel or two
+throughout.
+
+In the running port, from the snapshot camera: 195 records parsed, 37 clipped away, 144
+plotted, **276 pixels across x84-154, y33-99** against the disk's **278 across x82-155,
+y32-99**.
+
+### Two things this turned up
+
+**A point is two pixels wide.** `probe_project.mjs` put a single vertex through the real
+renderer 54 times and got a 2-pixel blob every time, at x and x+1 on the same row. The port
+plotted one, which left the starfield at half the original's density - 142 pixels against
+278. Plotting two took star agreement from 26.9% to 37.5% and within-one-pixel from 86.8%
+to 91.2%.
+
+**A plausibility guard was silently truncating models.** `parseShipBytecode()` had an
+`isPlausibleVector()` check that **broke out of the parse** on any vertex with z outside
+-10000..-500. Ship models sit around z -3500 so it never fired for them, but the star table
+spans -10000..+10000 and the guard threw away all 195 points at the first star - the port
+drew nothing at all. The format needs no such guess: `$7F` ends a model, which is why
+SHIP # 0 is that one byte. The guard is gone.
+
+### The port still draws planets the disk does not
+
+`renderPlanet()` in `cockpit.ts` places a body at a hardcoded `v3(200, 90, 0)` - commented
+as "opening capture of the disk", unverified - and fills it with `drawPlanetPointCloud()`,
+a procedural cloud, plus the fabricated `planet-N.json` shape tables.
+
+Measured, the disk draws **no planet body at all** in this scene: with the ship blanked, the
+whole render is the 195 stars, at every camera position tried, from Z -6401 out to Z 0 where
+only 10 pixels remain. The numbered planet files are ground wireframes and are BLOADed when
+you arrive somewhere, not while flying.
+
+This has **not** been changed. Removing a visible feature is a call about the game rather
+than about the disk, and what the original draws on approach has not been captured yet.
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -988,7 +1070,9 @@ not the transform.
   reimplementation of the same formula.
 - What opcode 3 means. The harness prefers "draw and continue" at 73.6% over 72.6% and
   72.2% for the alternatives, which is not much of a margin.
-- Planets. All of this is about ships; nothing has compared how the port draws a planet.
+- What the original draws on approach to a planet. The numbered PLANET files are ground
+  wireframes at y 0; nothing has captured them being drawn, and `cockpit.ts` still shows a
+  procedural body the disk does not draw in flight.
 - What state `$6000` needs before it will draw. Snapshot and replay sidesteps the question
   rather than answering it.
 - What opcodes 1, 2 and 3 mean in the ship bytecode. 1 behaves as a move and 2 as a line,

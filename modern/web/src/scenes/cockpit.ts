@@ -42,7 +42,11 @@ import {
 import type { Shape } from '../engine/shapeTable';
 import { VectorRenderer, type VectorOverlayData } from '../engine/vectorRenderer';
 
-const STARS = makeStarfield(220, 30000);
+// The original's stars are not random. PLANET # 0, BLOADed to $7300 by START line 100, is
+// 195 fixed points from offset 36 on - the same bytecode the ship models use, every record
+// opcode 0. oracle/probe_starfield.mjs extracts them; makeStarfield() was a 220-point
+// pseudo-random cloud that had nothing to do with the disk.
+let starOps: ShipBytecodeOp[] | null = null;
 
 const W1 = 20000;
 const W2 = -20000;
@@ -171,6 +175,10 @@ if (displayShipKind >= 1) {
       } catch { /* source-backed bombardment state not generated for every planet yet */ }
     } catch { /* planet fallback below still renders a visible body */ }
 
+    try {
+      const json = await loader.json<{ bytes: number[] }>('data/shapes/starfield-bytecode.json');
+      starOps = parseShipBytecode(json.bytes);
+    } catch { /* no star table: renderStarfield draws nothing */ }
     try {
       const json = await loader.json<{ bytes: number[] }>(`data/shapes/ship-${displayShipKind}-bytecode.json`);
       enemyBytecodeOps = parseShipBytecode(json.bytes);
@@ -665,17 +673,14 @@ const enemy = spawnEnemy(state);
       prevPitch = pitchRad;
     }
 
-    function renderStarfield(cam: Camera) {
+    function renderStarfield(_cam: Camera) {
+      if (!starOps) return;
       hires.hcolor(3);
-      for (let i = 0; i < STARS.length; i++) {
-        const s: Star = STARS[i];
-        const p = project(cam, s.pos);
-        if (!p.visible) continue;
-        if (p.x < 0 || p.x >= 280 || p.y < 0 || p.y >= 124) continue;
-        const px = Math.round(p.x);
-        const py = Math.round(p.y);
-        hires.hplot(px, py);
-      }
+      // Same projection and clipping as everything else, and the disk plots each star two
+      // pixels wide - measured, see oracle/DISK_TRUTH.md.
+      drawShipWorld(hires, projectShipWorld(
+        starOps, { x: state.x, y: state.y, z: state.z }, state.heading, state.pitch, null,
+      ));
     }
 
     function renderPlanet(cam: Camera) {
