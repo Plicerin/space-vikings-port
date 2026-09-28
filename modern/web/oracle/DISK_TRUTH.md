@@ -858,6 +858,83 @@ trig, but not its geometry.
 
 ---
 
+## The projection, derived
+
+The transform inside `$6000` was never read out of the disassembly. It did not have to be:
+the replay harness renders any state on demand, so the renderer can be asked directly.
+
+`probe_project.mjs` replaces the model at `$7879` with **one vertex** - `04 01` (the state
+DEBRIS uses, whose records are all points), a single opcode-0 record, then `$7F` - and the
+renderer answers with one 2-pixel blob. Sweeping the vertex and the camera gives 54
+observations of where a known world point lands.
+
+Each state is differenced against a baseline rendered at **the same camera**. That matters:
+moving the camera moves the planet too, so a baseline taken at one heading subtracts nothing
+useful at another and leaves the whole scene behind as false "new" pixels. With a single
+baseline the angle sweeps returned ~260 stray pixels; per-camera, they return 2.
+
+### The answer
+
+```
+d  = P - C                          world point relative to the camera
+d' = yaw d by heading, then pitch    256 byte units to a full turn
+sx = 139.0 + 230.9 * d'x / d'z
+sy =  61.7 - 212.7 * d'y / d'z
+```
+
+**0.61 px rms over 54 observations, worst single point 1.71 px.**
+
+- `FOCAL_Y / FOCAL_X` is **0.921**, and a 280x192 frame on a 4:3 display has a pixel aspect
+  of **0.914**. So it is one focal length with the Apple's non-square pixels corrected for,
+  not two independent constants.
+- The centre `(139.0, 61.7)` is the middle of the view above the panel: screen centre x is
+  140, and the flight view occupies y 0-127, whose centre is 64.
+- Rotation order is **yaw then pitch**, and the fit is unambiguous - 0.61 px against 3.11 px
+  the other way round. Small-angle data could not tell them apart; the states with heading
+  and pitch both non-zero could.
+- Pitch turns the opposite way from heading (sign -1). With the same sign the fit is 12 px.
+
+### Checked at large angles
+
+The small-angle sweep only covers +/-8 of 256. The wide sweep places each point so the
+rotation should bring it back to the same spot, for headings 16 through 224 - all the way
+round. Every one lands at **(114.5-116.5, 69.0)**: the model cancels the renderer's rotation
+across the whole circle, to about a pixel.
+
+That is also where the renderer's own broken sine lives (wrong by up to 1.48% outside the
+first quadrant). On those 14 states, using the machine's measured table fits **0.84 px** and
+using real sines fits **1.21 px** - so the renderer does use its own table, and the fit says
+so where it is possible for it to say so. At small angles the two are indistinguishable.
+
+### Checked against whole ships
+
+Single points fitting well is not the same as a ship fitting. Projecting all 149 of
+SHIP # 3's vertices with the fitted formula, against the golden renders:
+
+| state | disk box | predicted | error |
+| --- | --- | --- | --- |
+| z-6401 | x 94-133 y 74-85 | x 95-131 y 74-85 | 1.6 |
+| z-5500 | x 74-129 y 79-97 | x 75-128 y 80-97 | 1.5 |
+| z-4500 | x 34-119 y 97-123 | x 12-119 y 97-138 | **22.0** |
+| h4 | x 72-109 y 74-85 | x 71-109 y 74-86 | 0.8 |
+| h8 | x 46-87 y 75-86 | x 46-85 y 74-86 | 1.9 |
+| h12 | x 18-61 y 75-87 | x 18-61 y 75-87 | 0.4 |
+| h250 | x 128-165 y 74-85 | x 128-164 y 74-85 | 1.2 |
+| h246 | x 150-189 y 74-86 | x 151-187 y 74-86 | 1.8 |
+| p4 | x 94-133 y 53-64 | x 95-131 y 53-64 | 1.6 |
+| p8 | x 94-133 y 32-44 | x 95-131 y 32-43 | 1.6 |
+| p250 | x 94-131 y 104-116 | x 94-131 y 104-116 | 0.4 |
+
+Ten of eleven agree to within 1.9 px. The outlier is the closest approach, and it is
+explainable rather than a failure of the model: at Z -4500 some vertices fall outside the
+view, the renderer **clips** them with the Cohen-Sutherland code at `$61A9`-`$620F`, and
+this formula does not clip, so it predicts a box 22 px wider. Clipping is the missing piece,
+not the transform.
+
+`src/engine/diskProjection.ts` is generated from the fit.
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -874,12 +951,11 @@ trig, but not its geometry.
 - Everything about flight rendering. The parity harness covers one static screen; nothing
   that moves has been compared.
 - What `CALL 38402` (TRANLIT.OBJ0) draws into the gauge boxes.
-- The projection in `$6000`: how the model bytecode at `$7879` becomes screen coordinates.
-  The multiply, the clipper and the trig are identified; the transform around them is not.
-  This is now the one thing standing between the port and correct ship rendering - see
-  "Ship render parity" above. It can be probed rather than read: the replay harness will
-  render any ship state on demand, so the transform can be characterised by moving one
-  input at a time.
+- Clipping. The transform is derived (see "The projection, derived") but the
+  Cohen-Sutherland stage at `$61A9`-`$620F` is not, and it is what the remaining error at
+  closest approach comes from.
+- Wiring the derived projection into the port. `src/engine/diskProjection.ts` exists;
+  nothing uses it, and `cockpit.ts` still places ships by a distance heuristic.
 - What state `$6000` needs before it will draw. Snapshot and replay sidesteps the question
   rather than answering it.
 - What opcodes 1, 2 and 3 mean in the ship bytecode. 1 behaves as a move and 2 as a line,
