@@ -1,0 +1,81 @@
+Paddle 1 ($95FD) against pitch, starting from pitch 0, bank 0:
+
+ paddle   pitch after   step
+     0         4       +4
+    25         4       +4
+    31         3       +3  <-
+    40         3       +3
+    50         2       +2  <-
+    60         2       +2
+    70         1       +1  <-
+    80         1       +1
+    89         1       +1
+    90         0       +0  <-
+   128         0       +0
+   169         0       +0
+   170        -1       -1  <-
+   171        -1       -1
+   189        -1       -1
+   190        -2       -2  <-
+   209        -2       -2
+   210        -3       -3  <-
+   229        -3       -3
+   230        -4       -4  <-
+   255        -4       -4
+
+Paddle 0 ($95FE) against bank, starting from bank 0:
+
+ paddle   bank after
+     0         4
+    25         4
+    30         3
+    40         3
+    50         2
+    60         2
+    70         1
+    80         1
+    89         1
+    90         0
+   128         0
+   169         0
+   170        -1
+   190        -2
+   210        -3
+   230        -4
+   255        -4
+
+Bank against heading (paddles centred, so only $912E acts):
+
+  bank   heading after
+     0          0
+     4          0
+     5         -1
+    16         -1
+    17         -2
+    32         -2
+    33         -3
+    47         -3
+    48         -4
+    49          4
+   -48          3
+   -32          2
+   -16          1
+    -5          0
+    -1          0
+
+The steep-pitch heading flip ($90F2), heading 100:
+
+  pitch  latch in   heading after   latch out
+   $00       0           100          0
+   $3f       0           100          0
+   $40       0           226          1
+   $80       0           226          1
+   $bf       0           226          1
+   $c0       0           100          0
+   $40       1           100          1
+   $00       1           226          0
+
+Bank clamp - repeated full deflection on paddle 0:
+
+-4 -8 -12 -16 -20 -24 -28 -32 -36 -40 -44 -48 -48 -48 -48 -48 
+(bank after each of 8 calls at full deflection)

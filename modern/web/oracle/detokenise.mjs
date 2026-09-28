@@ -7,7 +7,7 @@
 //
 // Tokens are $80-$EA in this fixed order; anything else is a literal character with its
 // high bit set. Quoted text is copied through byte for byte.
-const TOKENS = ('END,FOR,NEXT,DATA,INPUT,DEL,DIM,READ,GR,TEXT,PR#,IN#,CALL,PLOT,HLIN,VLIN,' +
+export const APPLESOFT_TOKENS = ('END,FOR,NEXT,DATA,INPUT,DEL,DIM,READ,GR,TEXT,PR#,IN#,CALL,PLOT,HLIN,VLIN,' +
   'HGR2,HGR,HCOLOR=,HPLOT,DRAW,XDRAW,HTAB,HOME,ROT=,SCALE=,SHLOAD,TRACE,NOTRACE,NORMAL,' +
   'INVERSE,FLASH,COLOR=,POP,VTAB,HIMEM:,LOMEM:,ONERR,RESUME,RECALL,STORE,SPEED=,LET,GOTO,' +
   'RUN,IF,RESTORE,&,GOSUB,RETURN,REM,STOP,ON,WAIT,LOAD,SAVE,DEF,POKE,PRINT,CONT,LIST,' +
@@ -29,7 +29,7 @@ function detokeniseLine(mem, from, limit) {
     const b = mem[q++];
     const cur = segs[segs.length - 1];
     if (b === 0x22) segs.push({ quoted: !cur.quoted, text: '' });
-    else if (b >= 0x80 && !cur.quoted) cur.text += ' ' + TOKENS[b - 0x80] + ' ';
+    else if (b >= 0x80 && !cur.quoted) cur.text += ' ' + APPLESOFT_TOKENS[b - 0x80] + ' ';
     else cur.text += String.fromCharCode(b & 0x7f);
   }
   // Every quoted run is preceded by its opening quote; a run that is followed by another

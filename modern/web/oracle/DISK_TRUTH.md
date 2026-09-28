@@ -553,6 +553,93 @@ With both fixed: **26 of 26 shapes render exactly, 0 pixels differ.**
 
 ---
 
+## $9023 is the flight controls, not the renderer
+
+`CA = 36899 = $9023` is SPACE SIMULATOR ASSEMBLY, and STARSHIP SIMULATOR line 150 calls it
+every pass. It reads the paddles and writes pitch, bank and heading. **The renderer is
+somewhere else**: the last thing `$9023` does is `$921E: JSR $6000`, and `$6000` is LO-HI
+A2-3D1 - the same module that holds `CSN` and `SN` at `$6006` and `$6009`.
+
+Full listing in `captured/space_simulator.asm`.
+
+### How the listing was made
+
+`probe_trace.mjs` traced 1,279,509 instructions across 240 frames of real flight. Only
+**77** of them were inside `$9023`, touching 39 of its 597 bytes - the routine was entered
+**twice**, because a single pass of that Applesoft main loop costs half a million
+instructions. A trace alone would have left 93% of the module looking like tables.
+
+So the listing is built by **following the code** from its entry points - branches, JSRs and
+JMPs - and only bytes nothing can reach are left as data. The trace still earns its keep:
+every line it saw execute is marked, so the listing never implies more than was observed.
+
+### The control model, measured
+
+`probe_controls.mjs` writes the module into memory at `$9023` with no DOS and no game, so
+nothing else can move the values, patches `$921E` (`JSR $6000`) to `RTS` so only the control
+logic runs, and then sets inputs and reads outputs on the real 6502.
+
+`$95FD` is `PDL(1)` and `$95FE` is `PDL(0)` - STARSHIP SIMULATOR line 19 pokes them,
+`POKE 38397,J: POKE 38398,K`. Per call:
+
+| paddle | pitch / bank change |
+| --- | --- |
+| 0-30 | +4 |
+| 31-49 | +3 |
+| 50-69 | +2 |
+| 70-89 | +1 |
+| **90-169** | **0 - the dead zone** |
+| 170-189 | -1 |
+| 190-209 | -2 |
+| 210-229 | -3 |
+| 230-255 | -4 |
+
+Bank's first step is at **30**, pitch's at **31** (`CMP #$1E` against `CMP #$1F`). That is
+the one asymmetry in the whole table, and it is in the disassembly and in the measurement
+both.
+
+**Bank drives heading** (`$912E`), which is what makes a turn a roll rather than a yaw:
+
+| bank | heading change |
+| --- | --- |
+| -4..+4 | 0 |
+| 5-16 | -1 |
+| 17-32 | -2 |
+| 33-47 | -3 |
+| 48 | -4 |
+| -16..-5 | +1 |
+| -32..-17 | +2 |
+| -48..-33 | +3 |
+
+**Bank is clamped to +/-48.** `$91FE` and `$920E` undo an increment that would carry bank
+into `$30..$CF`. Measured by holding full deflection: bank steps -4, -8 ... -48 and then
+stays at -48 however long you hold it.
+
+**Pitching past vertical reverses heading** (`$90F2`). While pitch is in `$40..$BF` the ship
+is inverted, and crossing into or out of that band flips the heading once - `$952F` latches
+which side you are on so it happens on the transition, not every pass. Measured from
+heading 100: entering the band gives 226, leaving it gives 226 again from 100.
+
+The flip is not symmetric: it is `ADC #$7E` (+126) when heading is below `$7F` and
+`SBC #$7F` (-127) otherwise. That band matches STARSHIP SIMULATOR line 129's
+`IF P > 190 OR P < 64 THEN Y = Y - 2 * Y1`, which inverts the vertical velocity over the
+same range.
+
+### The last 86 bytes are not code or tables
+
+`$9222-$9277` is never executed and nothing can reach it. Rendered as Applesoft it reads:
+
+```basic
+O(I) = ASC(MID$(N$,J,1)) - 48 : IF O(I) > 9 THEN O(I) = O(I) - 7
+J = J + 1 : NEXT I : O = 4096 * O(1)
+```
+
+A hex-string-to-number converter, caught in memory when the module was BSAVEd over a region
+wider than the code. SOUND GEN BLOADs to `$9276` and overwrites the last two bytes of it,
+which is harmless for the same reason.
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -569,7 +656,8 @@ With both fixed: **26 of 26 shapes render exactly, 0 pixels differ.**
 - Everything about flight rendering. The parity harness covers one static screen; nothing
   that moves has been compared.
 - What `CALL 38402` (TRANLIT.OBJ0) draws into the gauge boxes.
-- What opcodes 1, 2 and 3 mean in the ship bytecode, and how `CALL CA` (`$9023`) projects
-  it. 1 behaves as a move and 2 as a line, but 3 is unexplained and the renderer is
-  undisassembled.
+- The renderer itself: LO-HI A2-3D1 at `$6000`, 4864 bytes, called from `$921E`. It holds
+  `CSN`/`SN` at `$6006`/`$6009` and is what projects the ship bytecode. Not disassembled.
+- What opcodes 1, 2 and 3 mean in the ship bytecode. 1 behaves as a move and 2 as a line,
+  but 3 is unexplained, and settling it needs `$6000`.
 - What the `PLANET # n` files at `$7300` are. They are not shape tables either.
