@@ -139,6 +139,19 @@ for (const [heading, pitch] of [[16, 8], [32, 8], [16, 248], [48, 250], [64, 6]]
   jobs.push({ sweep: 'h+p', p: { x: Math.round(700 + dx), y: 100, z: Math.round(-6401 + dz) }, heading, pitch });
 }
 
+// Large pitch. The wide sweep above varies heading all the way round, but pitch was never
+// taken past 8 - and the ground wireframe on approach is drawn at pitches well beyond that.
+// Same trick: place the point so the rotation should bring it back to the middle.
+const RP = (p) => { const a = (p / 256) * 2 * Math.PI; return { c: Math.cos(a), s: Math.sin(a) }; };
+for (const pitch of [12, 16, 24, 32, 40, 48, 244, 236, 224, 216]) {
+  // inverse of the fitted pitch (sign -1), applied to a target of (-300, -300, 2901)
+  const { c, s } = RP(pitch);
+  const ty = -300, tz = 2901;
+  const dy = ty * c - tz * s, dz = ty * s + tz * c;
+  jobs.push({ sweep: 'wide-p', p: { x: 400, y: Math.round(200 + dy), z: Math.round(-6401 + dz) }, pitch });
+}
+
+
 for (const j of jobs) {
   const opts = {};
   if (j.heading !== undefined) opts.heading = j.heading;

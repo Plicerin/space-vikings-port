@@ -2,10 +2,10 @@
 //
 // The original's world-to-screen projection, derived by measurement rather than read out of
 // the disassembly. probe_project.mjs replaced the ship model at $7879 with a single vertex
-// and asked the renderer where it went, for 54 camera and world positions;
+// and asked the renderer where it went, for 64 camera and world positions;
 // fit_projection.mjs solved for the constants and searched the rotation conventions.
 //
-// Fit: 0.61 px rms, worst single point 1.71 px.
+// Fit: 0.59 px rms, worst single point 1.80 px.
 // Projecting all of SHIP # 3's vertices reproduces the original's bounding box to within
 // about 1.5 px, except at closest approach where the renderer clips and this does not.
 
@@ -66,31 +66,39 @@ export const diskSin = (byte: number): number => DISK_SIN_Q15[byte & 255] * Q15;
 /** The original's cosine of a byte angle. */
 export const diskCos = (byte: number): number => DISK_COS_Q15[byte & 255] * Q15;
 
-/** sx = 139.0 + 230.9 * dx / dz */
-export const SCREEN_CENTRE_X = 138.97;
+/** sx = 138.9 + 230.9 * dx / dz */
+export const SCREEN_CENTRE_X = 138.88;
 export const FOCAL_X = 230.90;
 
 /**
- * sy = 61.7 - 212.7 * dy / dz
+ * sy = 61.7 - 212.8 * dy / dz
  *
- * FOCAL_Y / FOCAL_X is 0.921, and a 280x192 frame on a 4:3
+ * FOCAL_Y / FOCAL_X is 0.922, and a 280x192 frame on a 4:3
  * display has a pixel aspect of 0.914 - so this is one focal
  * length with the Apple's non-square pixels corrected for, not two independent constants.
  */
-export const SCREEN_CENTRE_Y = 61.72;
-export const FOCAL_Y = 212.68;
+export const SCREEN_CENTRE_Y = 61.74;
+export const FOCAL_Y = 212.80;
 
 export interface Vec3 { x: number; y: number; z: number; }
 
 /**
- * World point to screen, the way the original does it: translate to the camera, yaw by
- * heading, then pitch, then divide.
- *
- * Rotation order is yaw-then-pitch; the fit is unambiguous about it (0.61 px
- * against 3.11 px the other way round). Returns null for points at or behind the camera -
- * the original clips those, and this does not attempt to.
+ * The near plane, measured by oracle/probe_near.mjs: a point straight ahead is still drawn
+ * at dz 0 and not at dz -50, and a line running from behind the camera to in front of it
+ * IS drawn - the original clips it at the near plane rather than dropping it. Anything at
+ * or behind this is not in front of you.
  */
-export function projectWorldPoint(p: Vec3, camera: Vec3, heading: number, pitch: number): { x: number; y: number } | null {
+export const NEAR_Z = 1;
+
+/**
+ * World point into camera space: translate to the camera, yaw by heading, then pitch.
+ *
+ * Kept separate from the divide so that segments can be clipped against the near plane in
+ * three dimensions, where it is meaningful. Projecting first and dropping whatever landed
+ * behind the camera loses any segment that straddles it, which is most of a ground plane
+ * once you are flying over one.
+ */
+export function toCameraSpace(p: Vec3, camera: Vec3, heading: number, pitch: number): Vec3 {
   let dx = p.x - camera.x;
   let dy = p.y - camera.y;
   let dz = p.z - camera.z;
@@ -106,11 +114,43 @@ export function projectWorldPoint(p: Vec3, camera: Vec3, heading: number, pitch:
   dz = dy * sp + dz * cp;
   dy = ny;
 
-  if (dz <= 1) return null;
+  return { x: dx, y: dy, z: dz };
+}
+
+/** Camera space to screen. Returns null at or behind the near plane. */
+export function projectCameraSpace(d: Vec3): { x: number; y: number } | null {
+  if (d.z <= NEAR_Z) return null;
   return {
-    x: SCREEN_CENTRE_X + FOCAL_X * (dx / dz),
-    y: SCREEN_CENTRE_Y - FOCAL_Y * (dy / dz),
+    x: SCREEN_CENTRE_X + FOCAL_X * (d.x / d.z),
+    y: SCREEN_CENTRE_Y - FOCAL_Y * (d.y / d.z),
   };
+}
+
+/**
+ * Clip a camera-space segment against the near plane.
+ *
+ * Returns null when both ends are behind it, otherwise the segment with whichever end was
+ * behind pulled forward onto the plane.
+ */
+export function clipNear(a: Vec3, b: Vec3): { a: Vec3; b: Vec3 } | null {
+  const aIn = a.z > NEAR_Z, bIn = b.z > NEAR_Z;
+  if (!aIn && !bIn) return null;
+  if (aIn && bIn) return { a, b };
+  const t = (NEAR_Z - a.z) / (b.z - a.z);
+  const at = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: NEAR_Z };
+  return aIn ? { a, b: at } : { a: at, b };
+}
+
+/**
+ * World point to screen, the way the original does it: translate to the camera, yaw by
+ * heading, then pitch, then divide.
+ *
+ * Rotation order is yaw-then-pitch; the fit is unambiguous about it (0.59 px
+ * against 3.11 px the other way round). Returns null for points at or behind the near
+ * plane - use toCameraSpace() and clipNear() for anything that is part of a line.
+ */
+export function projectWorldPoint(p: Vec3, camera: Vec3, heading: number, pitch: number): { x: number; y: number } | null {
+  return projectCameraSpace(toCameraSpace(p, camera, heading, pitch));
 }
 
 /**

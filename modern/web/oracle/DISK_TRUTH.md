@@ -1115,6 +1115,50 @@ only drawn thing in flight with no counterpart in the original.
 
 ---
 
+## Near-plane clipping, and what the steep-angle gap is not
+
+### The near plane is at 0, and the original clips to it
+
+`probe_near.mjs` puts a single point straight ahead at a shrinking distance: it is still
+drawn at **dz 0** and gone at dz -50. And a line running from well behind the camera to well
+in front **is drawn** - 92 pixels for one spanning dz -2000 to 4000 - so the original clips
+such a segment at the near plane rather than dropping it.
+
+`projectShipWorld()` had been projecting each vertex on its own and dropping whatever landed
+behind the camera, which loses the whole segment. It now transforms to camera space, clips
+the segment there with `clipNear()`, and only then divides - `diskProjection.ts` exposes
+`toCameraSpace()`, `projectCameraSpace()` and `clipNear()` for it.
+
+**This is correct and it changes none of the numbers.** Ships 73.8%, stars 37.5%, ground
+64.2%, all unmoved. At the states measured, 14 to 17 segments per frame do straddle the near
+plane - so the new path is exercised - but over a ground plane seen from above they run off
+the *bottom* of the view, and the screen clip rejects them either way. The fix is right; the
+gap it was meant to close was somewhere else.
+
+### The steep-angle gap is not culling, and not the projection
+
+Two ground states do badly: pitch +32 (61% within a pixel, the port drawing one horizon row
+against a spread from y 0 to 92) and heading +64 (40.7% exact). Both were assumed to be
+culling. Neither is.
+
+**The clipper is right.** Unit-tested on a segment crossing top to bottom, one crossing left
+to right, one wholly inside, one wholly above, and one running to coordinates of 231,000 -
+it keeps and trims each correctly and rejects only the one that should be rejected.
+
+**The projection holds at large pitch.** The wide sweep that validated the rotation all the
+way round only varied *heading*; pitch had never been taken past 8. Extending it - placing
+each point so the pitch rotation should bring it back to the middle - every one lands at
+**(114.5, 82-84)** for pitches 12, 16, 24, 32, 40, 48 and 244 down to 216. The fit over all
+64 observations is **0.59 px rms**.
+
+So at pitch +32 the original draws 460 pixels of ground across the full width and the port
+draws none, and neither the clipper nor the transform accounts for it. **The cause is not
+identified.** It is worth noting that what the disk draws there is thin and wide - 460
+pixels spread over 276 columns, under two rows' worth - which does not look like a grid seen
+edge-on so much as a small number of long lines.
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -1136,8 +1180,9 @@ only drawn thing in flight with no counterpart in the original.
   reimplementation of the same formula.
 - What opcode 3 means. The harness prefers "draw and continue" at 73.6% over 72.6% and
   72.2% for the alternatives, which is not much of a margin.
-- Culling at steep angles. The ground wireframe is 85.4% within a pixel overall but only
-  61% at pitch +32, where much of the grid falls behind the camera.
+- The steep-angle ground gap. Near-plane clipping is implemented and correct, the screen
+  clipper is unit-tested, and the projection is validated to pitch 48 - none of them
+  explains pitch +32, where the original draws 460 pixels and the port draws none.
 - `renderPlanet()`'s procedural disc, which is now the only drawn thing in flight with no
   counterpart on the disk.
 - What state `$6000` needs before it will draw. Snapshot and replay sidesteps the question

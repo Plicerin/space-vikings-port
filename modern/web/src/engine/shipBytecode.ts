@@ -1,5 +1,8 @@
 import type { Hires } from './hires';
-import { projectWorldPoint, clipSegment, insideClip, type Vec3 as ProjVec3 } from './diskProjection';
+import {
+  toCameraSpace, projectCameraSpace, clipNear, clipSegment, insideClip,
+  type Vec3 as ProjVec3,
+} from './diskProjection';
 
 export interface ShipBytecodeHeaderOp {
   kind: 'set-state';
@@ -403,32 +406,50 @@ export function projectShipWorld(
 
   const segments: ShipWorldSegment[] = [];
   const dots: ShipProjectedPoint[] = [];
-  let pen: ShipProjectedPoint | null = null;
+  let pen: ProjVec3 | null = null;
   let culled = 0, clippedAway = 0;
 
   for (const op of ops) {
     if (op.kind !== 'vector') continue;
-    const q = projectWorldPoint(
+    // Camera space first, and keep it: a segment is clipped against the near plane in
+    // three dimensions, before the divide. Projecting each vertex and dropping the ones
+    // behind the camera loses every segment that straddles it, which over a ground plane
+    // is most of them.
+    const d = toCameraSpace(
       { x: op.x + shift.x, y: op.y + shift.y, z: op.z + shift.z },
       camera, headingByte, pitchByte,
     );
-    if (!q) { culled++; pen = null; continue; }
+
     if (op.opcode === 0) {                              // a point on its own
-      if (insideClip(q.x, q.y)) dots.push(q); else clippedAway++;
+      const q = projectCameraSpace(d);
+      if (!q) culled++;
+      else if (insideClip(q.x, q.y)) dots.push(q);
+      else clippedAway++;
       pen = null;
       continue;
     }
-    if (op.opcode === 1) { pen = q; continue; }         // start a run
-    if (op.opcode === 3 && opcode3 === 'move') { pen = q; continue; }
+    if (op.opcode === 1) { pen = d; continue; }         // start a run
+    if (op.opcode === 3 && opcode3 === 'move') { pen = d; continue; }
     if (pen) {                                          // 2 and 3 draw
-      // Clip the way the original does, against the view measured by probe_clip.mjs.
-      // The pen still advances to the unclipped point, so the next segment starts from
-      // where the model says - only what is drawn is trimmed.
-      const c = clipSegment(pen.x, pen.y, q.x, q.y);
-      if (c) segments.push({ from: { x: c.ax, y: c.ay }, to: { x: c.bx, y: c.by } });
-      else clippedAway++;
+      const near = clipNear(pen, d);
+      if (!near) {
+        culled++;
+      } else {
+        const pa = projectCameraSpace(near.a);
+        const pb = projectCameraSpace(near.b);
+        if (!pa || !pb) {
+          culled++;
+        } else {
+          // Then against the view, the way the original does at $61A9-$620F.
+          const c = clipSegment(pa.x, pa.y, pb.x, pb.y);
+          if (c) segments.push({ from: { x: c.ax, y: c.ay }, to: { x: c.bx, y: c.by } });
+          else clippedAway++;
+        }
+      }
     }
-    pen = (op.opcode === 3 && opcode3 === 'lift') ? null : q;
+    // The pen advances to the unclipped point, so the next segment starts where the model
+    // says it does.
+    pen = (op.opcode === 3 && opcode3 === 'lift') ? null : d;
   }
   return { segments, dots, culled, clippedAway };
 }
