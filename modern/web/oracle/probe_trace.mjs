@@ -12,8 +12,14 @@ import { openDisk, DISK, asMemory } from './dsk.mjs';
 import { listProgram } from './detokenise.mjs';
 import fs from 'fs';
 
-const LO = 0x9023, HI = 0x9278;            // SPACE SIMULATOR ASSEMBLY: $9023 + $255
-const TRIG_LO = 0x6000, TRIG_HI = 0x6300;  // LO-HI A2-3D1, which holds CSN/SN at $6006/$6009
+// Defaults trace SPACE SIMULATOR ASSEMBLY ($9023 + $255). Pass lo, hi and a frame count to
+// point it somewhere else - the renderer at $6000 needs far more frames, because one pass
+// of the Applesoft main loop costs half a million instructions.
+const LO = Number(process.argv[2] ?? 0x9023);
+const HI = Number(process.argv[3] ?? 0x9278);
+const FRAMES = Number(process.argv[4] ?? 240);
+const OUT = process.argv[5] ?? 'captured/trace_9023.json';
+const TRIG_LO = 0x6000, TRIG_HI = 0x6300;
 
 const disk = openDisk(DISK);
 const sim = disk.files.find((f) => f.name === 'STARSHIP SIMULATOR');
@@ -61,8 +67,8 @@ const trace = JSON.parse(await a2.ev(`(() => {
     prevPC = pc;
   };
 
-  // 240 frames of flight is plenty: CALL CA runs every pass through the main loop.
-  for (let f = 0; f < 240; f++) {
+  // Every pass of the main loop calls into both modules.
+  for (let f = 0; f < ${FRAMES}; f++) {
     cpu.stepCyclesDebug(M.FRAME_CYCLES, hook);
     const mmu = M.a2.getMMU && M.a2.getMMU();
     if (mmu && mmu.resetVB) mmu.resetVB();
@@ -106,8 +112,8 @@ for (let i = 0; i <= trace.exec.length; i++) {
 console.log(`\n${gaps.length} run(s) of 4+ bytes never executed:`);
 for (const [a, b] of gaps) console.log(`  $${a.toString(16).toUpperCase()}-$${b.toString(16).toUpperCase()}  (${b - a + 1} bytes)`);
 
-fs.writeFileSync('captured/trace_9023.json', JSON.stringify({
+fs.writeFileSync(OUT, JSON.stringify({
   lo: LO, hi: HI, image: Array.from(image), exec: trace.exec, trig: trace.trig,
   entries: trace.entries, instructions: trace.instructions, inside: trace.inside,
 }) + '\n');
-console.log('\nwrote captured/trace_9023.json');
+console.log('\nwrote ' + OUT);

@@ -640,6 +640,105 @@ which is harmless for the same reason.
 
 ---
 
+## The renderer: LO-HI A2-3D1 at $6000
+
+4864 bytes, BLOADed by START line 90, entered from `$921E: JSR $6000` at the end of the
+flight controls. Listing in `captured/renderer_6000.asm`.
+
+Traced over 1500 frames of real flight: **5,126,242 of 7,985,458 instructions were inside
+this module - 64% of all CPU time.** It was entered 9 times as `$6000`, 27 times at `$6006`
+and 18 times at `$6009`. 1,483 of its bytes were seen executing, and traversal from those
+plus the entry points reaches 2,008 - the rest is tables and data.
+
+### Shape of it
+
+| address | what |
+| --- | --- |
+| `$6000` | `JMP $611C` |
+| `$6006`, `$6009` | `JMP` to the sine and cosine |
+| `$600C-$6099` | **zero-page save buffer**, not tables - see below |
+| `$609A-$611B` | quarter-wave cosine table, 65 entries of 16-bit LE |
+| `$611C` | entry: save zero page, `JSR $6140`, restore |
+| `$6140` | the renderer proper: clears `$7B-$9C`, sets `$9C = $73` (the page PLANET # 0 and the ship model live on) |
+| `$61A9`, `$61CA`, `$61D7`, `$620F` | line clipping |
+| `$633D`, `$635C` | signed multiply |
+| `$64F8`, `$64FB`, `$6526`, `$653F` | sine and cosine |
+
+`$611C` copies zero page `$60-$C1` into `$6013-$6075`, calls `$6140`, and copies it back.
+So the file's own head is a **save area**, and what is on the disk there is whatever was in
+the developer's zero page when the module was BSAVEd - which is why it disassembles as
+stray Applesoft tokens. It is not data the renderer reads.
+
+### $635C is a signed Q15 multiply - measured
+
+`$633D` loads two 16-bit values from zero page through X and Y, calls `$635C`, and stores a
+16-bit result. `$635C` takes the sign from `$79 EOR $7B`, takes absolute values, and returns
+low byte in A, high in X.
+
+`probe_mul.mjs` calls it directly - no BASIC, the return address pushed by hand pointing at
+a `JMP`-to-self so stepping stops exactly on return - and it computes **`(p * q) / 32768`**,
+truncating, worst error 1.5 over the test cases:
+
+| p | q | result | p*q/32768 |
+| --- | --- | --- | --- |
+| 256 | 256 | 2 | 2.00 |
+| 16384 | 2 | 1 | 1.00 |
+| 32767 | 32767 | 32765 | 32766.00 |
+| -1000 | -1000 | 29 | 30.52 |
+| 32767 | 16384 | 16383 | 16383.50 |
+
+That is the same `DI = 32768` the BASIC divides trig results by at STARSHIP SIMULATOR line
+129. The engine has one fixed-point convention throughout: **Q15**.
+
+### Line clipping is Cohen-Sutherland
+
+`$6212` copies an 8-byte segment record, `JSR $61A9` computes outcodes into `$66` and `$6E`,
+and then:
+
+```
+$621E  LDA $66 : AND $6E : BNE $620F     ; both outside the same edge - reject
+$6224  LDA $66 : BNE $61D7               ; clip the first endpoint
+$6228  LDA $6E : BNE $61CA               ; clip the second
+$622C  BEQ $6270                         ; both inside - draw
+```
+
+### CSN and SN are the other way round, and wrong outside the first quadrant
+
+`$6006` (`CSN` in the BASIC) is `SEC: SBC #$40` and then falls into `$6009`'s body, so
+**`$6006(a) = $6009(a - 64)`**. Measured over all 256 inputs: `$6009` is
+`32767 * cos(2*pi*a/256)` and `$6006` is `32767 * sin(...)`. The BASIC's names are the wrong
+way round relative to the maths.
+
+The table at `$609A` is a quarter wave - 65 entries, index 0 to 64, exact to +/-1 - and the
+routine reconstructs the other three quadrants by negating. That negation is wrong:
+
+```
+$6509  SEC
+$650A  LDA #$00
+$650C  SBC $609B,Y      ; the HIGH byte
+$650F  TAX              ; ...stored as the result's high byte
+$6510  SBC $609A,Y      ; the LOW byte, subtracted from what is left in A
+```
+
+A correct 16-bit negation reloads `#$00` before the second subtract so the borrow lands on
+the high byte. This one does not, so the low byte comes out as `(0 - high) - low - borrow`.
+
+**So the original's sine and cosine are exact in the first quadrant and wrong everywhere
+else, by up to 486.5 - 1.48% of full scale.** Simulating those instructions exactly
+reproduces **512 of 512** measured values, so this is the behaviour and not an artefact of
+measuring. A port that computes real sines will not match the original's geometry.
+
+### What is not settled
+
+Calling `$6000` from a cold machine with all fifteen of START's binaries loaded and the ship
+placed at `$731B` **returns without drawing anything** (`probe_render.mjs`). It needs more
+setup than that - at least what `TRANLIT.OBJ0` builds through `CALL 38825`, and whatever
+object list `$6140` walks from page `$73`. Until that is reconstructed there is no ship
+render to compare the port against, and the projection itself - how the model bytecode at
+`$7879` becomes screen coordinates - has not been derived.
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -656,8 +755,10 @@ which is harmless for the same reason.
 - Everything about flight rendering. The parity harness covers one static screen; nothing
   that moves has been compared.
 - What `CALL 38402` (TRANLIT.OBJ0) draws into the gauge boxes.
-- The renderer itself: LO-HI A2-3D1 at `$6000`, 4864 bytes, called from `$921E`. It holds
-  `CSN`/`SN` at `$6006`/`$6009` and is what projects the ship bytecode. Not disassembled.
+- The projection in `$6000`: how the model bytecode at `$7879` becomes screen coordinates.
+  The multiply, the clipper and the trig are identified; the transform around them is not.
+- What state `$6000` needs before it will draw. Loading all fifteen binaries and placing
+  the ship is not enough.
 - What opcodes 1, 2 and 3 mean in the ship bytecode. 1 behaves as a move and 2 as a line,
-  but 3 is unexplained, and settling it needs `$6000`.
+  but 3 is unexplained.
 - What the `PLANET # n` files at `$7300` are. They are not shape tables either.
