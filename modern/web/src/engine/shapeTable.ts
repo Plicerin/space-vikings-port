@@ -50,8 +50,11 @@ export function decodeShape(rawBytes: number[]): Shape {
     if (b === 0) break;
     // Vector A — always emitted for a non-zero byte.
     vectors.push({ dir: b & 0x03, plot: (b & 0x04) !== 0 });
-    // Vector B — emitted iff bits 3-5 are non-zero.
-    if (((b >> 3) & 0x07) !== 0) {
+    // Vector B - emitted iff bits 3-7 are non-zero, NOT bits 3-5. The rule is that the
+    // rest of the byte is ignored once the REMAINING bits are all zero, so a byte with
+    // bits 3-5 clear but 6-7 set still carries a B vector: direction 0 (up), no plot.
+    // Testing bits 3-5 dropped that move and shifted everything after it.
+    if ((b >> 3) !== 0) {
       vectors.push({ dir: (b >> 3) & 0x03, plot: (b & 0x20) !== 0 });
     }
     // Vector C — emitted iff bits 6-7 are non-zero. No plot bit on C.
@@ -251,9 +254,14 @@ export class ShapeRenderer {
   }
 
   private plotSegment(x1: number, y1: number, x2: number, y2: number): void {
+    // A plot vector lights the pen's CURRENT position and then moves, so the destination
+    // belongs to the next vector, not this one - i runs to stepCount exclusive. Including
+    // it lit an extra pixel per vector; that mostly hid, because the next vector's plot
+    // lands on the same spot, and only showed where a plot was followed by a move or ended
+    // a run. At SCALE=N this still lights N pixels along the way, as the Apple does.
     const stepCount = Math.max(1, Math.ceil(Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))));
     const inv = 1 / stepCount;
-    for (let i = 0; i <= stepCount; i++) {
+    for (let i = 0; i < stepCount; i++) {
       this.hires.hplot(
         Math.round(x1 + (x2 - x1) * i * inv),
         Math.round(y1 + (y2 - y1) * i * inv),

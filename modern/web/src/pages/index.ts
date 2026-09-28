@@ -2,6 +2,7 @@
 // SceneManager, and every registered scene.  Entry point for the Vite app.
 
 import { Hires } from '../engine/hires';
+import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import { SceneManager } from '../engine/sceneManager';
 import { Input } from '../engine/input';
 import { Audio } from '../engine/audio';
@@ -96,7 +97,8 @@ function boot(): void {
 
   // Handles for the frame-parity harness (oracle/frame_parity.mjs), which renders a
   // screen on a throwaway Hires and diffs it against the original disk's hi-res page.
-  (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments };
+  (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments,
+    ShapeRenderer, decodeShapeTableJson };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();

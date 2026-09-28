@@ -1,0 +1,163 @@
+{
+  "num_shapes": 26,
+  "offsets": [
+    62,
+    68,
+    175,
+    198,
+    215,
+    229,
+    236,
+    241,
+    264,
+    296,
+    325,
+    374,
+    394,
+    401,
+    408,
+    529,
+    628,
+    729,
+    848,
+    919,
+    956,
+    972,
+    992,
+    1021,
+    1047,
+    1074
+  ],
+  "shapes": [
+    {
+      "index": 0,
+      "offset": 62,
+      "raw_bytes": "3e242d360400"
+    },
+    {
+      "index": 1,
+      "offset": 68,
+      "raw_bytes": "2c3c961e350d18242d2c15a5da731f568c150c18d01bfdba9e2108d83c600c189fb9ff6f0858c84a1c1c943af0390c5808d80d556c1224acb23508580c9c130c084896530c96929e8adf18b8d9db0b18f70d1828100cd81a0d0c080808480818f8db1be0138caa35153500"
+    },
+    {
+      "index": 2,
+      "offset": 175,
+      "raw_bytes": "24b412360c580c1c1f1e0e4d080f1858dff3aa6a090400"
+    },
+    {
+      "index": 3,
+      "offset": 198,
+      "raw_bytes": "2496360cd86c2ed0fa0c186856fc1b2600"
+    },
+    {
+      "index": 4,
+      "offset": 215,
+      "raw_bytes": "24963e08180dfd1b0c0d161f0400"
+    },
+    {
+      "index": 5,
+      "offset": 229,
+      "raw_bytes": "b426085e1f2400"
+    },
+    {
+      "index": 6,
+      "offset": 236,
+      "raw_bytes": "b40c1f0400"
+    },
+    {
+      "index": 7,
+      "offset": 241,
+      "raw_bytes": "1f6e0de421fc1bf669966b0c58292dfddbdb1b3f3f0400"
+    },
+    {
+      "index": 8,
+      "offset": 264,
+      "raw_bytes": "1e1e650c2c282828f09ad3d0e09e931c96f11e1e4d0848081808d88e0d180400"
+    },
+    {
+      "index": 9,
+      "offset": 296,
+      "raw_bytes": "1515e71c3c383838708a51080c9619550cd6aa1515df08d808d8e30400"
+    },
+    {
+      "index": 10,
+      "offset": 325,
+      "raw_bytes": "0c182024b492921236360c18081808180898492d2ddfdbdb3b3f6f490918180f18969210081e4d491c0c1808180d180400"
+    },
+    {
+      "index": 11,
+      "offset": 374,
+      "raw_bytes": "0c1820b49292360c1808184829fddbdb2b1f0400"
+    },
+    {
+      "index": 12,
+      "offset": 394,
+      "raw_bytes": "740e3f3f0c0400"
+    },
+    {
+      "index": 13,
+      "offset": 401,
+      "raw_bytes": "e51c36360c0400"
+    },
+    {
+      "index": 14,
+      "offset": 408,
+      "raw_bytes": "dfdbdbdb1b64242c20640c980d182d182d0c5f0d0c2d2d3e3ff75f4fc92d2dde4b3b3f3ff72b2ded13ff394e3f77093ff729353f772b2d3e3f2ebd393fce192d2d25240d180c980d180d180d180d5865fe3b3f2e1f2e1737be126c095808080818081808d8132d2d2c96d2da9eb309de0d5808080808182000"
+    },
+    {
+      "index": 15,
+      "offset": 529,
+      "raw_bytes": "4d4949490924243c201c1ce50fd80a1c1ce73f1c3f3736363675a9311595ab2320189092092d2d2d3c3f3f272d2d2d0dd83f3f3f1c2d2d2d253f3f3fe75b2d2d2d2d3c3f3f3f3fe72d2d2d2d2d1c3f3f3f3f272d2d2d2d1c3f3f3f272d2de51b3f0400"
+    },
+    {
+      "index": 16,
+      "offset": 628,
+      "raw_bytes": "dbdb1b3f3f3f3636ae3615953035752d0e2d2d252424243fe7e71c1c10243f3f372d2d3e3f372d2d753f3f3f0e0e582d2d75393f3f3f372d2d2d2d2d353f3f3f3f3f0e2d2d2d2d353f3f3f3f152d2d2d353f3f0c1808180818081808184d20f8b349920400"
+    },
+    {
+      "index": 17,
+      "offset": 729,
+      "raw_bytes": "4949292d6d2b353636170fbebe1717173f1e3f3f270818081808180818081808189092123636360e582d2ddc5b2b2d0d2d0c3f3f9c3f672b2d2d2d2d0c3f3f3f3f3f2c2d2d2d2de5dbdbdb1975492820251c242d6d2f7d3a3f3f2e2d0d773f3f2e2df53f3f172d2dfddb1b0818d00c18df680908982300"
+    },
+    {
+      "index": 18,
+      "offset": 848,
+      "raw_bytes": "24243f3f3f363636362e2d2d2d2d2d25242424243f3f77493f3f1f3f3f2e2d6d2d2d1e3d3f3f3f3f372d2d2d2d2d3636e63f3f3f3f7f202c2d2d2d2d5e3f3f3f3f2e2d6d6f2500"
+    },
+    {
+      "index": 19,
+      "offset": 919,
+      "raw_bytes": "5c243f3faf36362e2d2d2d2524243c3f36f6312d24243f15361f37fd2b242435fe22240400"
+    },
+    {
+      "index": 20,
+      "offset": 956,
+      "raw_bytes": "3c3f362e2d2d2524bf3127bc3a272500"
+    },
+    {
+      "index": 21,
+      "offset": 972,
+      "raw_bytes": "242c3536363e3f2724242c36362e2524b41a0400"
+    },
+    {
+      "index": 22,
+      "offset": 992,
+      "raw_bytes": "2d2d2d353e3f3f3f3f3f3f0f982c2d2d2d2d2d2ddfdb0b183f3f3f0400"
+    },
+    {
+      "index": 23,
+      "offset": 1021,
+      "raw_bytes": "2424242c36363636363636272424bc9212242424242424240400"
+    },
+    {
+      "index": 24,
+      "offset": 1047,
+      "raw_bytes": "2c2d2d2d363f3f3f2c2d2ddfdb5b383f3f372e2d2d2d273f3f2700"
+    },
+    {
+      "index": 25,
+      "offset": 1074,
+      "raw_bytes": "2d2424243c3f36363636363636ed2024240c1824242c3636b63636362524242400"
+    }
+  ]
+}

@@ -457,6 +457,102 @@ nothing is missing on screen - but that routine has not been disassembled.
 
 ---
 
+## Ships and shapes
+
+Two unrelated things live under "shapes" on this disk, and conflating them is what went
+wrong in the port.
+
+### The ship models are 3D vector bytecode, not shape tables
+
+`SHIP # 0/1/3/4` and `DEBRIS` are BLOADed to `$7879` and walked by the machine code at
+`$9023`. The format (`probe_shapes.mjs`):
+
+| byte | meaning |
+| --- | --- |
+| `04 nn` | set-state, one operand; every model starts with one |
+| `0n xx xx yy yy zz zz` | a vertex: opcode 0-3 then three 16-bit little-endian signed coordinates |
+| `7F` | end of model |
+
+Every model parses to the last byte with nothing left over. **`SHIP # 0` is a one-byte file
+containing exactly `$7F`** - an empty model, which is the clearest confirmation of the
+terminator there could be.
+
+The coordinates are world coordinates, already placed: SHIP # 1 runs x 270..560, y
+-175..-65, z -3535..-3465, around the anchor STARSHIP SIMULATOR line 2 sets up as
+`X9=400, Y9=-100, Z9=-3500`.
+
+| model | bytes | ops | opcodes |
+| --- | --- | --- | --- |
+| SHIP # 0 | 1 | 0 | empty |
+| SHIP # 1 | 962 | 138 | 1x22 2x91 3x24 |
+| SHIP # 3 | 1046 | 150 | 0x7 1x24 2x100 3x18 |
+| SHIP # 4 | 1592 | 228 | 1x56 2x170 3x1 |
+| DEBRIS | 354 | 51 | 0x50 |
+
+DEBRIS being fifty opcode-0 records and nothing else is what a debris cloud should be: a
+scatter of points. What opcodes 1, 2 and 3 mean exactly is not settled - the renderer at
+`$9023` has not been disassembled - but 1 behaves as a move and 2 as a line.
+
+> The port's ship bytecode was **already byte-identical to the disk** for ships 1, 3 and 4.
+> Its extractor read `../../extracted/*.payload.bin`, files of unknown provenance that
+> happen to be right. It now reads the disk, and SHIP # 0 and DEBRIS - which had never been
+> extracted - come with it.
+
+### The shape table is a different file
+
+`ENEMY I.A24580.L68` is BLOADed to `$7FFF`, and STARSHIP SIMULATOR line 2 does
+`POKE 232,HL: POKE 233,127`, pointing Applesoft's shape-table vector (`$E8/$E9`) at it. It
+is a real Applesoft shape table: **26 shapes**. Which shape is used where, from the BASIC:
+
+| shape | used by |
+| --- | --- |
+| 1, 5 | GALAXY MAP 3040/3050, `DRAW PL` - the planet symbols |
+| 2 | XDRAWn as a small sprite at various ROT and SCALE |
+| 12 | GALAXY MAP |
+| 13, 14 | STARSHIP SIMULATOR 159/180 - the panel needles (13 horizontal, 14 vertical) |
+| 15, 16, 17, 18 | XDRAWn **all four at the same anchor** - one 28x28 composite, the explosion |
+| 25 | a marker, drawn by almost every program |
+| 26 | STARSHIP SIMULATOR |
+
+Sprite choice is not by ship kind. `EX` line 6 draws 2 then 15, 16, 17, 18 all at
+`140,65` at SCALE=2, which is the explosion.
+
+> **The port's `ship-N.json` and `planet-N.json` "shape tables" are fabrications.** They
+> come from running an Applesoft shape-table decoder over files that are not shape tables.
+> `ship-1.json` declares offsets `[0, 1, 44, 1, 171]` - a shape table's offsets must point
+> past its own header, and 0 and 1 point into it. The real table is now extracted to
+> `public/data/shapes/shape-table.json`. Rewiring `cockpit.ts` to use it is **not done**:
+> it currently picks a sprite index by ship kind out of the fabricated table, and the disk
+> says sprite choice does not work that way.
+
+### The port's shape interpreter had two bugs, and now matches the ROM exactly
+
+`probe_shapetable.mjs` writes the table into memory at `$7FFF`, points `$E8/$E9` at it and
+DRAWs all 26 shapes on the real Applesoft ROM at `(140,96)`, `ROT=0`, `SCALE=1`,
+`HCOLOR=3`. No disk and no DOS: it enters Applesoft's cold start at `$E000`, and a
+five-line BASIC driver reads the shape number out of a zero-page byte so each shape costs a
+poke instead of thirty keystrokes. `shape_parity.mjs` then draws the same 26 with the
+port's `ShapeRenderer` and compares.
+
+It started at **8 of 26 exact, 133 pixels differing** - and in every failing case the port
+lit *more* pixels than the ROM, never fewer.
+
+**A plot vector lights one pixel, not two.** `plotSegment` ran `for (i = 0; i <= stepCount)`,
+plotting both endpoints. On the Apple a plot vector lights the pen's current position and
+*then* moves, so the destination belongs to the next vector. The extra mostly hid, because
+the next vector's plot lands on the same spot, and only showed where a plot was followed by
+a move or ended a run - which is why the excess was 1 or 2 pixels rather than double.
+
+**Vector B is skipped on bits 3-7, not bits 3-5.** The rule is that the rest of the byte is
+ignored once the *remaining* bits are all zero, so a byte with bits 3-5 clear but 6-7 set
+still carries a B vector: direction 0 (up), no plot. This table contains no such byte, so
+fixing it changed nothing here - it is corrected because it is wrong, not because it
+mattered.
+
+With both fixed: **26 of 26 shapes render exactly, 0 pixels differ.**
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -473,3 +569,7 @@ nothing is missing on screen - but that routine has not been disassembled.
 - Everything about flight rendering. The parity harness covers one static screen; nothing
   that moves has been compared.
 - What `CALL 38402` (TRANLIT.OBJ0) draws into the gauge boxes.
+- What opcodes 1, 2 and 3 mean in the ship bytecode, and how `CALL CA` (`$9023`) projects
+  it. 1 behaves as a move and 2 as a line, but 3 is unexplained and the renderer is
+  undisassembled.
+- What the `PLANET # n` files at `$7300` are. They are not shape tables either.
