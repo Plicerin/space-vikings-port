@@ -96,23 +96,40 @@ and page 1 of the text screen holds leftovers.
 
 ---
 
-## The program on the disk
+## The disk, read directly
 
-`probe_list.mjs` lists the running Applesoft program straight out of memory
-(`detokenise.mjs` walks the linked list from `TXTTAB`). This is the game's own source as
-the disk loaded it. Captured to `captured/title.bas`.
+`dsk.mjs` reads the DOS 3.3 image: 35 tracks of 16 sectors of 256 bytes, VTOC at track 17
+sector 0, catalog sectors as a linked list of 7 entries each. `probe_catalog.mjs` prints it;
+`probe_extract.mjs` writes every Applesoft program to `captured/disk/`.
 
-The boot program is **4,513 bytes**. It draws the title, asks
-`(N)EW GAME OR (O)LD GAME?`, loads the binaries, sets the opening state, and chains to
-`INSTRUMENTS`.
+This was worth doing because following the chain by reaching each game state only ever finds
+the branches you manage to trigger. The catalog has all of them: **66 files, 23 of them
+Applesoft programs.**
 
-### What it loads, and where
+### The check that makes the reader trustworthy
 
-| Address | File |
+`probe_chain.mjs` lists programs out of the *running machine* as the game chains through
+them, and names each one by matching it against the catalog. START, STARSHIP SIMULATOR and
+RE have all been captured both ways and are **identical byte for byte**. Two independent
+routes to the same bytes, so the reader is not inventing anything.
+
+That check also caught a mistake. Naming a live capture from the previous program's `RUN`
+filed STARSHIP SIMULATOR under `INSTRUMENTS`: START does run INSTRUMENTS, but INSTRUMENTS
+chains on before the image settles, so the second program seen live is already the next one.
+**Names come from the catalog now, never from a guess.**
+
+### Load addresses: two different numbers
+
+A binary's catalog header records where it was `BSAVE`d from, and **`BLOAD ,A$xxxx`
+overrides it**. Most files on this disk were saved out of a `$6000` staging area, so the
+header address is usually `$6000` and means nothing. The address that matters is the one in
+the `BLOAD`.
+
+| BLOADed to | File |
 | --- | --- |
 | `$6000` | LO-HI A2-3D1 |
-| `$7300` | PLANET # 0 |
-| `$7879` | SHIP # *n* - or DEBRIS |
+| `$7300` | PLANET # *n* |
+| `$7879` | SHIP # *n*, or DEBRIS |
 | `$7FFF` | ENEMY I.A24580.L68 |
 | `$8800` | CHARACTER TABLE |
 | `$8BEC` | MEM DATA |
@@ -122,34 +139,103 @@ The boot program is **4,513 bytes**. It draws the title, asks
 | `$9300` | HI-RES CHARACTER GENERATOR |
 | `$9400` | MEM TRANSFER A |
 | `$9506` | SHIP'S DATA (`-M` master for a new game) |
-| `$954C` | PLANET FILE (`-M` master for a new game), length `$AF` |
+| `$954C` | PLANET FILE (`-M` master), length `$AF` |
 | `$9600` | TRANLIT.OBJ0 |
-| `$97E1` | P/F (`-M` master for a new game) |
+| `$97E1` | P/F (`-M` master) |
 
-### The pointers the BASIC holds
+DOS commands are `PRINT CHR$(4)"BLOAD ..."`, so a literal control-D sits inside the quote in
+every listing. Grep accordingly.
 
-Set at line 30. These are **addresses the program pokes and peeks, not coordinates** -
-reading them as state is the trap that produced the earlier wrong numbers.
+### What runs what
 
-| Variable | Value | Address | Holds |
+The game is 23 chained Applesoft programs. `START` is the boot program; everything returns
+to `STARSHIP SIMULATOR` (flight) or `COM` (the ship's menu).
+
+```
+START -> INSTRUMENTS -> STARSHIP SIMULATOR
+STARSHIP SIMULATOR -> RE (re-entry), ORBIT, H/D
+COM  -> GALAXY MAP, GROUND FORCES, RADAR, STATUS, SUPPLY, STARSHIP SIMULATOR
+GROUND FORCES -> COLLECT, RECALL, SHORE LEAVE, COM
+RADAR -> SHIP # n I.D. -> RADAR
+GALAXY MAP -> COM, INSTRUMENTS, STARSHIP SIMULATOR
+H/D -> S/X, STARSHIP SIMULATOR
+COLLECT, STATUS, SUPPLY -> COM
+DMG, EX, ORBIT, RE, RECALL -> STARSHIP SIMULATOR / GROUND FORCES
+```
+
+| Program | Lines | Bytes | |
 | --- | --- | --- | --- |
-| `XI` | 29467 | `$731B` | ship X, 16-bit |
-| `YI` | 29469 | `$731D` | ship Y, 16-bit |
-| `ZI` | 29471 | `$731F` | ship Z, 16-bit |
-| `P1` | 29473 | `$7321` | pitch, 8-bit |
-| `B1` | 29474 | `$7322` | bank, 8-bit |
-| `H1` | 29475 | `$7323` | heading, 8-bit |
-| `CSN` | 24582 | `$6006` | not yet known |
-| `SN` | 24585 | `$6009` | not yet known |
-| `M1` | 24588 | `$600C` | not yet known |
-| `M2` | 24589 | `$600D` | not yet known |
-| `DI` | 32768 | `$8000` | not yet known |
-| `CA` | 36899 | `$9023` | SPACE SIMULATOR ASSEMBLY entry |
+| START | 110 | 4513 | boot, title, loads everything, sets the opening state |
+| STARSHIP SIMULATOR | 134 | 5553 | flight: the main loop |
+| SHORE LEAVE | 105 | 5562 | |
+| COM | 124 | 5412 | the ship's menu |
+| GROUND FORCES | 95 | 4708 | |
+| GALAXY MAP | 69 | 2721 | |
+| H/D | 57 | 2149 | |
+| STATUS | 60 | 1859 | |
+| COLLECT | 47 | 1909 | |
+| SHIP # 4 I.D. | 34 | 1728 | |
+| INSTRUMENTS | 32 | 1222 | |
+| SHIP # 1 I.D. | 26 | 1270 | |
+| SHIP # 3 I.D. | 28 | 1182 | |
+| RADAR | 27 | 1140 | |
+| SUPPLY | 27 | 1274 | |
+| END | 21 | 813 | |
+| ORBIT | 20 | 791 | |
+| RE | 18 | 764 | re-entry |
+| EX | 16 | 508 | |
+| S/X | 16 | 360 | |
+| RECALL | 12 | 554 | |
+| SHIP # 0 I.D. | 8 | 374 | |
+| DMG | 3 | 94 | |
 
-So the ship's state lives in a nine-byte block at `$731B`, inside PLANET # 0's load area
-(`$7300`).
+There are 21 planet binaries (PLANET # 0 to # 20) and four ship shapes (SHIP # 0, 1, 3, 4)
+plus DEBRIS.
 
----
+## The flight model
+
+From `captured/disk/starship_simulator.bas`, which is the main loop. Constants at lines 1-2:
+
+```
+DI = 32768   HH = 256   HL = 255   Q = 1.41
+W1 = 20000   W2 = -20000            world wrap
+CSN = $6006  SN = $6009  CA = $9023 cosine, sine, and the simulator entry point
+M1 = $600C   M2 = $600D             the byte pair those routines read and write
+```
+
+Heading, pitch and bank are single bytes. The program pokes one into `M1`, `CALL`s the sine
+or cosine routine in the assembly, and reads a 16-bit result back out of `M1`/`M2`, fixing
+up the sign itself (lines 21-128) — there is no floating-point trigonometry anywhere.
+
+The integration, line 129:
+
+```basic
+YP=YP/DI: ZH=ZH/DI: XH=XH/DI: ZP=ZP/DI
+X1 = S*(ZP*XH): Z1 = S*ZP*ZH: X = X+X1: Z = Z+Z1: Y1 = S*YP: Y = Y+Y1
+IF P>190 OR P<64 THEN Y = Y - 2*Y1
+```
+
+`S` is speed, held at `$9506+$33` (`PEEK(38157)`) and clamped to **0-120** (lines 207-208).
+The trig results are 16-bit fixed point over `DI = 32768`.
+
+Position wraps at **+/-20000** on each axis (lines 133-138): past one edge it reappears at
+the other.
+
+Pitch is clamped every frame (lines 175-177): `59` going one way, `195` (= -61) the other.
+
+The HUD prints `INT(X/2)`, `INT(Y/2)`, `INT(Z/2)`, `INT(H*1.41)`, `INT(P*1.41)` — so the
+displayed coordinates are **half** the stored ones, and displayed angles are the raw byte
+times 1.41 (256 -> ~360).
+
+Transitions out of flight:
+
+| Condition | Goes to |
+| --- | --- |
+| `ABS(X)<900 AND ABS(Y)<900 AND ABS(Z)<900 AND PEEK(38210)=0` | `RE` |
+| `PEEK(38210)=1 AND Y>4000` | `ORBIT` |
+| key `X` (24) | `H/D` |
+
+Keys are read with `PEEK(-16384)` and cleared with `POKE -16368,0` (lines 200-210).
 
 ## The opening state of a new game - settled
 
@@ -198,8 +284,11 @@ Line 73 refuses `(O)LD` with `THERE IS NO GAME SAVED` unless `PEEK(38391) = 77`
 
 ## Open questions
 
-- What `INSTRUMENTS` (chained at line 260) does with `$731B` - not yet listed.
-- What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` hold.
-- Which ship number `J = PEEK(38205)` selects, and what `DEBRIS` replaces it for
-  (line 240: `PEEK(38282 + PEEK(38209)) > 1 AND PEEK(38205) = 0`).
-- Everything about flight: no frame-parity harness exists yet.
+- What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
+  are in SPACE SIMULATOR ASSEMBLY and have not been disassembled.
+- What `CALL CA` (`$9023`, SPACE SIMULATOR ASSEMBLY) draws, and how. This is the renderer;
+  none of it is understood yet.
+- The meaning of the flags the BASIC peeks: `38157` (speed), `38164`, `38199`, `38205`,
+  `38207`, `38208`, `38209`, `38210`, `38282+n`. Only their use is known, not their names.
+- Which ship number `J = PEEK(38205)` selects, and what `DEBRIS` replaces it for.
+- Everything about flight rendering: no frame-parity harness exists yet.
