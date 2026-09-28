@@ -112,3 +112,46 @@ export function projectWorldPoint(p: Vec3, camera: Vec3, heading: number, pitch:
     y: SCREEN_CENTRE_Y - FOCAL_Y * (dy / dz),
   };
 }
+
+/**
+ * The view the original clips lines against, measured by oracle/probe_clip.mjs: long lines
+ * were drawn through the real renderer and cut at these edges. The panel starts at y 128,
+ * so the renderer keeps a few rows of margin above it.
+ */
+export const CLIP_MIN_X = 2;
+export const CLIP_MAX_X = 277;
+export const CLIP_MIN_Y = 0;
+export const CLIP_MAX_Y = 123;
+
+const LEFT = 1, RIGHT = 2, BELOW = 4, ABOVE = 8;
+const outcode = (x: number, y: number): number =>
+  (x < CLIP_MIN_X ? LEFT : x > CLIP_MAX_X ? RIGHT : 0) |
+  (y < CLIP_MIN_Y ? ABOVE : y > CLIP_MAX_Y ? BELOW : 0);
+
+/**
+ * Cohen-Sutherland, the algorithm the original uses at $61A9-$620F: compute an outcode per
+ * endpoint, reject when they share a bit (both outside the same edge), otherwise pull
+ * whichever endpoint is outside onto the boundary and try again.
+ *
+ * Returns null when the segment is wholly outside.
+ */
+export function clipSegment(
+  ax: number, ay: number, bx: number, by: number,
+): { ax: number; ay: number; bx: number; by: number } | null {
+  let oa = outcode(ax, ay), ob = outcode(bx, by);
+  for (let guard = 0; guard < 8; guard++) {
+    if (!(oa | ob)) return { ax, ay, bx, by };     // both inside
+    if (oa & ob) return null;                      // both outside the same edge
+    const out = oa || ob;
+    let x = 0, y = 0;
+    if (out & BELOW) { x = ax + (bx - ax) * (CLIP_MAX_Y - ay) / (by - ay); y = CLIP_MAX_Y; }
+    else if (out & ABOVE) { x = ax + (bx - ax) * (CLIP_MIN_Y - ay) / (by - ay); y = CLIP_MIN_Y; }
+    else if (out & RIGHT) { y = ay + (by - ay) * (CLIP_MAX_X - ax) / (bx - ax); x = CLIP_MAX_X; }
+    else { y = ay + (by - ay) * (CLIP_MIN_X - ax) / (bx - ax); x = CLIP_MIN_X; }
+    if (out === oa) { ax = x; ay = y; oa = outcode(ax, ay); } else { bx = x; by = y; ob = outcode(bx, by); }
+  }
+  return null;
+}
+
+/** Is a lone point inside the view? */
+export const insideClip = (x: number, y: number): boolean => outcode(x, y) === 0;

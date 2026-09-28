@@ -45,7 +45,7 @@ const rendered = await page.evaluate(({ bytes, jobs }) => {
     const h = new Hires(c);
     h.hgr();
     h.hcolor(3);
-    const proj = projectShipWorld(ops, j.camera, j.heading, j.pitch, null);
+    const proj = projectShipWorld(ops, j.camera, j.heading, j.pitch, null, j.opcode3);
     drawShipWorld(h, proj);
     return { on: Array.from(h.snapshot().on), segments: proj.segments.length, culled: proj.culled };
   });
@@ -53,7 +53,7 @@ const rendered = await page.evaluate(({ bytes, jobs }) => {
   bytes: shipBytes,
   jobs: states.map((s) => ({
     camera: { x: CAM.x, y: CAM.y, z: s.z },
-    heading: s.heading, pitch: s.pitch,
+    heading: s.heading, pitch: s.pitch, opcode3: process.env.OP3 || 'draw',
   })),
 });
 await browser.close();
@@ -76,8 +76,8 @@ console.log('derived in fit_projection.mjs, using the machine\'s own sine and co
 console.log('below is handed to it - not the centre, not the span.');
 
 console.log("SHAPE - and how close the pixels come");
-console.log('  state     disk px   port px   overlap   agreement   disk w x h   port w x h   too tall');
-let sumAgree = 0, n = 0, sumTall = 0;
+console.log('  state     disk px   port px   overlap   agreement   disk w x h   port w x h  too tall  within 1px');
+let sumAgree = 0, n = 0, sumTall = 0, sumNear = 0;
 for (let i = 0; i < states.length; i++) {
   const s = states[i];
   const r = rendered[i];
@@ -101,6 +101,22 @@ for (let i = 0; i < states.length; i++) {
   const union = s.lit + portLit - both;
   const agree = union ? both / union : 1;
   sumAgree += agree; n++;
+  // Exact overlap punishes a one-pixel shift completely, and the fitted projection is only
+  // good to about 0.6 px. So also ask the softer question: is there a port pixel touching?
+  // If nearly all of them are, the geometry is right and what is left is rasterisation.
+  let near = 0;
+  for (let k = 0; k < diskOn.length; k++) {
+    if (!diskOn[k]) continue;
+    const x = k % HGR_W, y = (k / HGR_W) | 0;
+    let hit = false;
+    for (let dy2 = -1; dy2 <= 1 && !hit; dy2++) for (let dx2 = -1; dx2 <= 1 && !hit; dx2++) {
+      const xx = x + dx2, yy = y + dy2;
+      if (xx < 0 || xx >= HGR_W || yy < 0 || yy >= HGR_H) continue;
+      if (portOn[yy * HGR_W + xx]) hit = true;
+    }
+    if (hit) near++;
+  }
+  sumNear += s.lit ? near / s.lit : 1;
   const dw = s.bounds.maxX - s.bounds.minX + 1, dh = s.bounds.maxY - s.bounds.minY + 1;
   const pw = pmaxX - pminX + 1, ph = pmaxY - pminY + 1;
   const tall = dh ? ph / dh : 0;
@@ -108,12 +124,13 @@ for (let i = 0; i < states.length; i++) {
   console.log(`  ${s.label.padEnd(8)} ${String(s.lit).padStart(7)} ${String(portLit).padStart(9)} ` +
     `${String(both).padStart(9)} ${(100 * agree).toFixed(1).padStart(10)}%   ` +
     `${String(dw).padStart(3)} x ${String(dh).padStart(3)}   ${String(pw).padStart(4)} x ${String(ph).padStart(3)}` +
-    `${tall.toFixed(2).padStart(11)}x`);
+    `${tall.toFixed(2).padStart(9)}x  ${(100 * (s.lit ? near / s.lit : 1)).toFixed(0).padStart(4)}%`);
   const img = new Uint8Array(HGR_W * HGR_H);
   for (let k = 0; k < img.length; k++) img[k] = portOn[k] ? 1 : 0;
   fs.writeFileSync(`captured/ship/port/${s.label}.png`, toPng(img));
 }
 console.log(`\nmean shape agreement over ${n} states: ${(100 * sumAgree / n).toFixed(1)}%`);
+console.log(`mean within one pixel: ${(100 * sumNear / n).toFixed(1)}% of the disk's pixels have a port pixel adjacent`);
 console.log(`the port's ship is on average ${(sumTall / n).toFixed(2)}x as tall as the disk's, at the same width.`);
 console.log('');
 console.log("Width is no longer handed over, so a matching width is a result too.");

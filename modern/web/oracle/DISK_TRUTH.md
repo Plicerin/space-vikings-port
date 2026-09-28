@@ -834,17 +834,16 @@ it, and nothing is handed to it - not the centre, not the span.
 
 ### Measured
 
-| | before | with the world projection | and with the disk's trig |
-| --- | --- | --- | --- |
-| mean shape agreement | **12.1%** | 62.0% | **69.8%** |
-| height vs the disk's | 2.30x | 1.05x | 1.05x |
+| | before | world projection | + the disk's trig | + clipping |
+| --- | --- | --- | --- | --- |
+| mean shape agreement | **12.1%** | 62.0% | 69.8% | **73.6%** |
+| height vs the disk's | 2.30x | 1.05x | 1.05x | **1.00x** |
 
-Agreement is intersection over union, over 11 states, and in the last two columns the port
+Agreement is intersection over union, over 11 states, and from the second column on the port
 is given nothing: it computes where the ship goes and how big it is.
 
-Switching from real sines to the machine's own table is the difference between the second
-and third columns, and it lands exactly where it should - on the negative angles, which are
-the quadrants the original's trig gets wrong:
+Switching from real sines to the machine's own table lands exactly where it should - on the
+negative angles, the quadrants the original's trig gets wrong:
 
 | state | real sines | the disk's table |
 | --- | --- | --- |
@@ -853,16 +852,28 @@ the quadrants the original's trig gets wrong:
 | heading -10 | 65.6% | **76.8%** |
 | heading +4, +8, +12 | 75.3 / 76.2 / 80.4% | unchanged |
 
-### What is still missing
+Clipping fixes the closest-approach state, which was the worst by a wide margin: **29.5% to
+60.4%**, and its aspect from 1.56x to 1.00x. In the running port that state now rejects 24
+segments and draws a box of x44-119 y97-123 where the disk draws x34-119 y97-123 - the
+vertical extent exact.
 
-**Clipping.** The worst remaining state is closest approach, Z -4500, at 29.5%: the port
-draws a box 108 wide where the disk draws 86. Nothing is culled - `culled` is 0 - because
-the projection only drops points behind the camera. The original clips lines against the
-view with the Cohen-Sutherland code at `$61A9`-`$620F`, and that is not implemented.
+### What the remaining gap is, measured
 
-The rest is segment-level detail: at pitch +4 and +8 the port draws 103 pixels against the
-disk's 118 and 142, in a box 3 px narrower, which is a handful of segments rather than a
-transform error.
+Exact overlap punishes a one-pixel shift completely, and the fitted projection is only good
+to about 0.6 px rms. So the harness also asks the softer question - is there a port pixel
+*touching* each of the disk's?
+
+**98.3% of the disk's pixels have a port pixel adjacent**, 96% to 100% across all eleven
+states.
+
+So the geometry is right and what is left is rasterisation: a float reimplementation of a
+fixed-point renderer, driven by a projection fitted to within a pixel, lands beside the
+original's pixels rather than on them. Getting past this would mean reproducing the
+renderer's fixed-point arithmetic exactly, not correcting anything conceptual.
+
+Opcode 3 was settled the same way rather than by reading it. The three possible readings -
+draw then lift the pen, draw and continue, move without drawing - score 72.6%, **73.6%** and
+72.2%. Close enough that the harness only just prefers one, and the code says so.
 
 ---
 
@@ -914,6 +925,19 @@ first quadrant). On those 14 states, using the machine's measured table fits **0
 using real sines fits **1.21 px** - so the renderer does use its own table, and the fit says
 so where it is possible for it to say so. At small angles the two are indistinguishable.
 
+### Clipping
+
+The original clips lines against the view with Cohen-Sutherland at `$61A9`-`$620F`.
+`probe_clip.mjs` measures the rectangle instead of reading it: a single long line is drawn
+through the real renderer and where it was cut is read off the page.
+
+**Lines are cut to x 2-277, y 0-123**, and a line wholly outside is rejected. The panel
+starts at y 128, so the renderer keeps a few rows of margin above it.
+
+A line stepped across the other axis is kept for y 0..123 and x 3..275; the cut extent is
+the number to trust, because the kept/rejected boundary depends on how a nominal screen
+position maps back through the fitted projection, which is good to about a pixel.
+
 ### Checked against whole ships
 
 Single points fitting well is not the same as a ship fitting. Projecting all 149 of
@@ -959,11 +983,12 @@ not the transform.
 - Everything about flight rendering. The parity harness covers one static screen; nothing
   that moves has been compared.
 - What `CALL 38402` (TRANLIT.OBJ0) draws into the gauge boxes.
-- Clipping. The transform is derived (see "The projection, derived") but the
-  Cohen-Sutherland stage at `$61A9`-`$620F` is not, and it is what the remaining error at
-  closest approach comes from.
-- Wiring the derived projection into the port. `src/engine/diskProjection.ts` exists;
-  nothing uses it, and `cockpit.ts` still places ships by a distance heuristic.
+- The renderer's fixed-point arithmetic. The geometry is right - 98.3% of the original's
+  pixels have a port pixel adjacent - but exact pixels need its integer maths, not a float
+  reimplementation of the same formula.
+- What opcode 3 means. The harness prefers "draw and continue" at 73.6% over 72.6% and
+  72.2% for the alternatives, which is not much of a margin.
+- Planets. All of this is about ships; nothing has compared how the port draws a planet.
 - What state `$6000` needs before it will draw. Snapshot and replay sidesteps the question
   rather than answering it.
 - What opcodes 1, 2 and 3 mean in the ship bytecode. 1 behaves as a move and 2 as a line,

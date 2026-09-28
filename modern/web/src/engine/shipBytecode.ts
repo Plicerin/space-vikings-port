@@ -1,5 +1,5 @@
 import type { Hires } from './hires';
-import { projectWorldPoint, type Vec3 as ProjVec3 } from './diskProjection';
+import { projectWorldPoint, clipSegment, insideClip, type Vec3 as ProjVec3 } from './diskProjection';
 
 export interface ShipBytecodeHeaderOp {
   kind: 'set-state';
@@ -356,11 +356,14 @@ export interface ShipWorldSegment {
 }
 
 export interface ShipWorldProjection {
+  /** Already clipped to the view the original clips to. */
   segments: ShipWorldSegment[];
   /** Opcode-0 vertices, which stand alone - DEBRIS is nothing but these. */
   dots: ShipProjectedPoint[];
   /** Vertices that fell at or behind the camera and were dropped. */
   culled: number;
+  /** Segments the clipper rejected outright. */
+  clippedAway: number;
 }
 
 /** The centre of a model's own coordinates, for placing it somewhere else. */
@@ -391,6 +394,7 @@ export function projectShipWorld(
   headingByte: number,
   pitchByte: number,
   origin?: ProjVec3 | null,
+  opcode3: 'lift' | 'draw' | 'move' = 'draw',
 ): ShipWorldProjection {
   const centre = origin ? measureModelCentre(ops) : null;
   const shift = origin && centre
@@ -400,7 +404,7 @@ export function projectShipWorld(
   const segments: ShipWorldSegment[] = [];
   const dots: ShipProjectedPoint[] = [];
   let pen: ShipProjectedPoint | null = null;
-  let culled = 0;
+  let culled = 0, clippedAway = 0;
 
   for (const op of ops) {
     if (op.kind !== 'vector') continue;
@@ -409,12 +413,24 @@ export function projectShipWorld(
       camera, headingByte, pitchByte,
     );
     if (!q) { culled++; pen = null; continue; }
-    if (op.opcode === 0) { dots.push(q); pen = null; continue; }   // a point on its own
+    if (op.opcode === 0) {                              // a point on its own
+      if (insideClip(q.x, q.y)) dots.push(q); else clippedAway++;
+      pen = null;
+      continue;
+    }
     if (op.opcode === 1) { pen = q; continue; }         // start a run
-    if (pen) segments.push({ from: pen, to: q });       // 2 and 3 draw
-    pen = op.opcode === 3 ? null : q;                   // 3 lifts the pen after
+    if (op.opcode === 3 && opcode3 === 'move') { pen = q; continue; }
+    if (pen) {                                          // 2 and 3 draw
+      // Clip the way the original does, against the view measured by probe_clip.mjs.
+      // The pen still advances to the unclipped point, so the next segment starts from
+      // where the model says - only what is drawn is trimmed.
+      const c = clipSegment(pen.x, pen.y, q.x, q.y);
+      if (c) segments.push({ from: { x: c.ax, y: c.ay }, to: { x: c.bx, y: c.by } });
+      else clippedAway++;
+    }
+    pen = (op.opcode === 3 && opcode3 === 'lift') ? null : q;
   }
-  return { segments, dots, culled };
+  return { segments, dots, culled, clippedAway };
 }
 
 /** Draw a world-space projection. Coordinates are already screen coordinates. */

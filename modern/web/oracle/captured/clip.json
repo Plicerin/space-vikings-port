@@ -1,0 +1,15 @@
+{
+  "source": "probe_clip.mjs - long lines drawn through the original renderer and measured where they were cut",
+  "minX": 2,
+  "maxX": 277,
+  "minY": 0,
+  "maxY": 123,
+  "keptForY": [
+    0,
+    123
+  ],
+  "keptForX": [
+    3,
+    275
+  ]
+}
