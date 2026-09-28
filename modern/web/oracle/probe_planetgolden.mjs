@@ -17,13 +17,20 @@ const TRAP = 0x0300;
 const PAGE2_LO = 0x4000, PAGE2_HI = 0x6000;
 const MODEL = 0x7879;
 
-const meta = JSON.parse(fs.readFileSync('captured/snapshot/flight.json', 'utf8'));
-const b64 = fs.readFileSync('captured/snapshot/flight.bin').toString('base64');
+// Which snapshot: the deep-space one by default, or the approach capture, where RE has run
+// and a numbered planet's ground wireframe is at $7300 in place of the star table.
+const SNAP = process.env.SNAPSHOT || 'flight';
+const OUT = process.env.OUTDIR || 'captured/stars';
+const meta = JSON.parse(fs.readFileSync(`captured/snapshot/${SNAP}.json`, 'utf8'));
+const b64 = fs.readFileSync(`captured/snapshot/${SNAP}.bin`).toString('base64');
+const ram0 = fs.readFileSync(`captured/snapshot/${SNAP}.bin`);
+const base = { x: (ram0[0x731b] | (ram0[0x731c] << 8)), y: (ram0[0x731d] | (ram0[0x731e] << 8)),
+  z: ((v) => (v > 32767 ? v - 65536 : v))(ram0[0x731f] | (ram0[0x7320] << 8)) };
 
 const STATES = [];
-for (const z of [-6401, -5000, -3000, 0, 3000]) STATES.push({ z, heading: 0, pitch: 0, label: `z${z}` });
-for (const heading of [8, 32, 64, 128, 248]) STATES.push({ z: -6401, heading, pitch: 0, label: `h${heading}` });
-for (const pitch of [8, 32, 248]) STATES.push({ z: -6401, heading: 0, pitch, label: `p${pitch}` });
+for (const dz of [0, 1400, 3400, 6400, 9400]) STATES.push({ z: base.z + dz, heading: 0, pitch: 0, label: `z${base.z + dz}` });
+for (const heading of [8, 32, 64, 128, 248]) STATES.push({ z: base.z, heading, pitch: 0, label: `h${heading}` });
+for (const pitch of [8, 32, 248]) STATES.push({ z: base.z, heading: 0, pitch, label: `p${pitch}` });
 
 const a2 = await openOracle();
 await a2.ev(`(() => { window.M.a2.reset(); return 'reset'; })()`);
@@ -69,7 +76,7 @@ async function render({ z, heading, pitch }) {
   })()`));
 }
 
-fs.mkdirSync('captured/stars', { recursive: true });
+fs.mkdirSync(OUT, { recursive: true });
 const golden = [];
 console.log('  state        px   extent');
 for (const st of STATES) {
@@ -86,11 +93,12 @@ for (const st of STATES) {
   }
   console.log(`  ${st.label.padEnd(9)} ${String(pts.length).padStart(5)}   ` +
     (pts.length ? `x ${minX}-${maxX}, y ${minY}-${maxY}` : '(nothing)'));
-  fs.writeFileSync(`captured/stars/${st.label}.png`, toPng(on));
+  fs.writeFileSync(`${OUT}/${st.label}.png`, toPng(on));
   golden.push({ ...st, lit: pts.length, bounds: { minX, maxX, minY, maxY }, points: pts });
 }
-fs.writeFileSync('captured/stars/golden.json', JSON.stringify({
-  source: 'the original renderer at $6000, replayed, with the ship model at $7879 blanked',
+fs.writeFileSync(`${OUT}/golden.json`, JSON.stringify({
+  source: `the original renderer at $6000, replayed from ${SNAP}, with the ship model at $7879 blanked`,
+  camera: base,
   page: 'hi-res page 2', states: golden,
 }) + '\n');
 console.log(`\nwrote captured/stars/golden.json and ${golden.length} PNGs`);

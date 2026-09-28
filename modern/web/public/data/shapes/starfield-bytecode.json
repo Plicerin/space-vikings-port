@@ -1,8 +1,8 @@
 {
   "source": "PLANET # 0 on the original disk, BLOADed to $7300; the record list from offset 36",
-  "note": "the same bytecode the ship models use - all opcode 0, which is a lone point",
+  "note": "the same bytecode the ship models use",
   "length": 1365,
-  "points": 195,
+  "vertices": 195,
   "bytes": [
     0,
     82,

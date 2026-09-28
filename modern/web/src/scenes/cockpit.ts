@@ -47,6 +47,11 @@ import { VectorRenderer, type VectorOverlayData } from '../engine/vectorRenderer
 // opcode 0. oracle/probe_starfield.mjs extracts them; makeStarfield() was a 220-point
 // pseudo-random cloud that had nothing to do with the disk.
 let starOps: ShipBytecodeOp[] | null = null;
+// On the disk these are the same slot: RE BLOADs PLANET # n over $7300, replacing the star
+// table with the planet's ground wireframe, so in the atmosphere you see ground and not
+// stars. Both are the same bytecode - the numbered files are opcode 1/2/3 line work with y
+// at 0, where PLANET # 0 is all opcode-0 points.
+let groundOps: ShipBytecodeOp[] | null = null;
 
 const W1 = 20000;
 const W2 = -20000;
@@ -179,6 +184,12 @@ if (displayShipKind >= 1) {
       const json = await loader.json<{ bytes: number[] }>('data/shapes/starfield-bytecode.json');
       starOps = parseShipBytecode(json.bytes);
     } catch { /* no star table: renderStarfield draws nothing */ }
+    try {
+      // The disk numbers planets 1..20; the port's array is 0-based.
+      const n = state.planetIndex + 1;
+      const json = await loader.json<{ bytes: number[] }>(`data/shapes/planet-${n}-ground.json`);
+      groundOps = parseShipBytecode(json.bytes);
+    } catch { /* no ground for this planet */ }
     try {
       const json = await loader.json<{ bytes: number[] }>(`data/shapes/ship-${displayShipKind}-bytecode.json`);
       enemyBytecodeOps = parseShipBytecode(json.bytes);
@@ -674,12 +685,14 @@ const enemy = spawnEnemy(state);
     }
 
     function renderStarfield(_cam: Camera) {
-      if (!starOps) return;
+      // In the atmosphere the disk has the ground wireframe in this slot, not the stars.
+      const ops = state.atmosphere ? groundOps : starOps;
+      if (!ops) return;
       hires.hcolor(3);
       // Same projection and clipping as everything else, and the disk plots each star two
       // pixels wide - measured, see oracle/DISK_TRUTH.md.
       drawShipWorld(hires, projectShipWorld(
-        starOps, { x: state.x, y: state.y, z: state.z }, state.heading, state.pitch, null,
+        ops, { x: state.x, y: state.y, z: state.z }, state.heading, state.pitch, null,
       ));
     }
 

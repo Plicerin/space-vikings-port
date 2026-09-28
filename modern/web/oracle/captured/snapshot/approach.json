@@ -1,0 +1,17 @@
+{
+  "lo": 0,
+  "hi": 49152,
+  "pc": 24576,
+  "cpu": {
+    "a": 0,
+    "x": 157,
+    "y": 35,
+    "s": 160,
+    "pc": 24576,
+    "sp": 226,
+    "cycles": 234367020
+  },
+  "note": "taken on the instruction at $6000 after RE ran, with a numbered planet loaded at $7300",
+  "planet": 1,
+  "atmosphere": 1
+}

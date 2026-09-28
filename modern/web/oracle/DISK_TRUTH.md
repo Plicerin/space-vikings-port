@@ -1049,6 +1049,72 @@ than about the disk, and what the original draws on approach has not been captur
 
 ---
 
+## The approach, captured
+
+### How the game gets there
+
+`RE` is what loads a numbered planet, not the hyperdrive. STARSHIP SIMULATOR line 156 runs
+it when `ABS(X) < 900 AND ABS(Y) < 900 AND ABS(Z) < 900 AND PEEK(38210) = 0`.
+
+RE is short: it floods the screen orange, prints `REENTRY SEQUENCE START`, sets the
+**atmosphere flag** at `$9542` (38210), `BLOAD PLANET # <current planet>` to `$7300`,
+repositions the ship to `Y = 1024`, `Z = -7000`, heading 20, and runs STARSHIP SIMULATOR
+again. So the approach is ordinary flight with a ground wireframe where the star table was.
+
+`probe_approach.mjs` flies there rather than reconstructing it: from the opening position
+the ship is already heading that way, and after **8,700 frames** - about 145 seconds of
+Apple II time, Z walking from -7000 to -881 - re-entry fires. It then stops on the
+instruction at `$6000` and takes all 48K.
+
+The capture checks itself: **`$7324` onwards matches PLANET # 1 on the disk in 778 of 778
+bytes**, with `$9541` = 1 and `$9542` = 1.
+
+### What the numbered planets are
+
+The same 36-byte header and record list as everything else. PLANET # 1 through 20 are
+opcode 1/2/3 line work with **y at 0** and x and z spanning +/-10000 - a ground plane, drawn
+flat, 89 to 162 vertices each. PLANET # 4 and # 6 reach y 800, so some of them carry raised
+features.
+
+Rendered from the approach snapshot, the ground fills the width and the lower screen, and
+the horizon moves with pitch exactly as it should:
+
+| state | px | extent |
+| --- | --- | --- |
+| at the capture | 3278 | x 2-277, y 75-123 |
+| pitch +8 (nose down) | 3928 | x 2-277, y 32-123 |
+| pitch +32 | 460 | x 2-277, y 0-92 |
+| pitch -8 (nose up) | 1328 | x 2-277, y 114-123 |
+| heading 128 (turned about) | 0 | nothing - the grid is finite |
+
+### Measured
+
+The port had no ground wireframe at all. `renderPlanet()` drew a procedural disc at a
+hardcoded position; nothing on screen came from the planet files.
+
+Extracting PLANET # 1-20's record lists and putting them through the same parser and world
+projection as everything else:
+
+**64.2% exact, 85.4% within one pixel**, over 12 states, with the extents matching almost
+throughout. Best is pitch -8 at 87.6% exact and 100% within a pixel.
+
+Two states do poorly and are worth naming rather than averaging away: pitch +32 (60% exact
+but only 61% within a pixel - the port draws one horizon row where the disk draws a spread
+from y 0 to 92) and heading +64 at 40.7%. Both are steep angles where much of the grid
+falls behind the camera, and the culling there is not right yet.
+
+### Wired
+
+`cockpit.ts` now draws the ground wireframe when `state.atmosphere` is set and the stars
+otherwise, which is the same slot the disk uses - RE BLOADs the planet over `$7300`, on top
+of the star table. In the running port: stars 276 pixels across x84-154, ground 2140 pixels
+across x2-277 y73-123.
+
+`renderPlanet()`'s procedural disc is still there and still not on the disk. It is now the
+only drawn thing in flight with no counterpart in the original.
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -1070,9 +1136,10 @@ than about the disk, and what the original draws on approach has not been captur
   reimplementation of the same formula.
 - What opcode 3 means. The harness prefers "draw and continue" at 73.6% over 72.6% and
   72.2% for the alternatives, which is not much of a margin.
-- What the original draws on approach to a planet. The numbered PLANET files are ground
-  wireframes at y 0; nothing has captured them being drawn, and `cockpit.ts` still shows a
-  procedural body the disk does not draw in flight.
+- Culling at steep angles. The ground wireframe is 85.4% within a pixel overall but only
+  61% at pitch +32, where much of the grid falls behind the camera.
+- `renderPlanet()`'s procedural disc, which is now the only drawn thing in flight with no
+  counterpart on the disk.
 - What state `$6000` needs before it will draw. Snapshot and replay sidesteps the question
   rather than answering it.
 - What opcodes 1, 2 and 3 mean in the ship bytecode. 1 behaves as a move and 2 as a line,
