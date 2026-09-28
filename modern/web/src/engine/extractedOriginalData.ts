@@ -170,8 +170,10 @@ export const OPENING_NEW_GAME_STATE = {
   pitch: 0,
   bank: 0,
 
-  // START.bas begins at the home planet / Alpha Centauri (system 1).
-  planetIndex: 1,
+  // Measured: PEEK(38209) = 1 at the start of a new game, and GALAXY MAP 15100 says
+  // S$(1) = "SOL" - so the disk starts you at SOL, not Alpha Centauri. The port's planets
+  // array is 0-based with index i = the disk's planet i + 1, so SOL is index 0.
+  planetIndex: 0,
 
   // These four are planet 1's P/F record. START line 220 calls into
   // TRANLIT.OBJ0, which copies the current planet's record to $953C-$9541;
@@ -185,7 +187,9 @@ export const OPENING_NEW_GAME_STATE = {
   shipDestructionLimit: 150,
   // STARSHIP SIMULATOR 156/158 gate RE and ORBIT on PEEK(38210); measured 0.
   atmosphere: false,
-  planetSurrendered: false,
+  // 38219+1 = 1 in PLANET FILE-M: SOL is already yours. COM 1130 prints
+  // S$(C);" HAS BEEN SECURED" for it.
+  planetSurrendered: true,
 
   // SHIP'S DATA-M offset 7 ($950D) is $78; measured PEEK(38157)=120 in play.
   speed: 120,
