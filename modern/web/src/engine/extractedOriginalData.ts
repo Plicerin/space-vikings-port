@@ -151,33 +151,44 @@ export function getFallbackArrivalState(planetIndex: number): ExtractedArrivalSt
 }
 
 export const OPENING_NEW_GAME_STATE = {
-  // START.bas:190-195 initializes the new-game simulator position before
-  // RUN INSTRUMENTS / STARSHIP SIMULATOR.
+  // START.bas:190-195, which runs BEFORE the new/old branch:
+  //   190 BV%=-7000: GOSUB 6000: POKE ZI,LO%: POKE ZI+1,HI%
+  //       BV%=700:   ... POKE XI ...     BV%=200: ... POKE YI ...
+  //   195 POKE H1,0
+  // Line 225 overwrites this block from SHIP'S DATA, but only for an OLD game
+  // (line 224 is IF G$ = "N" THEN GOTO 230).
+  //
+  // Measured on the original disk (oracle/probe_opening.mjs): after answering
+  // (N)EW, $731B settles at bc 02 c8 00 a8 e4 00 00 00 and does not change
+  // again. The earlier y=210, z=-6761, heading=255, pitch=248 here came from
+  // paused-opening-scene.json, which is a capture taken some way INTO flight,
+  // not the opening — the ship had already been flying when it was taken.
   x: 700,
   y: 200,
   z: -7000,
-  // Heading 252 (~-100° = atan2(-700,7000)) points the ship at the
-  // home planet so it's centered in the cockpit view on arrival.
-  heading: 252,
-  // Pitch 123 (~-1.6°) tilts the ship slightly down toward the planet.
-  pitch: 123,
+  heading: 0,
+  pitch: 0,
+  bank: 0,
 
   // START.bas begins at the home planet / Alpha Centauri (system 1).
   planetIndex: 1,
 
-  // Live original opening cockpit capture showed 38205=3 and 38207=30 while
-  // approaching the home planet. Ship placement is anchored separately by
-  // STARSHIP SIMULATOR.bas:2 (X9=400,Y9=-100,Z9=-3500).
+  // These four are planet 1's P/F record. START line 220 calls into
+  // TRANLIT.OBJ0, which copies the current planet's record to $953C-$9541;
+  // measured there at the start of a new game it reads 96 03 64 1e 01 01.
+  //   $953C = 150 destruction limit   $953D = 3 ship kind
+  //   $953F = 30 enemy ships          $9541 = 1 planet
+  // The simulator's own ship anchor remains STARSHIP SIMULATOR.bas:2
+  // (X9=400, Y9=-100, Z9=-3500).
   shipKind: 3 as const,
   enemyShips: 30,
   shipDestructionLimit: 150,
+  // STARSHIP SIMULATOR 156/158 gate RE and ORBIT on PEEK(38210); measured 0.
   atmosphere: false,
   planetSurrendered: false,
 
-  // Gentle approach speed — ship drifts toward the home planet
-  // so the cockpit feels alive (starfield scrolls, planet grows).
-  // Player takes full control via arrow keys / speed keys at any time.
-  speed: 20,
+  // SHIP'S DATA-M offset 7 ($950D) is $78; measured PEEK(38157)=120 in play.
+  speed: 120,
 } as const;
 
 

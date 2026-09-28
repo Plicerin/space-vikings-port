@@ -163,169 +163,190 @@
   ],
   "pf": [
     {
-      "planet": 1,
-      "w0": 918,
+      "at": 0,
+      "destructionLimit": 150,
+      "shipKind": 3,
       "b2": 100,
-      "b3": 30,
-      "b4": 1,
-      "at": 0
+      "enemyShips": 30,
+      "noSpawn": 1,
+      "planet": 1
     },
     {
-      "planet": 2,
-      "w0": 612,
+      "at": 16,
+      "destructionLimit": 100,
+      "shipKind": 2,
       "b2": 50,
-      "b3": 20,
-      "b4": 0,
-      "at": 16
+      "enemyShips": 20,
+      "noSpawn": 0,
+      "planet": 2
     },
     {
-      "planet": 3,
-      "w0": 918,
+      "at": 32,
+      "destructionLimit": 150,
+      "shipKind": 3,
       "b2": 120,
-      "b3": 22,
-      "b4": 0,
-      "at": 32
+      "enemyShips": 22,
+      "noSpawn": 0,
+      "planet": 3
     },
     {
-      "planet": 4,
-      "w0": 0,
+      "at": 48,
+      "destructionLimit": 0,
+      "shipKind": 0,
       "b2": 0,
-      "b3": 0,
-      "b4": 1,
-      "at": 48
+      "enemyShips": 0,
+      "noSpawn": 1,
+      "planet": 4
     },
     {
-      "planet": 5,
-      "w0": 276,
+      "at": 64,
+      "destructionLimit": 20,
+      "shipKind": 1,
       "b2": 20,
-      "b3": 0,
-      "b4": 0,
-      "at": 64
+      "enemyShips": 0,
+      "noSpawn": 0,
+      "planet": 5
     },
     {
-      "planet": 6,
-      "w0": 0,
+      "at": 80,
+      "destructionLimit": 0,
+      "shipKind": 0,
       "b2": 5,
-      "b3": 0,
-      "b4": 0,
-      "at": 80
+      "enemyShips": 0,
+      "noSpawn": 0,
+      "planet": 6
     },
     {
-      "planet": 7,
-      "w0": 1224,
+      "at": 96,
+      "destructionLimit": 200,
+      "shipKind": 4,
       "b2": 150,
-      "b3": 20,
-      "b4": 0,
-      "at": 96
+      "enemyShips": 20,
+      "noSpawn": 0,
+      "planet": 7
     },
     {
-      "planet": 8,
-      "w0": 276,
+      "at": 112,
+      "destructionLimit": 20,
+      "shipKind": 1,
       "b2": 100,
-      "b3": 0,
-      "b4": 0,
-      "at": 112
+      "enemyShips": 0,
+      "noSpawn": 0,
+      "planet": 8
     },
     {
-      "planet": 9,
-      "w0": 612,
+      "at": 128,
+      "destructionLimit": 100,
+      "shipKind": 2,
       "b2": 100,
-      "b3": 40,
-      "b4": 0,
-      "at": 128
+      "enemyShips": 40,
+      "noSpawn": 0,
+      "planet": 9
     },
     {
-      "planet": 10,
-      "w0": 918,
+      "at": 144,
+      "destructionLimit": 150,
+      "shipKind": 3,
       "b2": 120,
-      "b3": 25,
-      "b4": 0,
-      "at": 144
+      "enemyShips": 25,
+      "noSpawn": 0,
+      "planet": 10
     },
     {
-      "planet": 11,
-      "w0": 0,
+      "at": 160,
+      "destructionLimit": 0,
+      "shipKind": 0,
       "b2": 0,
-      "b3": 0,
-      "b4": 1,
-      "at": 160
+      "enemyShips": 0,
+      "noSpawn": 1,
+      "planet": 11
     },
     {
-      "planet": 12,
-      "w0": 0,
+      "at": 176,
+      "destructionLimit": 0,
+      "shipKind": 0,
       "b2": 0,
-      "b3": 0,
-      "b4": 1,
-      "at": 176
+      "enemyShips": 0,
+      "noSpawn": 1,
+      "planet": 12
     },
     {
-      "planet": 13,
-      "w0": 1224,
+      "at": 192,
+      "destructionLimit": 200,
+      "shipKind": 4,
       "b2": 200,
-      "b3": 50,
-      "b4": 0,
-      "at": 192
+      "enemyShips": 50,
+      "noSpawn": 0,
+      "planet": 13
     },
     {
-      "planet": 14,
-      "w0": 276,
+      "at": 208,
+      "destructionLimit": 20,
+      "shipKind": 1,
       "b2": 7,
-      "b3": 0,
-      "b4": 0,
-      "at": 208
+      "enemyShips": 0,
+      "noSpawn": 0,
+      "planet": 14
     },
     {
-      "planet": 15,
-      "w0": 0,
+      "at": 224,
+      "destructionLimit": 0,
+      "shipKind": 0,
       "b2": 0,
-      "b3": 0,
-      "b4": 1,
-      "at": 224
+      "enemyShips": 0,
+      "noSpawn": 1,
+      "planet": 15
     },
     {
-      "planet": 16,
-      "w0": 612,
+      "at": 240,
+      "destructionLimit": 100,
+      "shipKind": 2,
       "b2": 95,
-      "b3": 20,
-      "b4": 0,
-      "at": 240
+      "enemyShips": 20,
+      "noSpawn": 0,
+      "planet": 16
     },
     {
-      "planet": 17,
-      "w0": 918,
+      "at": 256,
+      "destructionLimit": 150,
+      "shipKind": 3,
       "b2": 100,
-      "b3": 40,
-      "b4": 0,
-      "at": 256
+      "enemyShips": 40,
+      "noSpawn": 0,
+      "planet": 17
     },
     {
-      "planet": 18,
-      "w0": 918,
+      "at": 272,
+      "destructionLimit": 150,
+      "shipKind": 3,
       "b2": 115,
-      "b3": 26,
-      "b4": 0,
-      "at": 272
+      "enemyShips": 26,
+      "noSpawn": 0,
+      "planet": 18
     },
     {
-      "planet": 19,
-      "w0": 0,
+      "at": 288,
+      "destructionLimit": 0,
+      "shipKind": 0,
       "b2": 5,
-      "b3": 0,
-      "b4": 0,
-      "at": 288
+      "enemyShips": 0,
+      "noSpawn": 0,
+      "planet": 19
     },
     {
-      "planet": 20,
-      "w0": 276,
+      "at": 304,
+      "destructionLimit": 20,
+      "shipKind": 1,
       "b2": 15,
-      "b3": 0,
-      "b4": 0,
-      "at": 304
+      "enemyShips": 0,
+      "noSpawn": 0,
+      "planet": 20
     }
   ],
   "notes": {
     "PLANET FILE base": "$954C (38220)",
     "unused offset 62": "at $9586 = 3 — offset 62 is never read: the defence table is indexed 38282+P for P=1..20, so it starts at offset 63",
-    "save sentinel $95F7": "0 (77 once a game has been saved; START line 26)"
+    "save sentinel $95F7": "0 (77 once a game has been saved; START line 26)",
+    "ship files on disk": "0, 1, 3, 4"
   }
 }

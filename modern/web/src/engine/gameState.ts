@@ -56,10 +56,14 @@ export class GameState {
   // Orientation (paddle-byte form, 0..255)
   // ---------------------------------------------------------------------
 
-  /** Pitch — paddle 1 ($7321 = 29473). 128 = level. */
-  pitch: PaddleByte = 128;
-  /** Bank — paddle 0 ($7322). 128 = wings level. */
-  bank: PaddleByte = 128;
+  /**
+   * Pitch — $7321 (29473). **0 is level**, not 128: the byte is signed, and
+   * STARSHIP SIMULATOR 175/177 clamp it to 0..59 and 195..255 (i.e. -61..59).
+   * START 195 leaves a new game at 0, measured on the disk.
+   */
+  pitch: PaddleByte = 0;
+  /** Bank — $7322. 0 is wings level, same signed convention as pitch. */
+  bank: PaddleByte = 0;
   /** Heading byte ($7323). Set to 0 by START.bas:195 on new game. */
   heading: PaddleByte = 0;
 

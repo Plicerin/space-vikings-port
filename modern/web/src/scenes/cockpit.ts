@@ -2,6 +2,7 @@ import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { GameState } from '../engine/gameState';
 import {
   Camera, forwardVector, makeStarfield, project, Star, v3, v3add, v3sub,
+  pitchByteToRad,
   v3scale, v3len, v3dot, v3normalize, v3cross,
 } from '../engine/math3d';
 import { decodeShapeTableJson, measureShapeBounds, ShapeRenderer, ShapeTable } from '../engine/shapeTable';
@@ -45,6 +46,9 @@ const W1 = 20000;
 const W2 = -20000;
 const OPENING_VIEW_TOLERANCE = 40;
 const FRAME_DT_SCALE = 0.72;
+// Measured from the original DSK: at S=120, Z advances in exact 120-unit
+// chunks about every 500 ms, or approximately two STARSHIP SIMULATOR loops/sec.
+const BASIC_SIMULATOR_TICK_SECONDS = 0.5;
 const TURN_RATE = 0.9;
 const FIRE_COOLDOWN_SECONDS = 0.45;
 const SHIP_SCALE_MIN = 0.02;
@@ -129,7 +133,7 @@ export async function cockpitScene(
   setScene('cockpit');
   glog('init', `pos=(${state.x},${state.y},${state.z}) atm=${state.atmosphere} orbit=${state.inOrbit}`);
 
-  let pitchRad = (state.pitch - 128) / 128 * (Math.PI / 4);
+  let pitchRad = pitchByteToRad(state.pitch);
   let headingRad = (state.heading / 256) * 2 * Math.PI;
 
 let planetSourceBitmap: Bitmap | null = null;
@@ -149,8 +153,9 @@ let assetsReady = false;
 const shipKind = state.shipKind;
 const effectiveShipKind: 0 | 1 | 3 | 4 = (shipKind as number) === 2 ? 3 : shipKind;
 const displayShipKind: 0 | 1 | 3 | 4 = effectiveShipKind >= 1 ? effectiveShipKind : 0;
+let assetsReadyPromise: Promise<void> = Promise.resolve();
 if (displayShipKind >= 1) {
-  void (async () => {
+  assetsReadyPromise = (async () => {
     try {
       const planetAssetIndex = Math.max(0, Math.min(20, state.planetIndex));
       const json = await loader.json<any>(`data/shapes/planet-${planetAssetIndex}.json`);
@@ -195,6 +200,7 @@ if (displayShipKind >= 1) {
     assetsReady = true;
   })();
 }
+await assetsReadyPromise;
 
 const viewport = document.getElementById('viewport');
 const stage = document.getElementById('stage') as HTMLCanvasElement | null;
@@ -210,7 +216,6 @@ void vectorRenderer.loadShip(loader, displayShipKind);
 const planetTech = state.planets[state.planetIndex]?.defense || 0;
 void planetTech;
 
-const openingSolView = isOpeningSolView(state);
 const enemy = spawnEnemy(state);
 
   const projectiles: Projectile[] = [];
@@ -230,17 +235,26 @@ const enemy = spawnEnemy(state);
     let raf = 0;
     let next: string | null = null;
     let lastT = performance.now();
+    let simulatorAccumulator = 0;
     let prevHeading = headingRad;
     let prevPitch = pitchRad;
     let fireCooldown = 0;
-  let transitionCooldown = 3;
+  let transitionCooldown = 0;
   let showControls = false;
   let vectorMode = false;
   const ai = new AIController();
 
     function runNextScene(): boolean {
       if (!next) return false;
-      state.pitch = Math.round(((pitchRad / (Math.PI / 4)) * 128 + 128 + 256) % 256);
+      // The true inverse of pitchByteToRad, which is (byte / 256) * 2 * Math.PI.
+      // This used to write ((pitchRad / (Math.PI / 4)) * 128 + 128) % 256, a different
+      // mapping entirely: leaving the cockpit level (0 rad) stored 128, and re-entering
+      // read that back as Math.PI - flying backwards. Heading below always used the
+      // true inverse, which is why only pitch drifted.
+      //
+      // 0 is level on the disk too: STARSHIP SIMULATOR 175/177 clamp $7321 to 0..59 and
+      // 195..255, a signed range centred on 0, and a new game starts it at 0.
+      state.pitch = Math.round(((pitchRad / (2 * Math.PI)) * 256 + 256) % 256);
       state.heading = Math.round(((headingRad / (2 * Math.PI)) * 256 + 256) % 256);
       vectorRenderer.destroy();
       cancelAnimationFrame(raf);
@@ -398,31 +412,26 @@ const enemy = spawnEnemy(state);
 
     function updatePhysics(dt: number): Camera {
       const fwd = forwardVector(pitchRad, headingRad);
-      const scale = state.speed * dt * FRAME_DT_SCALE;
-      const newPos = v3add(v3(state.x, state.y, state.z), v3scale(fwd, scale));
-      state.x = wrap(newPos.x);
-      state.y = wrap(newPos.y);
-      state.z = wrap(newPos.z);
+      // STARSHIP SIMULATOR.bas:129 applies S * vector once per source loop.
+      // The DSK trace shows one loop about every 500 ms, not every browser
+      // frame: at S=120, Z advances in exact 120-unit chunks.
+      simulatorAccumulator += dt;
+      const simulatorTicks = Math.floor(simulatorAccumulator / BASIC_SIMULATOR_TICK_SECONDS);
+      simulatorAccumulator -= simulatorTicks * BASIC_SIMULATOR_TICK_SECONDS;
+      for (let i = 0; i < simulatorTicks; i += 1) {
+        const newPos = v3add(v3(state.x, state.y, state.z), v3scale(fwd, state.speed));
+        state.x = wrap(newPos.x);
+        state.y = wrap(newPos.y);
+        state.z = wrap(newPos.z);
+      }
 
-      if (state.atmosphere && state.speed > 0) {
+      if (simulatorTicks > 0 && state.atmosphere && state.speed > 0) {
         const gravityFactor = 1 - Math.max(0, Math.sin(pitchRad));
-        state.y -= (6 - (state.speed / 10)) * gravityFactor * dt * FRAME_DT_SCALE;
+        state.y -= (6 - (state.speed / 10)) * gravityFactor * simulatorTicks;
         if (state.y < 20) {
           state.y = 20;
           pitchRad = 0;
-          state.pitch = 128;
-        }
-      }
-
-      if (state.energy > 0) {
-        const speedDrain = state.speed * 0.008 * dt;
-        const shieldDrain = state.shieldsOn ? 0.5 * dt : 0;
-        state.energy -= speedDrain + shieldDrain;
-        if (state.inOrbit) state.energy += 2 * dt;
-        state.energy = Math.max(0, Math.min(2000, state.energy));
-        if (state.energy <= 0 && state.shieldsOn) {
-          state.shieldsOn = false;
-          glog('energy', 'shields dropped — no energy');
+          state.pitch = 0;      // 0 is level; see the writeback above
         }
       }
 
@@ -459,7 +468,8 @@ const enemy = spawnEnemy(state);
     }
 
     function updateEnemyAI(dt: number) {
-      if (!enemy.alive || destructionPending || state.planetSurrendered) return;
+      if (destructionPending || state.planetSurrendered
+        || (!enemy.alive && !state.atmosphere)) return;
       const nearPlanet = state.atmosphere
         || (state.x > -3500 && state.x < 4500
           && state.y > -3000 && state.y < 3000
@@ -631,6 +641,9 @@ const enemy = spawnEnemy(state);
         );
       } else {
         renderStarfield(cam);
+        if (state.z < -5000) {
+          drawPlanetPointCloud(hires, 70, 55, 32, state.planetIndex);
+        }
         renderPlanet(cam);
         renderEnemyShip(cam);
         const solSpaceView = state.planetIndex === 0 && !state.atmosphere;
@@ -659,37 +672,38 @@ const enemy = spawnEnemy(state);
         if (p.x < 0 || p.x >= 280 || p.y < 0 || p.y >= 124) continue;
         const px = Math.round(p.x);
         const py = Math.round(p.y);
-        if (openingSolView) {
-          const dx = px - 140;
-          const dy = py - 62;
-          const mag = Math.max(1, Math.hypot(dx, dy));
-          const streak = Math.max(3, Math.min(10, 3 + (state.speed / 20)));
-          const ex = Math.round(px + (dx / mag) * streak);
-          const ey = Math.round(py + (dy / mag) * streak);
-          hires.line(px, py, ex, ey);
-        } else {
-          hires.hplot(px, py);
-        }
+        hires.hplot(px, py);
       }
     }
 
     function renderPlanet(cam: Camera) {
-      if (openingSolView) return;
-      const nearPlanetCoords = v3(0, 0, 0);
+      // Opening capture of the disk places planet 1 at this source-space
+      // center relative to the START simulator position.
+      const nearPlanetCoords = v3(200, 90, 0);
       const dp = project(cam, nearPlanetCoords);
       if (!dp.visible || dp.depth >= 20000) return;
-      const pScale = Math.max(1, Math.min(6, Math.round(25000 / dp.depth)));
+      const pScale = Math.max(0.02, Math.min(10, 50000 / Math.max(1, dp.depth)));
       shapeR.rot = 0;
       shapeR.scale = pScale;
       hires.hcolor(3);
-      drawPlanetPointCloud(
-        hires,
-        Math.round(dp.x),
-        Math.round(dp.y),
-        Math.max(4, pScale * 7),
-        state.planetIndex + 1,
-        1,
-      );
+      if (planetTable && planetTable.shapes.length > 0) {
+        // Apple II planet tables contain invisible positioning shapes; the
+        // original DRAW traversal keeps the pen position across the table.
+        shapeR.drawSequential(planetTable, Math.round(dp.x), Math.round(dp.y));
+        // The recovered table preserves the source marks but not the final
+        // screen-space body outline; retain the source-style projected cloud
+        // so the opening planet remains a coherent disk at this distance.
+        drawPlanetPointCloud(hires, Math.round(dp.x), Math.round(dp.y), 32, state.planetIndex);
+      } else {
+        drawPlanetPointCloud(
+          hires,
+          Math.round(dp.x),
+          Math.round(dp.y),
+          Math.max(4, pScale * 7),
+          state.planetIndex + 1,
+          1,
+        );
+      }
     }
 
     function renderEnemyShip(cam: Camera) {
@@ -697,7 +711,7 @@ const enemy = spawnEnemy(state);
       const visibleShip = enemy.alive ? enemy.pos : null;
       if (!visibleShip || state.atmosphere) return;
       const ep = project(cam, visibleShip);
-      if (!ep.visible || ep.y < 0 || ep.y >= 124) return;
+      if (!ep.visible) return;
       const sprScale = Math.max(1, Math.min(64, Math.round(2500 / ep.depth)));
       shapeR.rot = 0;
       shapeR.scale = 1;
@@ -707,10 +721,27 @@ const enemy = spawnEnemy(state);
         enemyScreenX = clamp(Math.round(ep.x), 12, 268);
         enemyScreenY = clamp(Math.round(ep.y), 12, 118);
       }
-      const desiredPx = Math.max(24, Math.min(72, 240000 / Math.max(1, ep.depth)));
+      const desiredPx = Math.max(12, Math.min(24, 80000 / Math.max(1, ep.depth)));
       const shipDrawX = Math.round(ep.x);
       const shipDrawY = clamp(Math.round(ep.y), 22, 86);
-      if (enemyBytecodeOps) {
+      const shipShapeIndex = selectRenderableShipShapeIndex(enemyTable, displayShipKind);
+      if (displayShipKind !== 3 && shipShapeIndex >= 0 && enemyTable) {
+        const shipShape = enemyTable.shapes[shipShapeIndex];
+        const shipBounds = measureShapeBounds(shipShape);
+        const sourceWidth = Math.max(1, (shipBounds?.max_x ?? 0) - (shipBounds?.min_x ?? 0));
+        const sourceHeight = Math.max(1, (shipBounds?.max_y ?? 0) - (shipBounds?.min_y ?? 0));
+        shapeR.scale = Math.max(0.01, Math.min(2, desiredPx / Math.max(sourceWidth, sourceHeight)));
+        const anchorX = Math.round(
+          shipDrawX - (((shipBounds?.min_x ?? 0) + (shipBounds?.max_x ?? 0)) * 0.5 * shapeR.scale),
+        );
+        const anchorY = Math.round(
+          shipDrawY - (((shipBounds?.min_y ?? 0) + (shipBounds?.max_y ?? 0)) * 0.5 * shapeR.scale),
+        );
+        shapeR.draw(enemyTable, shipShapeIndex, anchorX, anchorY);
+      } else if (enemyPointSprite && enemyPointSprite.shapes.length > 0) {
+        const scale = computeShipPointScale(enemyPointSprite.bounds, desiredPx);
+        renderShipPointSprite(hires, enemyPointSprite, shipDrawX, shipDrawY, scale);
+      } else if (enemyBytecodeOps) {
         const projection = projectShipBytecode(enemyBytecodeOps, desiredPx, COCKPIT_SHIP_WIREFRAME_VIEW);
         if (projection) {
           drawShipWireframe(hires, projection, shipDrawX, shipDrawY);
@@ -719,29 +750,8 @@ const enemy = spawnEnemy(state);
         }
       } else if (enemySourceBitmap && enemySourceBounds) {
         drawScaledBitmap(shipDrawX, shipDrawY, desiredPx, enemySourceBitmap, enemySourceBounds);
-      } else if (enemyPointSprite && enemyPointSprite.shapes.length > 0) {
-        const scale = computeShipPointScale(enemyPointSprite.bounds, desiredPx);
-        renderShipPointSprite(hires, enemyPointSprite, shipDrawX, shipDrawY, scale);
       } else {
-        const shipShapeIndex = selectRenderableShipShapeIndex(enemyTable, displayShipKind);
-        if (shipShapeIndex >= 0 && enemyTable) {
-          const shipShape = enemyTable.shapes[shipShapeIndex];
-          const shipShapeMetrics = shapeRenderMetrics(shipShape);
-          const shipBounds = measureShapeBounds(shipShape);
-          shapeR.scale = computeShipRenderScale(ep.depth, sprScale, shipShapeMetrics);
-          const anchorX = Math.round(
-            shipDrawX - (((shipBounds?.min_x ?? 0) + (shipBounds?.max_x ?? 0)) * 0.5 * shapeR.scale),
-          );
-          const anchorY = Math.round(
-            shipDrawY - (((shipBounds?.min_y ?? 0) + (shipBounds?.max_y ?? 0)) * 0.5 * shapeR.scale),
-          );
-          shapeR.draw(enemyTable, shipShapeIndex, anchorX, anchorY);
-        } else {
-          drawOrbitingShipFallback(
-            hires, shipDrawX, shipDrawY,
-            Math.max(1, Math.min(4, sprScale)),
-          );
-        }
+        drawOrbitingShipFallback(hires, shipDrawX, shipDrawY, Math.max(1, Math.min(4, sprScale)));
       }
     }
 
@@ -839,7 +849,6 @@ const enemy = spawnEnemy(state);
     function frame(now: number) {
       const dt = Math.min(0.05, (now - lastT) / 1000);
       lastT = now;
-
       updateTimers(dt);
       checkDebugFighters();
       checkAutoConquest();
@@ -1130,6 +1139,8 @@ function onLaserHit() {
 }
 
 function spawnEnemy(state: GameState) {
+  // START.bas loads SHIP # J before RUN INSTRUMENTS, so the opening frame
+  // includes the loaded ship over the home planet.
   if (state.atmosphere || state.planetSurrendered || state.shipKind === 0) {
     return {
       pos: v3(0, 0, 0),
@@ -1152,6 +1163,12 @@ function isOpeningSolView(state: GameState): boolean {
     && Math.abs(state.z + 7000) <= OPENING_VIEW_TOLERANCE;
 }
 
+function isOpeningApproach(state: GameState): boolean {
+  return state.planetIndex === 1
+    && !state.atmosphere
+    && state.z < -2500;
+}
+
 function drawSolPresentationStars(hires: import('../engine/hires').Hires): void {
   for (const [x, y] of SOL_PRESENTATION_STARS) {
     hires.hplot(x, y);
@@ -1169,6 +1186,36 @@ function drawPlanetFallback(
   radius: number,
 ): void {
   drawPlanetPointCloud(hires, cx, cy, radius, 1, 0.72);
+}
+
+export function drawPlanetPayload(
+  hires: import('../engine/hires').Hires,
+  cx: number,
+  cy: number,
+  payload: PlanetPayloadJson,
+  scale: number,
+): void {
+  const points: [number, number][] = [];
+  for (const shape of payload.shapes) {
+    for (const point of shape.points) points.push(point);
+  }
+  if (points.length === 0) return;
+  const xs = points.map(point => point[0]);
+  const ys = points.map(point => point[1]);
+  const centerX = (Math.min(...xs) + Math.max(...xs)) * 0.5;
+  const centerY = (Math.min(...ys) + Math.max(...ys)) * 0.5;
+  for (const shape of payload.shapes) {
+    for (let i = 1; i < shape.points.length; i++) {
+      const a = shape.points[i - 1];
+      const b = shape.points[i];
+      hires.line(
+        cx + (a[0] - centerX) * scale,
+        cy + (a[1] - centerY) * scale,
+        cx + (b[0] - centerX) * scale,
+        cy + (b[1] - centerY) * scale,
+      );
+    }
+  }
 }
 
 export let planetRotationTime = 0;
@@ -1195,7 +1242,6 @@ export function drawPlanetPointCloud(
     hires.hplot(x, y);
   }
 }
-
 function buildProjectedSphereCloud(
   rx: number,
   ry: number,
