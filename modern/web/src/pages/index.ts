@@ -4,7 +4,7 @@
 import { Hires } from '../engine/hires';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import { parseShipBytecode, projectShipBytecode, drawShipWireframe,
-  COCKPIT_SHIP_WIREFRAME_VIEW } from '../engine/shipBytecode';
+  projectShipWorld, drawShipWorld, COCKPIT_SHIP_WIREFRAME_VIEW } from '../engine/shipBytecode';
 import { SceneManager } from '../engine/sceneManager';
 import { Input } from '../engine/input';
 import { Audio } from '../engine/audio';
@@ -101,7 +101,8 @@ function boot(): void {
   // screen on a throwaway Hires and diffs it against the original disk's hi-res page.
   (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments,
     ShapeRenderer, decodeShapeTableJson,
-    parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW };
+    parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW,
+    projectShipWorld, drawShipWorld };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();

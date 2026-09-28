@@ -23,6 +23,7 @@ const PORT_URL = process.env.PORT_URL || 'http://localhost:4545/';
 const golden = JSON.parse(fs.readFileSync('captured/ship/golden.json', 'utf8'));
 const states = golden.states.filter((s) => s.lit > 0);
 const shipBytes = JSON.parse(fs.readFileSync('../public/data/shapes/ship-3-bytecode.json', 'utf8')).bytes;
+const CAM = JSON.parse(fs.readFileSync('captured/projection_fit.json', 'utf8')).camera;
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
@@ -32,10 +33,11 @@ await page.goto(PORT_URL, { waitUntil: 'load' });
 await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.projectShipBytecode), null, { timeout: 30000 })
   .catch(() => { throw new Error('the port did not expose projectShipBytecode - is the dev server running at ' + PORT_URL + '?'); });
 
-// Draw each state with the port, given the disk's own centre and span.
+// Draw each state with the port's world-space path: the camera the golden render used,
+// the model's own coordinates, and the projection derived in fit_projection.mjs. Nothing
+// is handed to it - no centre, no span. It has to put the ship where the disk did.
 const rendered = await page.evaluate(({ bytes, jobs }) => {
-  const { Hires, parseShipBytecode, projectShipBytecode, drawShipWireframe,
-    COCKPIT_SHIP_WIREFRAME_VIEW } = window.__spaceVikings;
+  const { Hires, parseShipBytecode, projectShipWorld, drawShipWorld } = window.__spaceVikings;
   const ops = parseShipBytecode(bytes);
   return jobs.map((j) => {
     const c = document.createElement('canvas');
@@ -43,17 +45,15 @@ const rendered = await page.evaluate(({ bytes, jobs }) => {
     const h = new Hires(c);
     h.hgr();
     h.hcolor(3);
-    const proj = projectShipBytecode(ops, j.span, COCKPIT_SHIP_WIREFRAME_VIEW);
-    if (!proj) return { on: null };
-    drawShipWireframe(h, proj, j.cx, j.cy);
-    return { on: Array.from(h.snapshot().on), segments: proj.segments.length };
+    const proj = projectShipWorld(ops, j.camera, j.heading, j.pitch, null);
+    drawShipWorld(h, proj);
+    return { on: Array.from(h.snapshot().on), segments: proj.segments.length, culled: proj.culled };
   });
 }, {
   bytes: shipBytes,
   jobs: states.map((s) => ({
-    span: Math.max(s.bounds.maxX - s.bounds.minX + 1, s.bounds.maxY - s.bounds.minY + 1),
-    cx: Math.round((s.bounds.minX + s.bounds.maxX) / 2),
-    cy: Math.round((s.bounds.minY + s.bounds.maxY) / 2),
+    camera: { x: CAM.x, y: CAM.y, z: s.z },
+    heading: s.heading, pitch: s.pitch,
   })),
 });
 await browser.close();
@@ -61,7 +61,7 @@ for (const e of errors.slice(0, 3)) console.log('page error:', e);
 
 fs.mkdirSync('captured/ship/port', { recursive: true });
 
-console.log('PLACEMENT - where the disk puts the ship, and how big it is\n');
+console.log('PLACEMENT - the port now computes this, so it is a result and not an input');
 console.log('  state       disk centre      disk span   disk px');
 for (const s of states) {
   const cx = Math.round((s.bounds.minX + s.bounds.maxX) / 2);
@@ -70,11 +70,12 @@ for (const s of states) {
   console.log(`  ${s.label.padEnd(8)}  (${String(cx).padStart(3)}, ${String(cy).padStart(3)})` +
     `${' '.repeat(8)}${String(span).padStart(4)}${String(s.lit).padStart(10)}`);
 }
-console.log('\nThe port does not compute any of that: projectShipBytecode() takes the span and');
-console.log('the centre as arguments. Placement is the caller\'s, and in the cockpit it comes');
-console.log('from a distance heuristic, not from the world projection the disk does.\n');
+console.log('');
+console.log('projectShipWorld() projects every vertex through the camera with the transform');
+console.log('derived in fit_projection.mjs, using the machine\'s own sine and cosine. Nothing');
+console.log('below is handed to it - not the centre, not the span.');
 
-console.log('SHAPE - the port given the disk\'s own centre and span\n');
+console.log("SHAPE - and how close the pixels come");
 console.log('  state     disk px   port px   overlap   agreement   disk w x h   port w x h   too tall');
 let sumAgree = 0, n = 0, sumTall = 0;
 for (let i = 0; i < states.length; i++) {
@@ -115,9 +116,5 @@ for (let i = 0; i < states.length; i++) {
 console.log(`\nmean shape agreement over ${n} states: ${(100 * sumAgree / n).toFixed(1)}%`);
 console.log(`the port's ship is on average ${(sumTall / n).toFixed(2)}x as tall as the disk's, at the same width.`);
 console.log('');
-console.log("The width matches because it was handed to the port. The height is the port's own:");
-console.log('projectShipBytecode() views the model at COCKPIT_SHIP_WIREFRAME_VIEW - yaw -1.05,');
-console.log('pitch -0.27, roll 0.05 - a fixed three-quarter view - then scales so the larger of');
-console.log('width and height fills the span. The disk projects world coordinates from the');
-console.log('cockpit, which at these ranges is nearly edge-on, so its ship is wide and flat.');
+console.log("Width is no longer handed over, so a matching width is a result too.");
 console.log(`wrote ${n} port render(s) to captured/ship/port/`);

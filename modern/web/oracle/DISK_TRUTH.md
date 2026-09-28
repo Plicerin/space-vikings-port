@@ -820,41 +820,49 @@ in the no-ship render, so blanking the model removes the ship and disturbs nothi
 Range grows it, heading slides it sideways, pitch slides it vertically. That is a world-space
 perspective projection, and it is what the port has to match.
 
-### What the port does
+### What the port did, and what it does now
 
-`projectShipBytecode()` centres the model on its own bounds, rotates it by
+`projectShipBytecode()` centred the model on its own bounds, rotated it by
 `COCKPIT_SHIP_WIREFRAME_VIEW` - **yaw -1.05, pitch -0.27, roll 0.05**, a fixed three-quarter
-view - projects at a focal length of 280, and then **rescales so the larger of width and
-height fills a span the caller passes in**. The caller also passes the screen centre.
+view - projected at a focal length of 280, and **rescaled so the larger of width and height
+filled a span the caller passed in**. The caller also passed the screen centre. So the port
+computed neither placement nor size; in the cockpit both came from a distance heuristic.
 
-So the port does not compute placement or size at all. In the cockpit both come from a
-distance heuristic. Nothing in it projects world coordinates.
+`projectShipWorld()` replaces it: every vertex goes through the camera with the transform
+derived in `fit_projection.mjs`, using the machine's own sine and cosine. `cockpit.ts` uses
+it, and nothing is handed to it - not the centre, not the span.
 
 ### Measured
 
-Handing the port the disk's own centre and span - asking only "is the shape right, given
-where and how big it should be?" - gives:
+| | before | with the world projection | and with the disk's trig |
+| --- | --- | --- | --- |
+| mean shape agreement | **12.1%** | 62.0% | **69.8%** |
+| height vs the disk's | 2.30x | 1.05x | 1.05x |
 
-**Mean shape agreement 12.1%** (intersection over union), over 11 states.
+Agreement is intersection over union, over 11 states, and in the last two columns the port
+is given nothing: it computes where the ship goes and how big it is.
 
-The width matches, because it was handed over. The height is the port's own, and it is
-wrong by a consistent factor:
+Switching from real sines to the machine's own table is the difference between the second
+and third columns, and it lands exactly where it should - on the negative angles, which are
+the quadrants the original's trig gets wrong:
 
-| | z-6401 | z-5500 | z-4500 | h4 | h8 | h12 | h250 | h246 | p4 | p8 | p250 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| disk h | 12 | 19 | 27 | 12 | 12 | 13 | 12 | 13 | 12 | 13 | 13 |
-| port h | 29 | 41 | 61 | 27 | 31 | 31 | 27 | 29 | 29 | 29 | 27 |
-| ratio | 2.42 | 2.16 | 2.26 | 2.25 | 2.58 | 2.38 | 2.25 | 2.23 | 2.42 | 2.23 | 2.08 |
+| state | real sines | the disk's table |
+| --- | --- | --- |
+| pitch -6 | 28.5% | **83.4%** |
+| heading -6 | 62.5% | **81.7%** |
+| heading -10 | 65.6% | **76.8%** |
+| heading +4, +8, +12 | 75.3 / 76.2 / 80.4% | unchanged |
 
-**The port's ship is on average 2.30x as tall as the disk's at the same width**, and the
-spread is narrow (2.08 to 2.58). That is the fixed three-quarter view: it shows the model
-from above and to one side, where the disk at these ranges is looking at it nearly edge-on
-from the cockpit, so the disk's ship is wide and flat.
+### What is still missing
 
-This is not a matter of tuning the view angles. The disk's aspect changes with the ship's
-position; a fixed view cannot follow it. Matching it needs the world projection, which means
-deriving the transform in `$6000` - identified as far as its multiply, its clipper and its
-trig, but not its geometry.
+**Clipping.** The worst remaining state is closest approach, Z -4500, at 29.5%: the port
+draws a box 108 wide where the disk draws 86. Nothing is culled - `culled` is 0 - because
+the projection only drops points behind the camera. The original clips lines against the
+view with the Cohen-Sutherland code at `$61A9`-`$620F`, and that is not implemented.
+
+The rest is segment-level detail: at pitch +4 and +8 the port draws 103 pixels against the
+disk's 118 and 142, in a box 3 px narrower, which is a handful of segments rather than a
+transform error.
 
 ---
 

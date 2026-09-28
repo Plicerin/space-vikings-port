@@ -1,4 +1,5 @@
 import type { Hires } from './hires';
+import { projectWorldPoint, type Vec3 as ProjVec3 } from './diskProjection';
 
 export interface ShipBytecodeHeaderOp {
   kind: 'set-state';
@@ -332,4 +333,96 @@ function isPlausibleVector(x: number, y: number, z: number): boolean {
   if (z >= -500 || z <= -10000) return false;
   if (Math.abs(x) > 4000 || Math.abs(y) > 4000) return false;
   return true;
+}
+
+
+// ---------------------------------------------------------------------
+// World-space projection, the way the disk does it
+// ---------------------------------------------------------------------
+//
+// projectShipBytecode() above centres the model on its own bounds, views it from a fixed
+// three-quarter angle and rescales it to a span the caller picks. That is a sprite, not a
+// projection: measured against the original it came out 2.30x too tall (see
+// oracle/DISK_TRUTH.md, "Ship render parity").
+//
+// This projects every vertex through the camera instead, with the transform derived from
+// the original renderer in oracle/fit_projection.mjs. The model's coordinates on the disk
+// are already absolute world coordinates, so with no `origin` the ship sits exactly where
+// the disk puts it; passing an origin moves it there, keeping its shape.
+
+export interface ShipWorldSegment {
+  from: ShipProjectedPoint;
+  to: ShipProjectedPoint;
+}
+
+export interface ShipWorldProjection {
+  segments: ShipWorldSegment[];
+  /** Opcode-0 vertices, which stand alone - DEBRIS is nothing but these. */
+  dots: ShipProjectedPoint[];
+  /** Vertices that fell at or behind the camera and were dropped. */
+  culled: number;
+}
+
+/** The centre of a model's own coordinates, for placing it somewhere else. */
+export function measureModelCentre(ops: ShipBytecodeOp[]): ProjVec3 | null {
+  const v = ops.filter((o): o is ShipBytecodeVectorOp => o.kind === 'vector');
+  if (!v.length) return null;
+  const min = { x: Infinity, y: Infinity, z: Infinity };
+  const max = { x: -Infinity, y: -Infinity, z: -Infinity };
+  for (const p of v) {
+    min.x = Math.min(min.x, p.x); max.x = Math.max(max.x, p.x);
+    min.y = Math.min(min.y, p.y); max.y = Math.max(max.y, p.y);
+    min.z = Math.min(min.z, p.z); max.z = Math.max(max.z, p.z);
+  }
+  return { x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 };
+}
+
+/**
+ * Project a ship's vertices through the camera.
+ *
+ * Opcode 1 starts a run and opcode 2 continues it, which is how the models read: ships are
+ * mostly 1 followed by a string of 2s. Opcode 0 is a lone point (DEBRIS is nothing but
+ * those) and opcode 3 ends a run - it is drawn as a line like 2, but the pen lifts after,
+ * which is the reading that matches the shapes the disk produces.
+ */
+export function projectShipWorld(
+  ops: ShipBytecodeOp[],
+  camera: ProjVec3,
+  headingByte: number,
+  pitchByte: number,
+  origin?: ProjVec3 | null,
+): ShipWorldProjection {
+  const centre = origin ? measureModelCentre(ops) : null;
+  const shift = origin && centre
+    ? { x: origin.x - centre.x, y: origin.y - centre.y, z: origin.z - centre.z }
+    : { x: 0, y: 0, z: 0 };
+
+  const segments: ShipWorldSegment[] = [];
+  const dots: ShipProjectedPoint[] = [];
+  let pen: ShipProjectedPoint | null = null;
+  let culled = 0;
+
+  for (const op of ops) {
+    if (op.kind !== 'vector') continue;
+    const q = projectWorldPoint(
+      { x: op.x + shift.x, y: op.y + shift.y, z: op.z + shift.z },
+      camera, headingByte, pitchByte,
+    );
+    if (!q) { culled++; pen = null; continue; }
+    if (op.opcode === 0) { dots.push(q); pen = null; continue; }   // a point on its own
+    if (op.opcode === 1) { pen = q; continue; }         // start a run
+    if (pen) segments.push({ from: pen, to: q });       // 2 and 3 draw
+    pen = op.opcode === 3 ? null : q;                   // 3 lifts the pen after
+  }
+  return { segments, dots, culled };
+}
+
+/** Draw a world-space projection. Coordinates are already screen coordinates. */
+export function drawShipWorld(hires: Hires, projection: ShipWorldProjection): void {
+  for (const s of projection.segments) {
+    hires.line(Math.round(s.from.x), Math.round(s.from.y), Math.round(s.to.x), Math.round(s.to.y));
+  }
+  for (const p of projection.dots) {
+    hires.hplot(Math.round(p.x), Math.round(p.y));
+  }
 }

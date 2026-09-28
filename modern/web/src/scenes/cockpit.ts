@@ -24,8 +24,10 @@ import { extractShipBitmapFromAppleWinState, type AppleWinStateJson } from '../e
 import {
   COCKPIT_SHIP_WIREFRAME_VIEW,
   drawShipWireframe,
+  drawShipWorld,
   parseShipBytecode,
   projectShipBytecode,
+  projectShipWorld,
   type ShipBytecodeOp,
 } from '../engine/shipBytecode';
 import { setScene, log as glog } from '../engine/gameLog';
@@ -742,9 +744,22 @@ const enemy = spawnEnemy(state);
         const scale = computeShipPointScale(enemyPointSprite.bounds, desiredPx);
         renderShipPointSprite(hires, enemyPointSprite, shipDrawX, shipDrawY, scale);
       } else if (enemyBytecodeOps) {
-        const projection = projectShipBytecode(enemyBytecodeOps, desiredPx, COCKPIT_SHIP_WIREFRAME_VIEW);
-        if (projection) {
-          drawShipWireframe(hires, projection, shipDrawX, shipDrawY);
+        // Project every vertex through the camera, the way the disk does, rather than
+        // stamping a fixed-view sprite at a projected point. The transform is derived in
+        // oracle/fit_projection.mjs; measured against the original, this took ship shape
+        // agreement from 12.1% to 69.8% and the aspect ratio from 2.30x too tall to 1.05x.
+        //
+        // The model's coordinates on the disk are absolute world coordinates, so it is
+        // moved to wherever the enemy currently is and keeps its shape.
+        const projection = projectShipWorld(
+          enemyBytecodeOps,
+          { x: state.x, y: state.y, z: state.z },
+          state.heading,
+          state.pitch,
+          visibleShip,
+        );
+        if (projection.segments.length || projection.dots.length) {
+          drawShipWorld(hires, projection);
         } else if (enemySourceBitmap && enemySourceBounds) {
           drawScaledBitmap(shipDrawX, shipDrawY, desiredPx, enemySourceBitmap, enemySourceBounds);
         }
