@@ -728,14 +728,64 @@ else, by up to 486.5 - 1.48% of full scale.** Simulating those instructions exac
 reproduces **512 of 512** measured values, so this is the behaviour and not an artefact of
 measuring. A port that computes real sines will not match the original's geometry.
 
-### What is not settled
+### Making it draw
 
 Calling `$6000` from a cold machine with all fifteen of START's binaries loaded and the ship
-placed at `$731B` **returns without drawing anything** (`probe_render.mjs`). It needs more
-setup than that - at least what `TRANLIT.OBJ0` builds through `CALL 38825`, and whatever
-object list `$6140` walks from page `$73`. Until that is reconstructed there is no ship
-render to compare the port against, and the projection itself - how the model bytecode at
-`$7879` becomes screen coordinates - has not been derived.
+placed at `$731B` **returns without drawing anything** (`probe_render.mjs`) - it needs state
+those BLOADs do not produce. Snapshot and replay solves that; see the next section. The
+projection itself - how the model bytecode at `$7879` becomes screen coordinates - has still
+not been derived.
+
+---
+
+## Driving the renderer: snapshot and replay
+
+Calling `$6000` on a cold machine with all fifteen of START's binaries loaded draws nothing,
+because it needs state those BLOADs do not produce. Rather than reconstruct that state by
+hand, take it from the running game.
+
+`probe_snapshot.mjs` boots the disk, waits for STARSHIP SIMULATOR, lets flight settle, then
+single-steps the 6502 until **PC is exactly `$6000`** and captures all 48K plus the
+registers. Whatever the renderer needed, it had, by construction.
+
+`probe_replay.mjs` writes that back into a fresh machine, sets the graphics soft switches,
+replaces the return address on the stack with a trap, and runs. **604,164 instructions, and
+it draws.** The ship can then be moved and it draws again - so this is a render oracle, the
+same kind of arbiter the cockpit panel and the shape table already have.
+
+| Z | heading | pixels | extent |
+| --- | --- | --- | --- |
+| -6401 | 0 | 404 | x 82-155, y 32-99 |
+| -4000 | 0 | 284 | x 46-163, y 15-122 |
+| -2000 | 0 | 102 | x 2-189, y 3-123 |
+| -6401 | 16 | 366 | x 2-177, y 29-104 |
+| -6401 | 32 | 4 | mostly out of frame |
+| -6401 | 64 | 6 | mostly out of frame |
+
+Closing from Z -6401 to -2000 spreads the object from a 73-pixel-wide box to nearly the full
+screen, and turning swings it out of view. That is a perspective projection behaving as one
+should.
+
+**It draws to hi-res page 2 (`$4000-$5FFF`) while page 1 is displayed.** STARSHIP SIMULATOR
+line 147 pokes `$7315` with `$54` or `$55` - the low byte of the PAGE1/PAGE2 soft switch -
+and the `FOR OO = 0 TO 1` loop at line 15 alternates them. The game double-buffers.
+
+### The oracle was free-running between calls
+
+Finding this exposed a real defect in `a2.mjs`. apple2js starts its own
+`requestAnimationFrame` loop when the page loads, and **that loop kept stepping the CPU
+between our evaluate calls**: a restore in one call and a run in the next were not adjacent,
+and the machine executed hundreds of thousands of instructions in the gap. Measured
+directly, PC moved from `$6000` to `$6D23` and SP from `$D6` to `$CE` between two adjacent
+reads that did nothing.
+
+That is exactly the nondeterminism `frames()` was written to avoid, and it had been there
+the whole time - `frames()` was the only clock the oracle *drove*, but not the only clock
+that *ran*. `openOracle()` now calls `a2.stop()`, and PC is identical across repeated reads.
+
+Re-checked afterwards: the cockpit panel is still 0 of 53,760 pixels different, and all 26
+shapes still render exactly. Those probes step explicitly and hand-shake through a flag
+byte, so the stray clock had not been perturbing them - but nothing guaranteed that before.
 
 ---
 
@@ -757,8 +807,8 @@ render to compare the port against, and the projection itself - how the model by
 - What `CALL 38402` (TRANLIT.OBJ0) draws into the gauge boxes.
 - The projection in `$6000`: how the model bytecode at `$7879` becomes screen coordinates.
   The multiply, the clipper and the trig are identified; the transform around them is not.
-- What state `$6000` needs before it will draw. Loading all fifteen binaries and placing
-  the ship is not enough.
+- What state `$6000` needs before it will draw. Snapshot and replay sidesteps the question
+  rather than answering it.
 - What opcodes 1, 2 and 3 mean in the ship bytecode. 1 behaves as a move and 2 as a line,
   but 3 is unexplained.
 - What the `PLANET # n` files at `$7300` are. They are not shape tables either.

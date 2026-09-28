@@ -1,0 +1,15 @@
+{
+  "lo": 0,
+  "hi": 49152,
+  "pc": 24576,
+  "cpu": {
+    "a": 255,
+    "x": 96,
+    "y": 10,
+    "s": 32,
+    "pc": 26602,
+    "sp": 214,
+    "cycles": 94915642
+  },
+  "note": "taken with the 6502 stopped on the instruction at $6000, during live flight"
+}

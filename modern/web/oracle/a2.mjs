@@ -55,6 +55,16 @@ export async function openOracle({ headless = true } = {}) {
 
   const ev = (code) => page.evaluate((s) => new Function('return (async () => (' + s + '))()')(), code);
 
+  // apple2js starts its own requestAnimationFrame loop when the page loads, and that loop
+  // keeps stepping the CPU between our calls - a restore in one evaluate and a run in the
+  // next are not adjacent, and the machine can execute hundreds of thousands of
+  // instructions in the gap. Stop it, so frames() is genuinely the only clock there is.
+  await ev(`(() => {
+    const a2 = window.Apple2.apple2;
+    if (typeof a2.stop === 'function') a2.stop();
+    return typeof a2.stop === 'function' ? 'run loop stopped' : 'no stop() to call';
+  })()`);
+
   // The handles every probe uses. Kept on window so a probe can add to them.
   await ev(`(() => {
     const a2 = window.Apple2.apple2;
