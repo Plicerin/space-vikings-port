@@ -12,6 +12,23 @@ const PALETTE: Record<number, string> = {
   7: '#ffffff',
 };
 
+/**
+ * Which pixel columns each HCOLOR lights, measured from the Applesoft ROM by
+ * oracle/probe_hcolor.mjs: black lights none, green and orange the odd columns, violet and
+ * blue the even ones, white all of them.
+ */
+const enum Phase { None = 0, Odd = 1, Even = 2, All = 3 }
+const HCOLOR_PHASE: readonly Phase[] = [
+  Phase.None,  // 0 black1
+  Phase.Odd,   // 1 green
+  Phase.Even,  // 2 violet
+  Phase.All,   // 3 white1
+  Phase.None,  // 4 black2
+  Phase.Odd,   // 5 orange
+  Phase.Even,  // 6 blue
+  Phase.All,   // 7 white2
+];
+
 const PALETTE_ARGB = new Map<number, number>();
 for (let i = 0; i <= 7; i++) {
   const hex = PALETTE[i]!;
@@ -89,6 +106,7 @@ export class Hires {
   private offCtx: CanvasRenderingContext2D;
   private colorArgb = 0xffffffff;
   private colorIndex = 3;
+  private phase: Phase = Phase.All;
   penX = 0;
   penY = 0;
 
@@ -149,13 +167,33 @@ export class Hires {
   hcolor(idx: number): void {
     this.colorIndex = idx & 7;
     this.colorArgb = PALETTE_ARGB.get(this.colorIndex) ?? 0xffffffff;
+    this.phase = HCOLOR_PHASE[this.colorIndex];
+  }
+
+  /**
+   * Does this HCOLOR light pixel column x?
+   *
+   * On the Apple II a non-white HCOLOR lights only alternate columns, so its lines come
+   * out dotted at half density. HPLOT *writes* the bit either way, so plotting green over
+   * white erases the even columns rather than leaving them - hence returning a colour to
+   * store rather than a yes/no.
+   *
+   * Measured on the real Applesoft ROM by oracle/probe_hcolor.mjs, all eight values.
+   */
+  private argbAt(x: number): number {
+    switch (this.phase) {
+      case Phase.None: return 0;
+      case Phase.All: return this.colorArgb;
+      case Phase.Odd: return (x & 1) ? this.colorArgb : 0;
+      default: return (x & 1) ? 0 : this.colorArgb;
+    }
   }
 
   hplot(x: number, y: number): void {
     const ix = Math.round(x);
     const iy = Math.round(y);
     if (ix < 0 || ix >= W || iy < 0 || iy >= H) return;
-    this.buf[iy * W + ix] = this.colorArgb;
+    this.buf[iy * W + ix] = this.argbAt(ix);
     this.dirty = true;
   }
 
@@ -175,12 +213,11 @@ export class Hires {
     const sx = x0 < x1r ? 1 : -1;
     const sy = y0 < y1r ? 1 : -1;
     let err = dx + dy;
-    const col = this.colorArgb;
     const buf = this.buf;
 
     for (;;) {
       if (x0 >= 0 && x0 < W && y0 >= 0 && y0 < H) {
-        buf[y0 * W + x0] = col;
+        buf[y0 * W + x0] = this.argbAt(x0);
       }
       if (x0 === x1r && y0 === y1r) break;
       const e2 = 2 * err;
@@ -226,6 +263,20 @@ export class Hires {
     for (let i = 0; i < visible.length; i++) {
       const ch = visible[i];
       const glyph = TEXT_GLYPHS[ch] ?? TEXT_GLYPHS[ch.toUpperCase()] ?? TEXT_GLYPHS['?'];
+      // Inverse video fills the whole character cell and knocks the glyph out of it, so
+      // the background has to be laid down across all 7x8 first - the glyph itself is only
+      // 5 wide and 7 tall, and painting just those columns left gaps the original does not
+      // have. On the disk an inverse run is solid: INSTRUMENTS 170 under POKE 973,255
+      // shows as an unbroken row of lit pixels.
+      if (opts?.invert) {
+        for (let gy = 0; gy < cellH; gy++) {
+          const rowOffset = (py + gy) * W;
+          for (let gx = 0; gx < cellW; gx++) {
+            const x = px + gx + i * cellW;
+            if (x >= 0 && x < W && py + gy >= 0 && py + gy < H) buf[rowOffset + x] = fgArgb;
+          }
+        }
+      }
       for (let gy = 0; gy < glyph.length; gy++) {
         const bits = glyph[gy];
         const rowOffset = (py + gy) * W;
@@ -234,8 +285,9 @@ export class Hires {
           const x = px + 1 + gx + i * cellW;
           const y = py + gy;
           if (x >= 0 && x < W && y >= 0 && y < H) {
+            // The cell is already filled above in inverse mode, so knock the glyph out.
             if (opts?.invert) {
-              buf[y * W + x] = on ? bgArgb : fgArgb;
+              if (on) buf[y * W + x] = bgArgb;
             } else {
               if (on) buf[y * W + x] = fgArgb;
             }

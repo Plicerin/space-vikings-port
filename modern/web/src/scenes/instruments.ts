@@ -8,6 +8,8 @@ import { setScene, log as glog } from '../engine/gameLog';
  * screen that can be compared against the original pixel for pixel. oracle/frame_parity.mjs
  * calls it on a fresh Hires and diffs the result against the disk's hi-res page.
  */
+const INVERSE = { invert: true } as const;
+
 export function drawInstruments(hires: import('../engine/hires').Hires): void {
   // All instruments drawn instantly — no artificial delays.
   hires.hcolor(1);
@@ -56,16 +58,19 @@ export function drawInstruments(hires: import('../engine/hires').Hires): void {
   }
 
   hires.hcolor(1);
-  hires.text(' SPEED ', 4, 18);
-  hires.text('TURN', 19, 18);
-  hires.text(' ENERGY ', 30, 18);
+  // INSTRUMENTS 165 does POKE 973,255 and 177 does POKE 973,0, so 973 ($3CD) is the
+  // hi-res character generator's inverse flag and it covers exactly these nine labels.
+  // Everything from line 180 on is printed normally.
+  hires.text(' SPEED ', 4, 18, INVERSE);
+  hires.text('TURN', 19, 18, INVERSE);
+  hires.text(' ENERGY ', 30, 18, INVERSE);
 
-  hires.text('V', 22, 20);
-  hires.text('E', 22, 21);
-  hires.text('R', 22, 22);
-  hires.text('T', 22, 23);
-  hires.text('C', 19, 20);
-  hires.text('D', 19, 23);
+  hires.text('V', 22, 20, INVERSE);
+  hires.text('E', 22, 21, INVERSE);
+  hires.text('R', 22, 22, INVERSE);
+  hires.text('T', 22, 23, INVERSE);
+  hires.text('C', 19, 20, INVERSE);
+  hires.text('D', 19, 23, INVERSE);
   hires.text('MANUAL', 4, 20);
   hires.text('AUTO', 13, 20);
   hires.text('ORBIT', 24, 20);
