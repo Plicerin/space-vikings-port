@@ -282,6 +282,84 @@ Line 73 refuses `(O)LD` with `THERE IS NO GAME SAVED` unless `PEEK(38391) = 77`
 
 ---
 
+## The planet tables
+
+`probe_planetdata.mjs` decodes `PLANET FILE-M` (175 bytes, BLOADed to `$954C`) and `P/F-M`
+(336 bytes, `$97E1`), and writes the result to `captured/planet_data.json` and to
+`src/engine/diskPlanetData.ts` in the port.
+
+**Planets are numbered 1..20.** GALAXY MAP loops `FOR P = 1 TO 20`, and `PEEK(38209)` — the
+current planet — is compared against `P` inside that loop and used to index `X()`/`Y()`/`Z()`.
+There is no planet 0 on the map.
+
+### Each table is located by a use site, and they do not share a base
+
+This is the trap. Reading the file as one array of records, or picking one base for all of
+it, puts half the data off by one.
+
+| Table | Use site | Address | Offset |
+| --- | --- | --- | --- |
+| flag | GALAXY MAP 3066: `IF PEEK(38219 + P) = 1 THEN HCOLOR= 2` | `$954B+P` | `P-1` |
+| defence | STARSHIP SIMULATOR 8: `TE = PEEK(38282 + PEEK(38209))` | `$9586+P` | `62+P` |
+| Z | GALAXY MAP 3020: `Z(P) = PEEK((M + P) - 42)`, `M = 38366` | `$95B4+P` | `104+P` |
+| Y | GALAXY MAP 3020: `Y(P) = PEEK((M + P) - 21)` | `$95C9+P` | `125+P` |
+| X | GALAXY MAP 3020: `X(P) = PEEK(M + P)` | `$95DE+P` | `146+P` |
+
+Offset 62 (`$9586`, value 3) is **not** a planet: no planet number indexes it, because the
+defence table is read at `38282 + P` for `P` in 1..20, which is offsets 63..82.
+
+| P | flag | X | Y | Z | defence |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 1 | 15 | 15 | 15 | 3 |
+| 2 | 0 | 13 | 13 | 12 | 3 |
+| 3 | 0 | 14 | 9 | 15 | 3 |
+| 4 | 0 | 8 | 16 | 12 | 0 |
+| 5 | 0 | 22 | 14 | 19 | 2 |
+| 6 | 0 | 13 | 22 | 19 | 1 |
+| 7 | 0 | 17 | 23 | 12 | 4 |
+| 8 | 0 | 14 | 8 | 9 | 2 |
+| 9 | 0 | 19 | 13 | 25 | 3 |
+| 10 | 0 | 20 | 22 | 10 | 4 |
+| 11 | 0 | 9 | 23 | 20 | 0 |
+| 12 | 0 | 7 | 23 | 14 | 1 |
+| 13 | 0 | 25 | 21 | 13 | 4 |
+| 14 | 0 | 25 | 15 | 21 | 2 |
+| 15 | 0 | 9 | 21 | 19 | 0 |
+| 16 | 0 | 25 | 5 | 11 | 3 |
+| 17 | 0 | 24 | 10 | 10 | 3 |
+| 18 | 0 | 11 | 18 | 27 | 3 |
+| 19 | 0 | 18 | 27 | 11 | 1 |
+| 20 | 0 | 11 | 11 | 25 | 2 |
+
+Defenders only appear when defence is **2 or more** (STARSHIP SIMULATOR line 189:
+`IF PEEK(38282 + PEEK(38209)) < 2 THEN 200`).
+
+`$95F7` (offset 171) is the save sentinel: 0 in the master, 77 once a game has been saved.
+START line 26 reads it, and line 73 refuses `(O)LD` without it.
+
+### P/F-M
+
+21 fixed 16-byte records, byte 5 of each being the planet number it belongs to (1..20, the
+last record being filler). Bytes 0-1 are a 16-bit little-endian value, then three bytes.
+Their meaning is **not yet settled** — no use site has been read for them — so they are
+recorded in `captured/planet_data.json` as `w0`, `b2`, `b3`, `b4` and nothing is claimed
+about them.
+
+### The port's planet table is off by one
+
+`src/engine/extractedOriginalData.ts` holds `EXTRACTED_LIVE_PLANET_TABLE`, 20 rows labelled
+planets 0..19. Its `tech` column matches `PLANET FILE` offsets **62..81** — all 20 values,
+exactly. The game reads planet `P` at offset **62+P**, which is offsets 63..82.
+
+So every planet in the port carries **the previous planet's defence level**, and the
+disk's planet 20 (defence 2) is missing entirely. Matching offsets 63..82 instead scores
+5/20, which is what a one-place shift through this data looks like.
+
+`src/engine/diskPlanetData.ts` is generated from the disk and is correct. The old table is
+still in the tree and still wired up; replacing its consumers is not done.
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -291,4 +369,8 @@ Line 73 refuses `(O)LD` with `THERE IS NO GAME SAVED` unless `PEEK(38391) = 77`
 - The meaning of the flags the BASIC peeks: `38157` (speed), `38164`, `38199`, `38205`,
   `38207`, `38208`, `38209`, `38210`, `38282+n`. Only their use is known, not their names.
 - Which ship number `J = PEEK(38205)` selects, and what `DEBRIS` replaces it for.
+- What the `P/F-M` record fields mean - no use site read yet.
+- What `$953C-$954B` holds. `SHIP'S DATA-M` is only 54 bytes (`$9506-$953B`), so a new game
+  leaves that gap untouched, yet `PEEK(38209)` (`$9541`, the current planet) lives in it and
+  is read on the first pass through flight. Something in the assembly must write it.
 - Everything about flight rendering: no frame-parity harness exists yet.
