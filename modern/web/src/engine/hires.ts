@@ -118,6 +118,29 @@ export class Hires {
     requestAnimationFrame(autoPresent);
   }
 
+  /**
+   * The screen at the Apple II's own resolution, for comparing against the disk.
+   *
+   * The game content lives in the top-left 280x192 of the 560x384 buffer at 1:1 - hplot()
+   * writes Apple coordinates straight in, and present() sources only that region - so this
+   * reads that corner rather than sampling. `on` is 1 wherever the pixel is not black,
+   * which is the comparison that does not depend on how either side resolves hi-res colour
+   * fringing.
+   */
+  snapshot(): { w: number; h: number; on: Uint8Array; argb: Uint32Array } {
+    const w = 280, h = 192;
+    const on = new Uint8Array(w * h);
+    const argb = new Uint32Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const px = this.buf[y * W + x];
+        argb[y * w + x] = px;
+        on[y * w + x] = (px & 0x00ffffff) !== 0 ? 1 : 0;
+      }
+    }
+    return { w, h, on, argb };
+  }
+
   hgr(): void {
     this.buf.fill(0);
     this.dirty = true;

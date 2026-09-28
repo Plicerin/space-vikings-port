@@ -360,6 +360,57 @@ still in the tree and still wired up; replacing its consumers is not done.
 
 ---
 
+## Frame parity
+
+`frame_parity.mjs` renders the same screen on both sides and counts the pixels that
+disagree. Until it existed nothing answered "does this look like the original?" - the port
+had a typechecker and some screenshots.
+
+The screen is the cockpit panel, INSTRUMENTS lines 10-200. It is the right one to start
+with: a pure sequence of HPLOTs and PRINTs, no RNG, no input, no dependence on ship state,
+so any difference is the port's and not timing's. The oracle capture is taken at the moment
+INSTRUMENTS is the loaded program - identified by its program image, not by a delay - and
+before STARSHIP SIMULATOR draws ships over it.
+
+Both sides reduce to 280x192 lit-or-not. Colour is left out on purpose: hi-res colour is a
+property of bit position and fringing, and comparing it would confuse "the port drew the
+wrong thing" with "the port resolves fringing differently".
+
+**As measured: 2,642 of 53,760 pixels differ - 95.086% agree.** Every differing pixel is at
+y >= 128, which is the panel; nothing else on the screen disagrees.
+
+### Two causes, both measured
+
+**Coloured lines are drawn at double density.** Row 128 is `HPLOT 1,128 TO 279,128` under
+`HCOLOR= 1`:
+
+```
+disk x1-40  1010101010101010101010101010101010101010   140 lit, all odd columns
+port x1-40  1111111111111111111111111111111111111111   279 lit
+```
+
+A non-white HCOLOR on the Apple II lights alternate pixel columns. The port's odd-column
+count matches the disk exactly (140 vs 140 on row 128, 124 vs 124 on row 145), so the
+geometry is right and only the even columns are spurious. The original's green and orange
+lines are visibly dotted; the port's are solid.
+
+**Inverse-video text is not implemented.** Row 143:
+
+```
+disk x1-40  1000000000000000000011111111111111111111   a solid run from x20
+port x1-40  1000000000000000000000000000000000000000
+```
+
+INSTRUMENTS 165 does `POKE 973,255` before printing SPEED / TURN / ENERGY and 177 does
+`POKE 973,0` after, so **973 (`$3CD`) is the hi-res character generator's inverse flag**.
+STARSHIP SIMULATOR 156 uses it the same way. The port draws those labels as plain glyphs.
+
+Separately, the port's `TEXT_GLYPHS` is its own 5x7 font, not the disk's. The authoritative
+one is CHARACTER TABLE, BLOADed to `$8800` - 1024 bytes, 128 glyphs of 8 rows - driven by
+HI-RES CHARACTER GENERATOR at `$9300`.
+
+---
+
 ## Open questions
 
 - What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
@@ -373,4 +424,7 @@ still in the tree and still wired up; replacing its consumers is not done.
 - What `$953C-$954B` holds. `SHIP'S DATA-M` is only 54 bytes (`$9506-$953B`), so a new game
   leaves that gap untouched, yet `PEEK(38209)` (`$9541`, the current planet) lives in it and
   is read on the first pass through flight. Something in the assembly must write it.
-- Everything about flight rendering: no frame-parity harness exists yet.
+- Everything about flight rendering. The parity harness covers one static screen; nothing
+  that moves has been compared.
+- What HI-RES CHARACTER GENERATOR (`$9300`) does with CHARACTER TABLE (`$8800`) beyond the
+  inverse flag at 973.

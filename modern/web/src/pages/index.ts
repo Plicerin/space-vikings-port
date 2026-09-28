@@ -12,7 +12,7 @@ import { initCopyButton } from '../engine/gameLog';
 // ── Scene imports ──────────────────────────────────────────────────────────
 import { startScene } from '../scenes/start';
 import { cockpitScene } from '../scenes/cockpit';
-import { instrumentsScene } from '../scenes/instruments';
+import { instrumentsScene, drawInstruments } from '../scenes/instruments';
 import { galaxyMapScene } from '../scenes/galaxyMap';
 import { comScene } from '../scenes/com';
 import { statusScene } from '../scenes/status';
@@ -93,6 +93,10 @@ function boot(): void {
 
   // Expose state for manual and E2E debugging.
   (window as any).__spaceVikingsState = state;
+
+  // Handles for the frame-parity harness (oracle/frame_parity.mjs), which renders a
+  // screen on a throwaway Hires and diffs it against the original disk's hi-res page.
+  (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();
