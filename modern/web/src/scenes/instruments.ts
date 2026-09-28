@@ -49,8 +49,11 @@ export function drawInstruments(hires: import('../engine/hires').Hires): void {
   hires.line(5, 177, 117, 177);
   hires.line(163, 177, 277, 177);
 
+  // INSTRUMENTS 90-160: eight boxes, at y152 and y160 for x = 6, 71, 200 and 261. There
+  // used to be a ninth and tenth at y168; the original draws no such thing, and frame
+  // parity showed them as 64 pixels the port lit and the disk did not.
   hires.hcolor(3);
-  for (const [x, y] of [[6, 152], [71, 152], [6, 160], [71, 160], [200, 152], [261, 152], [200, 160], [261, 160], [6, 168], [71, 168]] as Array<[number, number]>) {
+  for (const [x, y] of [[6, 152], [71, 152], [6, 160], [71, 160], [200, 152], [261, 152], [200, 160], [261, 160]] as Array<[number, number]>) {
     hires.line(x, y, x + 11, y);
     hires.line(x + 11, y, x + 11, y + 5);
     hires.line(x + 11, y + 5, x, y + 5);

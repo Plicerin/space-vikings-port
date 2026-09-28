@@ -376,27 +376,25 @@ Both sides reduce to 280x192 lit-or-not. Colour is left out on purpose: hi-res c
 property of bit position and fringing, and comparing it would confuse "the port drew the
 wrong thing" with "the port resolves fringing differently".
 
-**As measured: 1,264 of 53,760 pixels differ - 97.649% agree.** Every differing pixel is
-at y >= 128, which is the panel; nothing else on the screen disagrees.
+**As measured: 0 of 53,760 pixels differ - the port's cockpit panel is pixel-identical to
+the disk's.** Both light 2,856 pixels, in the same places.
 
-It started at 95.086% (2,642 differing). Two causes were found and fixed.
+It started at 95.086%. Five defects were found and fixed, each one visible only because the
+previous had been cleared.
 
-### Fixed: coloured lines were drawn at double density
+The comparison is against **every distinct hi-res page the oracle sees while INSTRUMENTS is
+the loaded program**, picking the frame that agrees best. INSTRUMENTS' BASIC drawing (lines
+10-200) finishes before line 210's `CALL 38402` fills the gauges, so the port's
+`drawInstruments` has an exact counterpart part-way through - and which frame that is gets
+found by comparing rather than by timing.
 
-Row 128 is `HPLOT 1,128 TO 279,128` under `HCOLOR= 1`. Before:
-
-```
-disk x1-40  1010101010101010101010101010101010101010   140 lit, all odd columns
-port x1-40  1111111111111111111111111111111111111111   279 lit
-```
+### 1. Coloured lines were drawn at double density
 
 A non-white HCOLOR on the Apple II lights alternate pixel columns, so its lines come out
-dotted at half density. The port's odd-column count already matched the disk exactly, so
-the geometry was right and only the even columns were spurious.
-
-`probe_hcolor.mjs` measured all eight values rather than assuming the other six. It does
-not need the game or even a disk - HGR, HCOLOR and HPLOT are Applesoft ROM - so it enters
-Applesoft's cold start at `$E000` and types HPLOT commands at the `]` prompt:
+dotted. `probe_hcolor.mjs` measured all eight values rather than assuming the six the panel
+does not use. It needs neither the game nor a disk - HGR, HCOLOR and HPLOT are Applesoft
+ROM - so it enters Applesoft's cold start at `$E000` and types HPLOT commands at the `]`
+prompt:
 
 | HCOLOR | | columns lit | bit 7 |
 | --- | --- | --- | --- |
@@ -408,37 +406,54 @@ Applesoft's cold start at `$E000` and types HPLOT commands at the `]` prompt:
 | 6 | blue | **even** | 1 |
 | 7 | white2 | all | 1 |
 
-HPLOT *writes* the bit either way, so plotting green over white erases the even columns
-rather than leaving them. `Hires.argbAt()` stores black for the off-phase for that reason.
+Green and orange share a phase; violet and blue take the other one. HPLOT *writes* the bit
+either way, so plotting green over white erases the even columns rather than leaving them -
+`Hires.argbAt()` stores black for the off-phase for that reason.
 
 > **Known limit.** HPLOT also sets bit 7 of every byte it touches, which switches the
 > palette for all seven pixels in that byte. The port has an ARGB buffer rather than a bit
-> framebuffer, so it cannot reproduce that spill. Geometry is right; colour fringing at
-> byte boundaries is not modelled.
+> framebuffer, so it cannot reproduce that spill.
 
-### Fixed: inverse-video text was not implemented
+### 2. Inverse video was not implemented
 
 INSTRUMENTS 165 does `POKE 973,255` before printing SPEED / TURN / ENERGY and 177 does
 `POKE 973,0` after, so **973 (`$3CD`) is the hi-res character generator's inverse flag**.
-STARSHIP SIMULATOR 156 uses it the same way. It covers exactly nine labels; everything from
-line 180 on is printed normally.
+STARSHIP SIMULATOR 156 uses it the same way. It covers exactly nine labels. Inverse fills
+the whole 7x8 cell and knocks the glyph out of it; painting only the five glyph columns left
+gaps the original does not have.
 
-Inverse fills the whole 7x8 character cell and knocks the glyph out of it. The port's
-`text()` already had an `invert` option but only painted the five glyph columns, leaving
-gaps the original does not have - on the disk an inverse run is solid.
+### 3. The character set was not the disk's
 
-### What still differs
+CHARACTER TABLE is BLOADed to `$8800`: 1024 bytes, 128 glyphs of 8 rows, driven by HI-RES
+CHARACTER GENERATOR at `$9300`. Each row is 7 bits with **bit 0 the leftmost pixel** - the
+same order hi-res bytes use - and the index is the character code masked to 7 bits. The
+glyphs carry their own left margin, so there is no offset to add when drawing.
 
-**The character set.** The port's `TEXT_GLYPHS` is its own 5x7 font. The disk's is
-CHARACTER TABLE, BLOADed to `$8800` - 1024 bytes, 128 glyphs of 8 rows - driven by HI-RES
-CHARACTER GENERATOR at `$9300`. Most of the remaining difference is glyph shape.
+Neither the bit order nor the index mapping is written down anywhere, and guessing either
+would put every letter subtly wrong. `probe_font.mjs` lifts the 7x8 cells under labels the
+disk had actually drawn (MANUAL, AUTO, ORBIT, DAMAGE, MISSILE, LASER, COND, SHIELD) and
+searches for the decoding that reproduces all 43 of them. A decoding that renders the real
+screen is the right one by construction.
 
-**`CALL 38402`.** INSTRUMENTS line 210 calls into TRANLIT.OBJ0 before chaining, and it
-fills the four gauge boxes: measured inside them at y152-165 the disk has 393 lit pixels,
-6 to 10 per interior row of a 12-wide box, where the port has only the outline. The port
-draws its gauges later, in the cockpit scene, so this is partly an artefact of comparing at
-this instant rather than a missing feature - but what that routine draws has not been
-read.
+### 4. Two boxes the original does not draw
+
+INSTRUMENTS 90-160 draws **eight** boxes, at y152 and y160 for x = 6, 71, 200 and 261. The
+port drew ten, with an extra pair at y168 - 64 pixels it lit and the disk did not.
+
+### 5. Text was transparent; on the Apple it is opaque
+
+The character generator writes whole bytes, so a character erases whatever was under its
+cell. INSTRUMENTS 200 prints X, Y, Z, XHDNG and YHDNG at text row 23, straight over the
+orange rule line 70 drew at y177, and on the disk the rule is **gone** beneath them. The
+port drew only the lit pixels, so the rule showed through - 31 pixels, at exactly the
+character cells of HTAB 3, 9, 15, 25 and 34.
+
+### What `CALL 38402` draws is still unread
+
+INSTRUMENTS line 210 calls into TRANLIT.OBJ0 before chaining, and it fills the four gauge
+boxes and marks the rules: measured, the disk's final panel has 2,993 lit pixels against
+2,856 once that routine has run. The port draws its gauges later, in the cockpit scene, so
+nothing is missing on screen - but that routine has not been disassembled.
 
 ---
 
@@ -457,5 +472,4 @@ read.
   is read on the first pass through flight. Something in the assembly must write it.
 - Everything about flight rendering. The parity harness covers one static screen; nothing
   that moves has been compared.
-- What HI-RES CHARACTER GENERATOR (`$9300`) does with CHARACTER TABLE (`$8800`) beyond the
-  inverse flag at 973.
+- What `CALL 38402` (TRANLIT.OBJ0) draws into the gauge boxes.

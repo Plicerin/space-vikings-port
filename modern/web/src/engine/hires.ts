@@ -1,3 +1,4 @@
+import { glyphFor } from './diskFont';
 const W = 560;
 const H = 384;
 
@@ -38,67 +39,6 @@ for (let i = 0; i <= 7; i++) {
   PALETTE_ARGB.set(i, (0xff << 24) | (r << 16) | (g << 8) | b);
 }
 
-const TEXT_GLYPHS: Record<string, readonly number[]> = {
-  ' ': [0, 0, 0, 0, 0, 0, 0],
-  '!': [0b00100, 0b00100, 0b00100, 0b00100, 0, 0b00100, 0],
-  '"': [0b01010, 0b01010, 0, 0, 0, 0, 0],
-  '#': [0b01010, 0b11111, 0b01010, 0b01010, 0b11111, 0b01010, 0],
-  '%': [0b11001, 0b11010, 0b00100, 0b01011, 0b10011, 0, 0],
-  "'": [0b00100, 0b00100, 0, 0, 0, 0, 0],
-  '(': [0b00010, 0b00100, 0b01000, 0b01000, 0b00100, 0b00010, 0],
-  ')': [0b01000, 0b00100, 0b00010, 0b00010, 0b00100, 0b01000, 0],
-  '*': [0, 0b10101, 0b01110, 0b11111, 0b01110, 0b10101, 0],
-  '+': [0, 0b00100, 0b00100, 0b11111, 0b00100, 0b00100, 0],
-  ',': [0, 0, 0, 0, 0b00100, 0b00100, 0b01000],
-  '-': [0, 0, 0, 0b11111, 0, 0, 0],
-  '.': [0, 0, 0, 0, 0, 0b00100, 0],
-  '/': [0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0, 0],
-  ':': [0, 0b00100, 0, 0, 0b00100, 0, 0],
-  ';': [0, 0b00100, 0, 0, 0b00100, 0b00100, 0b01000],
-  '<': [0b00010, 0b00100, 0b01000, 0b10000, 0b01000, 0b00100, 0],
-  '=': [0, 0, 0b11111, 0, 0b11111, 0, 0],
-  '>': [0b01000, 0b00100, 0b00010, 0b00001, 0b00010, 0b00100, 0],
-  '?': [0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0, 0b00100],
-  '[': [0b01110, 0b01000, 0b01000, 0b01000, 0b01000, 0b01110, 0],
-  ']': [0b01110, 0b00010, 0b00010, 0b00010, 0b00010, 0b01110, 0],
-  '_': [0, 0, 0, 0, 0, 0, 0b11111],
-  '0': [0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110],
-  '1': [0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
-  '2': [0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111],
-  '3': [0b11110, 0b00001, 0b00001, 0b01110, 0b00001, 0b00001, 0b11110],
-  '4': [0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010],
-  '5': [0b11111, 0b10000, 0b10000, 0b11110, 0b00001, 0b00001, 0b11110],
-  '6': [0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110],
-  '7': [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000],
-  '8': [0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110],
-  '9': [0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100],
-  'A': [0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
-  'B': [0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110],
-  'C': [0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110],
-  'D': [0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110],
-  'E': [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111],
-  'F': [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000],
-  'G': [0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110],
-  'H': [0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
-  'I': [0b01110, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
-  'J': [0b00111, 0b00010, 0b00010, 0b00010, 0b10010, 0b10010, 0b01100],
-  'K': [0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001],
-  'L': [0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111],
-  'M': [0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001],
-  'N': [0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001],
-  'O': [0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
-  'P': [0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000],
-  'Q': [0b01110, 0b10001, 0b10001, 0b10001, 0b10101, 0b10010, 0b01101],
-  'R': [0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001],
-  'S': [0b01111, 0b10000, 0b10000, 0b01110, 0b00001, 0b00001, 0b11110],
-  'T': [0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100],
-  'U': [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
-  'V': [0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b01010, 0b00100],
-  'W': [0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b10101, 0b01010],
-  'X': [0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001],
-  'Y': [0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100],
-  'Z': [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0b11111],
-};
 
 export class Hires {
   private displayCtx: CanvasRenderingContext2D;
@@ -262,7 +202,7 @@ export class Hires {
 
     for (let i = 0; i < visible.length; i++) {
       const ch = visible[i];
-      const glyph = TEXT_GLYPHS[ch] ?? TEXT_GLYPHS[ch.toUpperCase()] ?? TEXT_GLYPHS['?'];
+      const glyph = glyphFor(ch.toUpperCase());
       // Inverse video fills the whole character cell and knocks the glyph out of it, so
       // the background has to be laid down across all 7x8 first - the glyph itself is only
       // 5 wide and 7 tall, and painting just those columns left gaps the original does not
@@ -280,17 +220,20 @@ export class Hires {
       for (let gy = 0; gy < glyph.length; gy++) {
         const bits = glyph[gy];
         const rowOffset = (py + gy) * W;
-        for (let gx = 0; gx < 5; gx++) {
-          const on = (bits & (1 << (4 - gx))) !== 0;
-          const x = px + 1 + gx + i * cellW;
+        for (let gx = 0; gx < cellW; gx++) {
+          // The disk's glyphs are 7 wide with bit 0 the leftmost pixel, the same order
+          // hi-res bytes use. They carry their own left margin (bit 0 is blank on every
+          // letter), so unlike the old 5-wide set there is no +1 to add here.
+          const on = (bits & (1 << gx)) !== 0;
+          const x = px + gx + i * cellW;
           const y = py + gy;
           if (x >= 0 && x < W && y >= 0 && y < H) {
-            // The cell is already filled above in inverse mode, so knock the glyph out.
-            if (opts?.invert) {
-              if (on) buf[y * W + x] = bgArgb;
-            } else {
-              if (on) buf[y * W + x] = fgArgb;
-            }
+            // Text is opaque. The Apple's character generator writes whole bytes, so a
+            // character erases whatever was under its cell - INSTRUMENTS 200 prints X, Y,
+            // Z, XHDNG and YHDNG at text row 23, straight over the orange rule line 70
+            // drew at y177, and on the disk the rule is gone beneath them. Drawing only
+            // the lit pixels left it showing through.
+            buf[y * W + x] = on ? (opts?.invert ? bgArgb : fgArgb) : (opts?.invert ? fgArgb : bgArgb);
           }
         }
       }

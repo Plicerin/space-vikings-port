@@ -66,6 +66,34 @@ console.log('');
 console.log(`bit 7 across the row, HCOLOR= 1 (green):  ${hiBits(pg1)}`);
 console.log(`bit 7 across the row, HCOLOR= 5 (orange): ${hiBits(pg5)}`);
 
+// INSTRUMENTS 70 draws its orange rules as HPLOT 5,177 TO 117,177 rather than across the
+// whole width, and frame parity showed the disk lighting a few even columns there. A
+// full-width line did not. Draw the game's actual line and look.
+console.log('');
+console.log('INSTRUMENTS 70, drawn exactly as the game draws it:');
+await type(`HGR:HCOLOR=5:HPLOT 5,${ROW} TO 117,${ROW}`);
+await a2.frames(60);
+{
+  const on = decodeHgr(await a2.readRange(0x2000, 0x4000));
+  const row = on.slice(ROW * HGR_W, (ROW + 1) * HGR_W);
+  let even = 0, odd = 0;
+  for (let x = 0; x < HGR_W; x++) if (row[x]) { if (x % 2) odd++; else even++; }
+  console.log(`  HPLOT 5,y TO 117,y   even ${even}, odd ${odd}`);
+  console.log(`  x0-39   ${Array.from(row.slice(0, 40)).join('')}`);
+  console.log(`  x40-79  ${Array.from(row.slice(40, 80)).join('')}`);
+}
+// and the same span starting on a byte boundary, for comparison
+await type(`HGR:HCOLOR=5:HPLOT 7,${ROW} TO 117,${ROW}`);
+await a2.frames(60);
+{
+  const on = decodeHgr(await a2.readRange(0x2000, 0x4000));
+  const row = on.slice(ROW * HGR_W, (ROW + 1) * HGR_W);
+  let even = 0, odd = 0;
+  for (let x = 0; x < HGR_W; x++) if (row[x]) { if (x % 2) odd++; else even++; }
+  console.log(`  HPLOT 7,y TO 117,y   even ${even}, odd ${odd}`);
+  console.log(`  x0-39   ${Array.from(row.slice(0, 40)).join('')}`);
+}
+
 console.log('');
 console.log('summary:');
 for (const r of results) console.log(`  ${r.c} ${r.name.padEnd(7)} -> ${r.pattern}`);

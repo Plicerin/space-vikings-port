@@ -39,9 +39,15 @@ async function fromDisk() {
   await a2.boot();
   await a2.key('N');
 
-  let lastPanel = null, sawInstruments = false;
-  for (let i = 0; i < 200; i++) {
-    await a2.frames(30);
+  // Keep every distinct hi-res page seen while INSTRUMENTS is the loaded program, not just
+  // the last. Its BASIC drawing (lines 10-200) finishes before line 210's CALL 38402 fills
+  // the gauges, so the port's drawInstruments has an exact counterpart part-way through -
+  // and which frame that is gets found by comparing, not by timing.
+  const frames = [];
+  const seen = new Set();
+  let sawInstruments = false;
+  for (let i = 0; i < 600; i++) {
+    await a2.frames(8);
     const bytes = await a2.readRange(0x800, 0x2000);
     const mem = {};
     for (let k = 0; k < bytes.length; k++) mem[0x800 + k] = bytes[k];
@@ -52,15 +58,19 @@ async function fromDisk() {
 
     if (text === wanted) {
       sawInstruments = true;
-      lastPanel = await a2.readRange(0x2000, 0x4000);     // keep the newest panel frame
+      const page = await a2.readRange(0x2000, 0x4000);
+      let h = 2166136261;
+      for (const v of page) { h ^= v; h = Math.imul(h, 16777619); }
+      const key = (h >>> 0).toString(16);
+      if (!seen.has(key)) { seen.add(key); frames.push(decodeHgr(page)); }
     } else if (sawInstruments) {
-      break;                                             // it has chained on; we have it
+      break;                                             // it has chained on; we have them
     }
   }
   const errors = a2.errors.slice(0, 3);
   await a2.close();
-  if (!lastPanel) throw new Error('never caught INSTRUMENTS running - nothing to compare against');
-  return { on: decodeHgr(lastPanel), errors };
+  if (!frames.length) throw new Error('never caught INSTRUMENTS running - nothing to compare against');
+  return { frames, errors };
 }
 
 // --- the port side ---------------------------------------------------------------------
@@ -99,7 +109,18 @@ console.log('rendering the cockpit panel on both sides\n');
 const [a, b] = await Promise.all([fromDisk(), fromPort()]);
 for (const e of [...a.errors, ...b.errors]) console.log('page error:', e);
 
-const c = compare(a.on, b.on);
+// Of the frames INSTRUMENTS went through, the one the port should match is the one where
+// its BASIC drawing is complete. Pick it by agreement rather than by guessing the timing.
+let best = 0, bestC = compare(a.frames[0], b.on);
+for (let i = 1; i < a.frames.length; i++) {
+  const t = compare(a.frames[i], b.on);
+  if (t.differing < bestC.differing) { best = i; bestC = t; }
+}
+console.log(`${a.frames.length} distinct frames while INSTRUMENTS was loaded; ` +
+  `frame ${best} agrees best
+`);
+a.on = a.frames[best];
+const c = bestC;
 const diff = new Uint8Array(a.on.length);
 for (let i = 0; i < diff.length; i++) diff[i] = a.on[i] === b.on[i] ? 0 : 1;
 
@@ -126,5 +147,47 @@ ${rows.length} of ${HGR_H} rows differ; worst:`);
     console.log(`       port x1-40 ${strip(b.on)}`);
   }
 }
+// Where the differences actually are. INSTRUMENTS 90-160 draws four gauge boxes, and
+// line 210 CALLs 38402 (inside TRANLIT.OBJ0) before chaining, which fills them - so
+// differences inside them are that routine, not the drawing above it.
+const BOXES = [[6, 17], [71, 82], [200, 211], [261, 272]];
+let inBoxes = 0, minX = HGR_W, maxX = -1;
+for (let y = 0; y < HGR_H; y++) {
+  for (let x = 0; x < HGR_W; x++) {
+    if (a.on[y * HGR_W + x] === b.on[y * HGR_W + x]) continue;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y >= 152 && y <= 165 && BOXES.some(([lo, hi]) => x >= lo && x <= hi)) inBoxes++;
+  }
+}
+if (c.differing) {
+  console.log(`
+differences span x ${minX}-${maxX};  ${inBoxes} of ${c.differing} are inside the four gauge boxes`);
+  const rest = c.differing - inBoxes;
+  if (rest) {
+    const byRow = new Map();
+    for (let y = 0; y < HGR_H; y++) {
+      for (let x = 0; x < HGR_W; x++) {
+        if (a.on[y * HGR_W + x] === b.on[y * HGR_W + x]) continue;
+        if (y >= 152 && y <= 165 && BOXES.some(([lo, hi]) => x >= lo && x <= hi)) continue;
+        if (!byRow.has(y)) byRow.set(y, []);
+        byRow.get(y).push(x);
+      }
+    }
+    console.log(`${rest} are elsewhere, on ${byRow.size} rows:`);
+    for (const [y, xs] of [...byRow].slice(0, 10)) {
+      console.log(`  row ${String(y).padStart(3)}  x ${xs[0]}-${xs[xs.length - 1]}  (${xs.length} px)`);
+      console.log(`    at x: ${xs.join(' ')}`);
+      const seg = (arr, from, to) => Array.from(arr.slice(y * HGR_W + from, y * HGR_W + to)).join('');
+      for (const [from, to] of [[0, 70], [110, 180], [210, 280]]) {
+        console.log(`    disk x${from}-${to - 1}  ${seg(a.on, from, to)}`);
+        console.log(`    port x${from}-${to - 1}  ${seg(b.on, from, to)}`);
+      }
+    }
+  } else {
+    console.log('Nothing outside them differs at all.');
+  }
+}
+
 console.log(`
 wrote ${OUT}/disk.png, port.png, diff.png`);
