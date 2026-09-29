@@ -844,7 +844,9 @@ plus the entry points reaches 2,008 - the rest is tables and data.
 | --- | --- |
 | `$6000` | `JMP $611C` |
 | `$6006`, `$6009` | `JMP` to the sine and cosine |
-| `$600C-$6099` | **zero-page save buffer**, not tables - see below |
+| `$600C-$600D` | a byte pair `$6526`/`$653F` read and write |
+| `$600E-$6013` | **live per-object scale factors**, three 16-bit values - see the correction below |
+| `$6014-$6099` | zero-page save buffer, not tables - see below |
 | `$609A-$611B` | quarter-wave cosine table, 65 entries of 16-bit LE |
 | `$611C` | entry: save zero page, `JSR $6140`, restore |
 | `$6140` | the renderer proper: clears `$7B-$9C`, sets `$9C = $73` (the page PLANET # 0 and the ship model live on) |
@@ -853,9 +855,17 @@ plus the entry points reaches 2,008 - the rest is tables and data.
 | `$64F8`, `$64FB`, `$6526`, `$653F` | sine and cosine |
 
 `$611C` copies zero page `$60-$C1` into `$6013-$6075`, calls `$6140`, and copies it back.
-So the file's own head is a **save area**, and what is on the disk there is whatever was in
-the developer's zero page when the module was BSAVEd - which is why it disassembles as
-stray Applesoft tokens. It is not data the renderer reads.
+So most of the file's head is a **save area**, and what is on the disk there is whatever was
+in the developer's zero page when the module was BSAVEd - which is why it disassembles as
+stray Applesoft tokens.
+
+**Correction.** The claim that all of `$600C-$6099` is save area was wrong, and it is wrong
+at exactly the bytes the save overlaps: the copy starts at `$6013`, so `$600E-$6012` is not
+covered by it at all. `$690F` fills six bytes there from the model stream -
+`INY / LDA ($9B),Y / STA $600D,Y / CPY #$06 / BNE $690F` - and `$6631` reads them back as
+three 16-bit factors that scale the whole matrix, skipping the multiply when a factor is
+`$7FFF`. So `$600D-$6013` is a live per-object parameter block that the renderer both
+writes and reads, and the save buffer proper begins after it.
 
 ### $635C is a signed Q15 multiply - measured
 
@@ -2702,16 +2712,75 @@ touch it - 1.2% - is the **sine and cosine being wrong outside the first quadran
 this file already records as up to 1.48%. The matrix is built with the disk's own broken
 trig, so a port that wants the same pixels has to use the same broken trig.
 
+### The matrix construction, at $654E - read, not fitted
+
+The angles do not come from `$7321-$7323` directly. `$62CB` copies **nine** bytes out of the
+display list into `$90-$98` - `INY / LDA ($9B),Y / STA $008F,Y / CPY #$09 / BNE` - so `$90-$95`
+is the camera position and `$96`, `$97`, `$98` are pitch, bank and heading. `$62D5` then calls
+`$654E`, which is the construction.
+
+`$654E` takes six table reads and nine multiplies. Writing Sp/Cp for the pitch pair and
+Sb/Cb, Sh/Ch for bank and heading, and reading the entries in the order `$6730` uses them:
+
+```
+$7E  $84  $8A       [ Ch.Cb + Sp.Sh.Sb    Sb.Cp    Sp.Ch.Sb - Sh.Cb ]
+$80  $86  $8C   =   [ Sp.Sh.Cb - Ch.Sb    Cp.Cb    Sh.Sb + Sp.Ch.Cb ]
+$82  $88  $8E       [ Sh.Cp               -Sp      Ch.Cp            ]
+```
+
+Every product goes through `$635C`, never through a real multiply, and both trig values come
+out of the 65-entry table at `$609A`. `$6140` preloads the diagonal with `$7FFD` as an
+identity, but `$654E` overwrites all nine entries unconditionally, so that only shows before
+the first build.
+
+`$654E` falls through at `$6631` into the per-object scale described above.
+
+#### Two places the machine loses precision, and neither is a rounding error
+
+**The negated table fetch is wrong.** `$6502` handles angles in the second octant by indexing
+the quarter table and negating, and `$6509` gets the negation backwards:
+
+```
+$6509  SEC / LDA #$00 / SBC $609B,Y    ; the HIGH byte first
+$650F  TAX                             ; and it is kept as the result's high byte
+$6510  SBC $609A,Y                     ; then the low byte, subtracted from THAT, not from zero
+```
+
+So the low byte comes out as `-high - low` rather than `-low`. `cos` of 45 degrees reads back
+as `23169`, but `cos` of 225 degrees reads back as **`-23004`**, not `-23169` - short by 165.
+At 180 degrees it is `-32383` against a table entry of `32767`. This is not a small effect and
+it is not symmetric, so no float rotation reproduces it.
+
+**`$635C` is not `a * b / 32768`.** The first thing it does to `a` is turn it into `-|a| - 1`
+(one's complement when positive, decrement when negative), the first six of its fifteen rounds
+carry only an eight-bit accumulator and add only `b`'s high byte, and bit 15 is never tested.
+`100 * 1000` comes back as `2` where the arithmetic says `3`.
+
+The table itself also has a plain typo: entry 25 is `26489` where a cosine gives `26790`.
+
+#### Transcribed and checked
+
+`modern/web/src/engine/diskRotation.ts` has `cos64FB`, `sin64F8`, `mul635C`, `buildMatrix654E`
+and `toCameraSpace6730`. `oracle/probe_rottrig.mjs` and `oracle/probe_rotbuild.mjs` call the
+disk's own routines; `oracle/rotation_parity.mjs` runs the port over the same inputs:
+
+| check | result |
+| --- | --- |
+| `$64FB` cosine, every angle | 256 of 256 exact |
+| `$64F8` sine, every angle | 256 of 256 exact |
+| `$635C` multiply, 768 operand pairs | 768 of 768 exact |
+| `$654E` matrix, 357 pitch/bank/heading triples | 3213 of 3213 entries exact |
+
+A float rotation of the same three angles is out by up to **1133 in Q15 (0.035)**, at pitch
+214 bank 153 heading 186. That is the size of what `toCameraSpace()` currently gets wrong.
+
 ### What is still not done
 
-The matrix **construction** - the code that turns `$7321` and `$7323` into those nine entries
-- has not been found. Ten combinations of heading and pitch are captured in
-`captured/rot/golden.json`, which is enough to check an implementation against but not to
-write one from.
-
-Until that is read, `toCameraSpace()` stays in floating point. The chain is now understood
-end to end in structure, and two of its three pieces are transcribed exactly - `$6DD5` and
-`$68A1` - but the third still needs reading rather than fitting.
+`toCameraSpace()` in `diskProjection.ts` is still the float version, and still rotates by two
+angles rather than three. All three pieces of the chain are now transcribed exactly - `$6DD5`,
+`$68A1` and `$654E`/`$635C` - so what remains is wiring, not reading: the port's world
+coordinates have to be put in the display list's integer units before the fixed-point path can
+replace the float one.
 
 ---
 

@@ -3,6 +3,7 @@
 
 import { Hires } from '../engine/hires';
 import { project68A1, project68A1ToScreen } from '../engine/diskProjectionFixed';
+import { cos64FB, sin64F8, mul635C, buildMatrix654E, toCameraSpace6730 } from '../engine/diskRotation';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import { parseShipBytecode, projectShipBytecode, drawShipWireframe,
   projectShipWorld, drawShipWorld, COCKPIT_SHIP_WIREFRAME_VIEW } from '../engine/shipBytecode';
@@ -104,7 +105,8 @@ function boot(): void {
   (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments,
     ShapeRenderer, decodeShapeTableJson,
     parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW,
-    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu, drawShipId, project68A1, project68A1ToScreen };
+    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu, drawShipId, project68A1, project68A1ToScreen,
+    cos64FB, sin64F8, mul635C, buildMatrix654E, toCameraSpace6730 };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();
