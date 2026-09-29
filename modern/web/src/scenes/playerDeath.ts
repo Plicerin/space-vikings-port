@@ -1,103 +1,56 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
+import { drawExBurst } from './ex';
 
-interface Debris {
-  angle: number;
-  speed: number;
-  dist: number;
-  size: number;
-  color: number;
+/**
+ * S/X, the player's death - S/X.bas, sixteen lines.
+ *
+ * Two programs run it: H/D line 4, when its line 2 finds the energy at 0, and STARSHIP
+ * SIMULATOR line 3350 when the hull reaches 0.
+ *
+ * It is EX with the colour inverted. Lines 7-30 are the same sixteen steps of fifteen
+ * segments from (140,60) - `drawExBurst` is shared - but line 5 sets `HCOLOR= 0`, so the
+ * burst cuts black channels out of the screen instead of painting white ones onto it.
+ */
+
+/**
+ * Line 5: `HCOLOR= 0: Y1 = 20: POKE 973,255: PRINT ""`.
+ *
+ * That single inverse `PRINT` leaves the **whole page solid white** - measured, watching the
+ * lit count go 3,909 to 16,872 to 53,760 of 53,760 over about twenty-five frames while
+ * `$3CD` read 255 and `$E4` read 0. One empty PRINT blanking an entire 24-row window is not
+ * what a newline does on its own, so something in the hi-res character generator's scroll or
+ * window handling is doing it; that part is not derived, only the result is.
+ */
+export function drawPlayerDeathBackground(hires: import('../engine/hires').Hires): void {
+  hires.hcolor(3);
+  for (let y = 0; y < 192; y++) hires.hlin(0, 279, y);
 }
 
-function drawDebris(hires: import('../engine/hires').Hires, cx: number, cy: number, debris: Debris[]): void {
-  for (const d of debris) {
-    const x = cx + Math.round(Math.cos(d.angle) * d.dist);
-    const y = cy + Math.round(Math.sin(d.angle) * d.dist * 0.7);
-    if (x < 0 || x > 279 || y < 0 || y > 123) continue;
-    hires.hcolor(d.color);
-    hires.line(x - d.size, y, x + d.size, y);
-    hires.line(x, y - d.size, x, y + d.size);
-  }
-}
-
-function computeStats(state: import('../engine/gameState').GameState): { planetsOwned: number; kills: number } {
-  let planetsOwned = 0;
-  for (const p of state.planets) {
-    if (p.surrendered) planetsOwned++;
-  }
-  const kills = Math.max(0, 20 - state.enemyShips);
-  return { planetsOwned, kills };
+/** Line 40: `VTAB 22: HTAB 5: SPEED= 127: PRINT "YOUR SHIP HAS BEEN DESTROYED!!"`. */
+export function drawPlayerDeathMessage(hires: import('../engine/hires').Hires): void {
+  hires.text('YOUR SHIP HAS BEEN DESTROYED!!', 5, 22, { invert: true });
 }
 
 export async function playerDeathScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
-  const { hires, state, input, audio } = ctx;
+  const { hires, input, audio } = ctx;
   setScene('playerDeath');
-  glog('destroy', 'player ship destroyed (S_X)');
+  glog('destroy', 'player ship destroyed (S/X)');
 
-  const cx = 140;
-  const cy = 60;
+  // 5
+  drawPlayerDeathBackground(hires);
+  // 6: 500 calls to the EXPL routine before anything is drawn.
+  audio.beep(50, 400);
+  await new Promise((r) => setTimeout(r, 400));
 
-  const debris: Debris[] = [];
-  for (let i = 0; i < 50; i++) {
-    debris.push({
-      angle: Math.random() * Math.PI * 2,
-      speed: 1 + Math.random() * 8,
-      dist: 1 + Math.random() * 4,
-      size: 1 + Math.floor(Math.random() * 3),
-      color: Math.random() < 0.3 ? 5 : Math.random() < 0.5 ? 6 : 1,
-    });
-  }
+  // 7-30, the same burst as EX in HCOLOR 0.
+  drawExBurst(hires, Math.random, 0);
 
-  audio.beep(50, 150);
-  for (let frame = 0; frame < 4; frame++) {
-    hires.hgr();
-    hires.hcolor(5);
-    for (let y = 0; y < 124; y++) hires.line(0, y, 279, y);
-    hires.hcolor(1);
-    hires.line(cx - 12, cy, cx + 12, cy);
-    hires.line(cx, cy - 10, cx, cy + 10);
-    await new Promise(r => setTimeout(r, 50));
-  }
+  // 40
+  drawPlayerDeathMessage(hires);
 
-  audio.beep(100, 80);
-  for (let frame = 0; frame < 16; frame++) {
-    hires.hgr();
-    for (const d of debris) {
-      d.dist += d.speed;
-      if (frame < 8) d.speed += 0.3;
-      else d.speed = Math.max(0.3, d.speed - 0.3);
-    }
-    drawDebris(hires, cx, cy, debris);
-    if (frame % 2 === 0) audio.beep(120 + frame * 6, 25);
-    await new Promise(r => setTimeout(r, 40));
-  }
-
-  for (let frame = 0; frame < 10; frame++) {
-    hires.hgr();
-    const survivors = debris.filter((_, i) => (i + frame) % 2 === 0);
-    for (const d of survivors) {
-      d.dist += d.speed * 0.5;
-      d.color = 3;
-    }
-    drawDebris(hires, cx, cy, survivors);
-    audio.beep(30 + frame * 4, 20);
-    await new Promise(r => setTimeout(r, 60));
-  }
-
-  hires.hgr();
-  hires.hcolor(5);
-  hires.text('YOUR SHIP HAS BEEN', 9, 6);
-  hires.text('DESTROYED!!', 13, 7);
-
-  const stats = computeStats(state);
-  hires.hcolor(1);
-  hires.text(`SYSTEMS CONQUERED: ${stats.planetsOwned}/20`, 4, 10);
-  hires.text(`ENEMY SHIPS DESTROYED: ${stats.kills}`, 4, 11);
-
-  hires.hcolor(3);
-  hires.text('PRESS SPACE TO CONTINUE', 8, 20);
-
+  // 50: GET A$ twice, then PR#6 - the disk reboots. The port goes back to the title.
   await input.waitForKey();
-
-  scenes.run('start');
+  await input.waitForKey();
+  return scenes.run('start');
 }

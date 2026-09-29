@@ -312,6 +312,12 @@ export class Hires {
     const buf = this.buf;
     const bgArgb = 0;
     const fgArgb = this.colorArgb;
+    // Inverse does not use HCOLOR. Measured two ways: STATUS clears with inverse spaces
+    // under `HCOLOR= 1` and the rows come out fully lit - 266 of 266 pixels across columns
+    // 1-38, not the 133 half-density green would give - and S/X prints its message under
+    // `HCOLOR= 0`, where the cell stays white and only the 433 glyph pixels go dark. So an
+    // inverse cell is white behind a black glyph whatever HCOLOR happens to be.
+    const inverseArgb = PALETTE_ARGB.get(3)!;
 
     for (let i = 0; i < visible.length; i++) {
       const ch = visible[i];
@@ -326,7 +332,7 @@ export class Hires {
           const rowOffset = (py + gy) * W;
           for (let gx = 0; gx < cellW; gx++) {
             const x = px + gx + i * cellW;
-            if (x >= 0 && x < W && py + gy >= 0 && py + gy < H) buf[rowOffset + x] = fgArgb;
+            if (x >= 0 && x < W && py + gy >= 0 && py + gy < H) buf[rowOffset + x] = inverseArgb;
           }
         }
       }
@@ -346,7 +352,9 @@ export class Hires {
             // Z, XHDNG and YHDNG at text row 23, straight over the orange rule line 70
             // drew at y177, and on the disk the rule is gone beneath them. Drawing only
             // the lit pixels left it showing through.
-            buf[y * W + x] = on ? (opts?.invert ? bgArgb : fgArgb) : (opts?.invert ? fgArgb : bgArgb);
+            buf[y * W + x] = opts?.invert
+              ? (on ? bgArgb : inverseArgb)
+              : (on ? fgArgb : bgArgb);
           }
         }
       }

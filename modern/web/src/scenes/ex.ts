@@ -52,8 +52,9 @@ export function drawExFlash(hires: H, shapes: ShapeTable): void {
  *
  * HPLOT truncates its coordinates, and every one here is positive.
  */
-export function drawExBurst(hires: H, rnd: () => number = Math.random): number {
-  hires.hcolor(3);
+export function drawExBurst(hires: H, rnd: () => number = Math.random, colour = 3): number {
+  // S/X runs the identical loop with HCOLOR 0, so the colour is a parameter.
+  hires.hcolor(colour);
   let y1 = 20;
   let drawn = 0;
   for (let x1 = 5; x1 <= 130; x1 += 8) {

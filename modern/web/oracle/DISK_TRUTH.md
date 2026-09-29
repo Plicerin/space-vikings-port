@@ -2251,6 +2251,66 @@ nothing and prints nothing.
 
 ---
 
+## S/X, the player's death - and what inverse video really is
+
+`S/X.bas`, sixteen lines, run by H/D line 4 when its line 2 finds the energy at 0, and by
+STARSHIP SIMULATOR line 3350 when the hull reaches 0. `probe_sx.mjs` captures it;
+`sx_parity.mjs` compares. Getting there is a matter of setting a destination, emptying the
+tank and pressing H - which also captures H/D's own out-of-energy screen on the way.
+
+### It is EX inverted
+
+Lines 7-30 are EX's lines 7-30, character for character: sixteen steps of fifteen segments
+from (140,60), `Y1` from 24.8 to 96.8, `Y2` clamped to -60..65. The one difference is line 5's
+`HCOLOR= 0`, so the burst cuts black channels out of the screen instead of painting white
+ones onto it. `drawExBurst` takes a colour and both scenes share it.
+
+### Line 5 turns the whole page white
+
+```
+5 HCOLOR= 0:Y1 = 20: POKE 973,255: PRINT ""
+```
+
+That one empty `PRINT` leaves **the entire page solid white**. Measured by sampling the lit
+count while it ran: 3,909, then 16,872, then 53,760 of 53,760 over about twenty-five frames,
+with `$3CD` reading 255 and `$E4` reading 0 throughout. A newline does not blank a
+twenty-four row window on its own, so something in the character generator's scroll or
+window handling is doing it. Only the result is established.
+
+| | |
+| --- | --- |
+| the finished screen | disk 45,481 lit; the port's runs give 45,306 to 46,628 |
+| line 40's message row | **433 dark pixels on both** |
+
+### Inverse video does not use HCOLOR
+
+This is the part worth keeping. The port painted an inverse cell's background in the current
+HCOLOR, which happened to work everywhere it had been tested and is wrong.
+
+Two measurements settle it:
+
+- **STATUS** clears with inverse spaces under `HCOLOR= 1`, and the rows come out **fully
+  lit** - 266 of 266 pixels across columns 1-38. Half-density green would give 133.
+- **S/X** prints its message under `HCOLOR= 0`. If the background followed HCOLOR the whole
+  row would be black; the machine leaves it white and darkens only the 433 glyph pixels.
+
+So an inverse cell is **white behind a black glyph, whatever HCOLOR is**. The port now does
+that, and it is why the message row went from 1,680 dark pixels to 433.
+
+Nothing regressed: COM, STATUS, SUPPLY, GROUND FORCES and COLLECT are all still exact. They
+could not have caught this - every one of them is inverse under a non-zero HCOLOR, where
+lighting all seven pixels of a cell in green and lighting them in white are the same thing to
+a lit-pixel comparison. Only `HCOLOR= 0` tells them apart, and S/X is the only screen that
+does it.
+
+### What the port had
+
+The same forty polar debris particles as EX, animated over twenty-four frames, plus a stats
+screen counting planets owned and kills. S/X has no stats and no animation - it whitens the
+page, cuts the burst out of it, prints one line, waits for two keys and reboots with `PR#6`.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -2258,9 +2318,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Six of the 23 programs.** S/X, DMG, END and the four SHIP # n I.D. programs are
-  extracted and readable but nothing has been compared against them. STATUS, GALAXY MAP,
-  RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL and EX are done.
+- **Five of the 23 programs.** DMG, END and the four SHIP # n I.D. programs are extracted
+  and readable but nothing has been compared against them. STATUS, GALAXY MAP, RADAR,
+  GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX and S/X are done.
+- **Why one empty inverse PRINT whitens a whole page.** S/X line 5 does it, measured; the
+  mechanism in the character generator is not derived.
 - **EX line 6's XDRAW.** The port draws the five flash shapes rather than XORing them, which
   differs wherever the flight view already has a pixel.
 - **Four of RECALL's five branches.** Only line 2020 has been run; a new game always has the
