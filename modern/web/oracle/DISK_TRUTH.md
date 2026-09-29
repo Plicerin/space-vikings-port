@@ -2145,6 +2145,53 @@ such thing, and those per-unit values were another set of invented prices.
 
 ---
 
+## RECALL
+
+`RECALL.bas`, twelve lines, chained from GROUND FORCES option 2. `probe_recall.mjs`
+captures it; `recall_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| the whole page | **0 of 53,760 pixels differ** |
+
+It redraws the same box COM does, prints one of five two-line messages, and chains straight
+back to GROUND FORCES. No key, no title, no status panel.
+
+Everything else comes from up the chain. It never clears and never sets the window, so both
+are COM's by way of GROUND FORCES - left 1, width 21, `$3CD` 0, `$E4` 42 for HCOLOR 1 - and
+rows 1-12 are already blank because GROUND FORCES line 65 ran `R = 5: GOSUB 12` on the way
+out.
+
+The message lands on **0-based rows 4 and 5**, which is measured rather than traced. Tracing
+the cursor through GROUND FORCES' dispatch and RECALL's own four file PRINTs is not reliable
+- the first attempt predicted rows 2 and 3 - but the capture is unambiguous: rows 4 and 5,
+with the box on 0 and 13 and COM's forty-character line on 14.
+
+### The five branches
+
+| line | condition | prints |
+| --- | --- | --- |
+| 2000 | `38209 <> 38158` and `0 < 38166 < 3` | TROOPS ARE NOT ON / *blank* / THIS PLANET, SIR! |
+| 2005 | `TR = 0` | WE HAVE NO TROOPS / LEFT, SIR! and pokes 38166 to 0 |
+| 2010 | `38166 = 1 or 2` | TROOPS ARE BEING / RECALLED, SIR! and pokes 38166 to 0 |
+| 2020 | `38166 = 3` | TROOPS ARE IN / CRYOGENIC SLEEP! |
+| 2030 | `38166 = 0` | TROOPS ARE ALREADY / ON BOARD, SIR! |
+
+Only 2020 has been run - a new game has the troops in cryogenic sleep. The other four are
+ported from the listing and are not verified.
+
+Note 2000 is the only one with a blank line in the middle of it, and that it is also the
+only branch that leaves 38166 alone while refusing.
+
+### What the port had
+
+A `RECALL TROOPS` title, two horizontal rules, a seven-line TROOP STATUS panel of troops,
+fighters, tanks, missiles, transports, morale and credits, a `PRESS ANY KEY...` prompt, five
+differently worded messages, and `MERCURY, VENUS, EARTH, MARS...` for the planet names - the
+same fabricated list that was deleted from `orbit.ts`. None of it is on the disk.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -2152,9 +2199,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Eight of the 23 programs.** RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
-  programs are extracted and readable but nothing has been compared against them. STATUS,
-  GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D and COLLECT are done.
+- **Seven of the 23 programs.** EX, S/X, DMG, END and the four SHIP # n I.D. programs are
+  extracted and readable but nothing has been compared against them. STATUS, GALAXY MAP,
+  RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT and RECALL are done.
+- **Four of RECALL's five branches.** Only line 2020 has been run; a new game always has the
+  troops in cryogenic sleep.
 - **COLLECT's tech 1 path.** Lines 840-900, including the line 880 silver bug, have never
   been run - every assault reached so far has been tech 3.
 - **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read

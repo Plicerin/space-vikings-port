@@ -1,77 +1,88 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 
-const PLANET_NAMES = [
-  'MERCURY', 'VENUS', 'EARTH', 'MARS', 'JUPITER',
-  'SATURN', 'URANUS', 'NEPTUNE', 'PLUTO', 'ALPHA',
-  'BETA', 'GAMMA', 'DELTA', 'EPSILON', 'ZETA',
-  'ETA', 'THETA', 'IOTA', 'KAPPA', 'LAMBDA',
-];
+/**
+ * RECALL, from RECALL.bas - twelve lines of it.
+ *
+ * GROUND FORCES option 2 chains here (its line 2000 is `PRINT "RUN RECALL"`). It redraws the
+ * same box COM does and prints one of five messages, then goes straight back to GROUND
+ * FORCES. There is no key to press and no status panel.
+ *
+ * It never clears and never sets the window, so both come from COM by way of GROUND FORCES:
+ * left 1, width 21, `$3CD` 0 and `$E4` 42 - HCOLOR 1, normal video. Rows 1-12 are already
+ * blank because GROUND FORCES line 65 ran `R = 5: GOSUB 12` on the way out.
+ *
+ * The message lands on 0-based rows 4 and 5. GROUND FORCES' dispatch and RECALL's own file
+ * reads leave the cursor on row 3, and line 2000's leading `PRINT` drops it to 4 - measured,
+ * not traced.
+ */
+
+/** Lines 2000-2030, in the order the original tests them. */
+export interface RecallInputs {
+  /** PEEK(38209) and PEEK(38158). */
+  planet: number;
+  troopPlanet: number;
+  /** TR, from the MISC file. */
+  troops: number;
+  /** PEEK(38166): 0 on board, 1 planetside, 2 shore leave, 3 cryogenic sleep. */
+  location: number;
+}
+
+export interface RecallResult {
+  lines: string[];
+  /** The value lines 2005 and 2010 poke into 38166, or null when nothing is written. */
+  newLocation: number | null;
+  /** Which line printed, for the record. */
+  line: number;
+}
+
+export function recallMessage(i: RecallInputs): RecallResult {
+  if (i.planet !== i.troopPlanet && i.location > 0 && i.location < 3) {
+    return { lines: ['TROOPS ARE NOT ON', '', 'THIS PLANET, SIR!'], newLocation: null, line: 2000 };
+  }
+  if (i.troops === 0) {
+    return { lines: ['WE HAVE NO TROOPS', 'LEFT, SIR!'], newLocation: 0, line: 2005 };
+  }
+  if (i.location === 1 || i.location === 2) {
+    return { lines: ['TROOPS ARE BEING', 'RECALLED, SIR!'], newLocation: 0, line: 2010 };
+  }
+  if (i.location === 3) {
+    return { lines: ['TROOPS ARE IN', 'CRYOGENIC SLEEP!'], newLocation: null, line: 2020 };
+  }
+  return { lines: ['TROOPS ARE ALREADY', 'ON BOARD, SIR!'], newLocation: null, line: 2030 };
+}
+
+/** Line 20's box and the message. */
+export function drawRecall(hires: import('../engine/hires').Hires, lines: string[]): void {
+  hires.hcolor(1);
+  hires.line(1, 1, 139, 1);
+  hires.line(139, 1, 139, 110);
+  hires.line(139, 110, 1, 110);
+  hires.line(1, 110, 1, 1);
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]) hires.text(lines[i], 2, 5 + i);
+  }
+}
 
 export async function recallScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
-  const { hires, state, input } = ctx;
+  const { hires, state } = ctx;
   setScene('recall');
 
-  hires.hgr();
-  hires.hcolor(3);
-  hires.text('RECALL TROOPS', 14, 2);
-
-  hires.hcolor(1);
-  hires.line(1, 25, 278, 25);
-
-  const loc = state.forces.troopLocation;
-  const troopsPlanet = state.forces.troopPlanetIndex;
-  const here = troopsPlanet === state.planetIndex;
-  const planetName = troopsPlanet >= 0 && troopsPlanet < PLANET_NAMES.length
-    ? PLANET_NAMES[troopsPlanet] : `SYSTEM ${troopsPlanet + 1}`;
-
-  hires.text('TROOP STATUS', 4, 4);
-  hires.text(`TROOPS: ${state.forces.troops}`, 4, 6);
-  hires.text(`FIGHTERS: ${state.forces.fighters}`, 4, 7);
-  hires.text(`TANKS: ${state.forces.tanks}`, 4, 8);
-  hires.text(`MISSILES: ${state.forces.groundMissiles}`, 4, 9);
-  hires.text(`TRANSPORTS: ${state.forces.transports}`, 4, 10);
-  hires.text(`MORALE: ${'*'.repeat(state.forces.morale)}${'.'.repeat(6 - state.forces.morale)}`, 4, 11);
-  hires.text(`CREDITS: ${state.credits}`, 4, 12);
-
-  hires.hcolor(1);
-  hires.line(1, 100, 278, 100);
-
-  if (troopsPlanet >= 0 && troopsPlanet !== state.planetIndex && loc > 0 && loc < 3) {
-    hires.hcolor(5);
-    hires.text('TROOPS DEPLOYED ON', 2, 14);
-    hires.text(`${planetName}!`, 2, 15);
-    hires.hcolor(3);
-    hires.text('CANNOT RECALL FROM', 2, 17);
-    hires.text('ANOTHER SYSTEM.', 2, 18);
-  } else if (state.forces.troops === 0) {
-    hires.hcolor(5);
-    hires.text('NO TROOPS TO RECALL!', 2, 14);
-    state.forces.troopLocation = 0;
-  } else if (loc === 1 || loc === 2) {
-    hires.hcolor(1);
-    hires.text('RECALLING ALL TROOPS!', 2, 14);
-    hires.text('TRANSPORTS EN ROUTE.', 2, 15);
-    state.forces.troopLocation = 0;
-    state.forces.troopPlanetIndex = -1;
-    glog('recall', `troops recalled from location ${loc}`);
-  } else if (loc === 3) {
-    hires.hcolor(6);
-    hires.text('TROOPS IN CRYOGENIC', 2, 14);
-    hires.text('SLEEP. THAWING NOW!', 2, 15);
-  } else {
-    hires.hcolor(1);
-    hires.text('ALL TROOPS ON BOARD.', 2, 14);
+  const r = recallMessage({
+    planet: state.planetIndex,
+    troopPlanet: state.forces.troopPlanetIndex,
+    troops: state.forces.troops,
+    location: state.forces.troopLocation,
+  });
+  drawRecall(hires, r.lines);
+  if (r.newLocation !== null) {
+    state.forces.troopLocation = r.newLocation as 0 | 1 | 2 | 3;
+    if (r.newLocation === 0) state.forces.troopPlanetIndex = -1;
   }
+  glog('recall', `line ${r.line}: ${r.lines.filter(Boolean).join(' ')}`);
 
-  hires.hcolor(3);
-  hires.text('PRESS ANY KEY...', 12, 22);
-
-  if (state.commanderMode) {
-    await new Promise(r => setTimeout(r, 60));
-    return scenes.run('starshipSimulator');
-  }
-  await input.waitForKey();
-
-  scenes.run('groundForces');
+  // Line 2050 chains straight on - the message is only up for as long as GROUND FORCES takes
+  // to load, which the capture put at about two seconds.
+  await new Promise((res) => setTimeout(res, 1800));
+  return scenes.run('groundForces');
 }
