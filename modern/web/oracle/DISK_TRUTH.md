@@ -3474,6 +3474,71 @@ against the 41.2% the two gates predict.
 
 ---
 
+## There is no enemy AI. There is a weapons model.
+
+`X9 = 400: Y9 = -100: Z9 = -3500` is set once at line 2 and never touched again. Nothing moves
+the enemy, nothing steers it, nothing decides when it fires - it is a fixed point in the world
+that the renderer draws and the missile box tests against. The only thing that moves is you.
+`ai.ts` in the port is the player's autopilot for commander mode, which has no counterpart on
+the disk and is labelled as such.
+
+What stands in for combat is lines 185, 1000-1090 and 1500-1570:
+
+```
+185   IF PEEK(-16287) > 127 THEN GOSUB 1500
+1500  IF PEEK(38208) = 1 THEN POKE 38208,0: POKE 38150,100
+1501  IF PEEK(38202) = 1 THEN 1000                 ; 38202 = 1 selects the missile
+1502  IF PEEK(38186) = 0 THEN RETURN
+1505  ...three beams, CALL LA...  J1 = 10: J2 = 1
+1535  VP = PEEK(38160) + (J1 / (TE+1)): IF VP < HL THEN POKE 38160,VP
+1540  IF PEEK(38210) = 0 THEN DP = PEEK(38152) + (J2 / (TE+1)):
+      IF DP < HL THEN POKE 38152,DP
+1550  IF VP => PEEK(38150) THEN ...THE PLANET HAS SURRENDERED... POKE 38208,1
+1560  IF DP > PEEK(38204) AND PEEK(38205) <> 0 THEN "RUNEX"
+1085  IF HIT = 1 THEN GOSUB 1200: J1 = 10: J2 = 120: GOSUB 1535
+1090  J = PEEK(38187) - 2: GOSUB 3380: POKE 38187,J
+```
+
+`TE = PEEK(38282 + PEEK(38209))` is the planet's tech, read **once** at line 8, and `HL = 255`
+from line 1. H/D line 93 sets both `38150` and `38204` to `TECH * 60`, and line 16 zeroes
+`38152`, so a planet's bar and its ship's are the same height.
+
+### What holding the fire button on the disk shows
+
+- **The laser does not aim.** 1535 and 1540 test nothing about heading, or range, or where
+  anything is on screen. Holding the button while pointing at nothing raised 38160 all the
+  same. The port had a screen-space gate - the enemy within 40 by 30 pixels of the middle -
+  which is invented, and it meant a player who could not line the shot up did no damage at all
+  where the original would have taken the planet.
+- **`IF VP < HL THEN POKE` is a test, not a clamp.** At 250 a shot computes 252.5 and stores
+  252. At 253 it computes 255.5, which is not less than 255, and **nothing is stored** - the
+  byte sat at 253 while the same held button had just moved it from 250. A run therefore
+  stalls at 254 and the planet can never be taken by laser alone if the bar is set at 255.
+- **Every store truncates, and the fraction is gone.** The next shot PEEKs the byte back, so
+  nothing accumulates below one. 38160 moved in steps of **2** where the arithmetic says 2.5.
+- **So the laser can never damage the enemy ship.** 1540 adds `1 / (TE + 1)`, which reaches a
+  whole number only at `TE = 0`, and line 189 refuses to put an enemy on a planet below tech 2.
+  Measured at TE = 3: 38152 stayed at **0** through 900 frames of continuous fire. Only the
+  missile, at J2 = 120, can destroy it - 30 a hit at that tech.
+- **A missile costs two whether it hits or misses** (1090, measured 4 taken over two firings),
+  and `5251 GOTO 1090` means shooting down a ground battery leaves through the same line and
+  **charges two missiles for that as well**.
+- **Firing at a planet that has already surrendered un-surrenders it** and puts the bar back to
+  100 (1500).
+
+Aiming exists only for the missile: 1010 tests its height against the horizon in atmosphere,
+and 1050 tests a box 300 by 80 by 200 around the fixed enemy point in space.
+
+`diskWeapons.ts` holds the transcription and `oracle/weapons_parity.mjs` checks the port
+against the disk's own figures - the step from 250, the stall at 253, 38152 unmoved, the
+missile cost, the box - fifteen checks, all clean.
+
+One caution about the measurement: the main loop reads `$C061` once a pass and a pass is long,
+so a 500-frame hold gets one shot away, not many. What that pins down is the **step**, not
+where a run of shots ends up, and the harness compares it that way.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -3504,9 +3569,8 @@ is what is genuinely not known, roughly in order of how much it matters.
   it no `RND`-driven routine can be reproduced exactly - which is why the combat is checked
   by predicate rather than by replay, and why EXPL's noise can only be matched given the same
   floating-bus reads. Transcribing it means transcribing Applesoft's floating point.
-- **The enemy AI, and RECALL's branches.** The economy, GROUND FORCES' combat and the damage
-  model are done. STARSHIP SIMULATOR's enemy movement and firing, and four of RECALL's five
-  branches, are still only read.
+- **Four of RECALL's five branches.** The economy, GROUND FORCES' combat, the damage model and
+  the weapons are done; there is no enemy AI to do. RECALL is what is left of the game logic.
 - **What feeds the ENV. CONTROL readout, if anything.** 38194 is MEM TRANSFER A's loop counter
   and COM shows it as a system percentage. Whether the game was ever meant to have an env.
   control system, or the address was simply reused, is not knowable from the disk.

@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { fireLaser1500 } from '../engine/diskWeapons';
 import { damageTick3000 } from '../engine/diskDamage';
 import { GameState } from '../engine/gameState';
 import {
@@ -903,21 +904,11 @@ const enemy = spawnEnemy(state);
       });
       audio.laser();
 
-      // Hit detection — if enemy is near centre of screen
-      let laserDidHit = false;
-      if (!state.atmosphere && enemy.alive) {
-        const ep = project(
-          { pos: v3(state.x, state.y, state.z), pitch: pitchRad, heading: headingRad },
-          enemy.pos,
-        );
-        const dist = v3len(v3sub(enemy.pos, v3(state.x, state.y, state.z)));
-        if ((ep.visible && Math.abs(ep.x - 140) < 40 && Math.abs(ep.y - 65) < 30)
-          || (state.autopilot && dist < 900)) {
-          onLaserHit();
-          laserDidHit = true;
-        }
-      }
-      if (!state.atmosphere && (!enemy.alive || !laserDidHit)) {
+      // 1535 and 1540 run on every shot. The original has no aiming for the laser at all -
+      // no screen-space test, no range test - so this is unconditional.
+      onLaserHit();
+      const laserDidHit = !state.atmosphere && enemy.alive;
+      if (!state.atmosphere && !laserDidHit) {
         for (let i = fighters.length - 1; i >= 0; i--) {
           const f = fighters[i];
           if (Math.abs(f.screenX - 140) < 40 && Math.abs(f.screenY - 65) < 30) {
@@ -982,25 +973,43 @@ const enemy = spawnEnemy(state);
     }
 
 function onLaserHit() {
-  // Laser hit on enemy ship — STARSHIP_SIM:1535-1560
+  // 1535-1560. There is no aiming: the original tests nothing about where the ship points or
+  // how far away anything is, so this runs on every shot. `IF VP < HL THEN POKE` is a test
+  // rather than a clamp, and each store truncates into a byte, so the fraction never carries
+  // to the next shot - measured on the disk, 38160 moving in steps of 2 where the arithmetic
+  // says 2.5, and standing still at 253 while the same held button moved it from 250.
   glog('hit', `laser shipVit=${state.shipVitality}`);
   flashes.push({ timer: 0.2, type: 'explosion' });
   audio.beep(180, 100);
 
-  const j1 = 10;
-  const j2 = state.commanderMode ? 30 : 1;
-  const te = Math.max(1, state.defenseTech);
-  state.planetVitality = Math.min(255, state.planetVitality + j1 / (te + 1));
-  if (!state.atmosphere) {
-    state.shipVitality = Math.min(255, state.shipVitality + j2 / (te + 1));
-  }
-
-  if (state.planetVitality >= state.planetVitalityLimit && state.planetVitalityLimit > 0 && !state.planetSurrendered) {
+  const r = fireLaser1500({
+    planetVitality: state.planetVitality,
+    enemyDamage: state.shipVitality,
+    missiles: state.missilesRemaining,
+    surrendered: state.planetSurrendered,
+    surrenderAt: state.planetVitalityLimit,
+  }, {
+    // TE is the planet's tech straight from line 8 - no Math.max(1, ...), which the port had
+    // and which would halve the step on a tech-0 planet.
+    tech: state.commanderMode ? 0 : state.defenseTech,
+    atmosphere: state.atmosphere,
+    laserPct: state.damage.laserPct,
+    enemyLimit: state.shipDestructionLimit,
+    enemyPresent: state.shipKind !== 0,
+  });
+  if (!r.fired) return;
+  state.planetVitality = r.planetVitality;
+  state.shipVitality = r.enemyDamage;
+  state.planetVitalityLimit = r.surrenderAt;
+  if (r.planetSurrendered) {
     glog('surrender', `planetVit=${state.planetVitality}`);
     surrenderMsgTimer = 3;
     markPlanetConquered(state);
   }
-    }
+  if (r.enemyDestroyed && !destructionPending) {
+    destructionPending = true;
+  }
+}
 
   function enemyAttack(nearPlanet: boolean) {
     // Lines 3000-3381, in diskDamage.ts, transcribed from the listing and checked against a

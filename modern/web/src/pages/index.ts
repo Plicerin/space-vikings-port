@@ -12,6 +12,8 @@ import { lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS } from
 import { combatRound550, truncate4000 } from '../engine/diskCombat';
 import { damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS,
   UNDAMAGED_SYSTEMS } from '../engine/diskDamage';
+import { fireLaser1500, fireMissile1000, storeIfUnder255, missileHits1050,
+  groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE } from '../engine/diskWeapons';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import { parseShipBytecode, projectShipBytecode, drawShipWireframe,
   projectShipWorld, drawShipWorld, COCKPIT_SHIP_WIREFRAME_VIEW } from '../engine/shipBytecode';
@@ -120,7 +122,9 @@ function boot(): void {
     soundGen9276, laser92D1, expl9276,
     lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS,
     combatRound550, truncate4000,
-    damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS, UNDAMAGED_SYSTEMS };
+    damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS, UNDAMAGED_SYSTEMS,
+    fireLaser1500, fireMissile1000, storeIfUnder255, missileHits1050,
+    groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();
