@@ -1115,7 +1115,7 @@ only drawn thing in flight with no counterpart in the original.
 
 ---
 
-## Near-plane clipping, and what the steep-angle gap is not
+## Near-plane clipping
 
 ### The near plane is at 0, and the original clips to it
 
@@ -1126,36 +1126,52 @@ such a segment at the near plane rather than dropping it.
 
 `projectShipWorld()` had been projecting each vertex on its own and dropping whatever landed
 behind the camera, which loses the whole segment. It now transforms to camera space, clips
-the segment there with `clipNear()`, and only then divides - `diskProjection.ts` exposes
-`toCameraSpace()`, `projectCameraSpace()` and `clipNear()` for it.
+the segment there with `clipNear()`, and only then divides.
 
-**This is correct and it changes none of the numbers.** Ships 73.8%, stars 37.5%, ground
-64.2%, all unmoved. At the states measured, 14 to 17 segments per frame do straddle the near
-plane - so the new path is exercised - but over a ground plane seen from above they run off
-the *bottom* of the view, and the screen clip rejects them either way. The fix is right; the
-gap it was meant to close was somewhere else.
+### The clipping undid itself
 
-### The steep-angle gap is not culling, and not the projection
+Implementing that changed **nothing** - ships, stars and ground all to the same pixel - and
+that was the useful signal, because 14 to 17 segments a frame demonstrably straddled the
+plane.
 
-Two ground states do badly: pitch +32 (61% within a pixel, the port drawing one horizon row
-against a spread from y 0 to 92) and heading +64 (40.7% exact). Both were assumed to be
-culling. Neither is.
+`clipNear()` puts a clipped endpoint **exactly on** the plane, and `projectCameraSpace()`
+rejected `z <= NEAR_Z`. So every segment that had just been clipped was thrown away by the
+next line. One character: the test is `z < NEAR_Z`.
 
-**The clipper is right.** Unit-tested on a segment crossing top to bottom, one crossing left
-to right, one wholly inside, one wholly above, and one running to coordinates of 231,000 -
-it keeps and trims each correctly and rejects only the one that should be rejected.
+It was found by hand-checking a single segment - the `x = 0` grid line of PLANET # 1 at the
+state the port drew nothing for - and following it through each stage until one of them
+returned null.
 
-**The projection holds at large pitch.** The wide sweep that validated the rotation all the
-way round only varied *heading*; pitch had never been taken past 8. Extending it - placing
-each point so the pitch rotation should bring it back to the middle - every one lands at
-**(114.5, 82-84)** for pitches 12, 16, 24, 32, 40, 48 and 244 down to 216. The fit over all
-64 observations is **0.59 px rms**.
+### What it was worth
 
-So at pitch +32 the original draws 460 pixels of ground across the full width and the port
-draws none, and neither the clipper nor the transform accounts for it. **The cause is not
-identified.** It is worth noting that what the disk draws there is thin and wide - 460
-pixels spread over 276 columns, under two rows' worth - which does not look like a grid seen
-edge-on so much as a small number of long lines.
+| | before | after |
+| --- | --- | --- |
+| ground, within one pixel | 85.4% | **99.5%** |
+| ground, exact | 64.2% | 67.5% |
+| stars, within one pixel | 91.2% | 91.7% |
+| ships, within one pixel | 98.8% | 98.8% |
+
+Every ground extent now matches the original's exactly, and the per-state within-one-pixel
+figures are 98% to 100% across all twelve. The state that drew nothing at all - heading 0,
+pitch +32 - is 72.3% exact and **99% within a pixel**.
+
+Ships moved from 73.8% to 72.2% on exact overlap while staying at 98.8% within a pixel: the
+near-clipped remnants are now drawn, and a few of their rasterised pixels fall beside the
+original's rather than on them. The geometry is no worse; the overlap metric is simply
+sensitive to that.
+
+### The horizon theory was wrong
+
+The guess had been that the renderer draws something at steep pitch which is not in the
+planet's vertex list - a horizon. It does not. **With the record list emptied, nothing is
+drawn at any pitch**: 0, 8, 16, 32, 48 and 248 all give a blank page. Everything on screen
+comes from the data.
+
+> Truncating the list part-way is **not** a valid experiment, and its numbers should be
+> ignored. `$7F` terminates when it is the first byte of a model, which is why writing it at
+> `$7879` cleanly removes the ship, but written mid-list it desynchronises the stream rather
+> than ending it - keeping 1 record drew 460 pixels, keeping 2 drew none, keeping 6 drew 460
+> again.
 
 ---
 
@@ -1180,9 +1196,9 @@ edge-on so much as a small number of long lines.
   reimplementation of the same formula.
 - What opcode 3 means. The harness prefers "draw and continue" at 73.6% over 72.6% and
   72.2% for the alternatives, which is not much of a margin.
-- The steep-angle ground gap. Near-plane clipping is implemented and correct, the screen
-  clipper is unit-tested, and the projection is validated to pitch 48 - none of them
-  explains pitch +32, where the original draws 460 pixels and the port draws none.
+- Exact pixel overlap, everywhere. Geometry is now 98-100% within a pixel for ground and
+  ships; landing on the same pixel needs the renderer's fixed-point arithmetic rather than
+  a float reimplementation of the same formula.
 - `renderPlanet()`'s procedural disc, which is now the only drawn thing in flight with no
   counterpart on the disk.
 - What state `$6000` needs before it will draw. Snapshot and replay sidesteps the question

@@ -327,9 +327,16 @@ export function toCameraSpace(p: Vec3, camera: Vec3, heading: number, pitch: num
   return { x: dx, y: dy, z: dz };
 }
 
-/** Camera space to screen. Returns null at or behind the near plane. */
+/**
+ * Camera space to screen. Returns null behind the near plane.
+ *
+ * The test is z < NEAR_Z, not z <= NEAR_Z, and the difference matters: clipNear() puts a
+ * clipped endpoint exactly ON the plane, so rejecting z == NEAR_Z threw away every segment
+ * that had just been clipped - the clipping undid itself, and near-plane clipping appeared
+ * to change nothing at all.
+ */
 export function projectCameraSpace(d: Vec3): { x: number; y: number } | null {
-  if (d.z <= NEAR_Z) return null;
+  if (d.z < NEAR_Z) return null;
   return {
     x: SCREEN_CENTRE_X + FOCAL_X * (d.x / d.z),
     y: SCREEN_CENTRE_Y - FOCAL_Y * (d.y / d.z),
