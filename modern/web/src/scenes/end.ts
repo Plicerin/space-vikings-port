@@ -1,135 +1,93 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
-import { drawOptions, drawPrompt, getChoice } from '../engine/menu';
 import { setScene, log as glog } from '../engine/gameLog';
 
-function drawStats(hires: import('../engine/hires').Hires, state: import('../engine/gameState').GameState): void {
-  const conquered = state.planets.filter(p => p.surrendered).length;
-  const visited = state.planets.filter(p => p.visited).length;
-  const hullPct = 100 - state.damage.hullPct;
+/**
+ * END, the save/quit menu - END.bas.
+ *
+ * COM line 132 chains here: `IF COM = 4 THEN PRINT "RUNEND"`.
+ *
+ * The window comes from COM line 128's `POKE 32,0: POKE 33,40: POKE 34,0: POKE 35,24`, so
+ * END's own `POKE 33,40` changes nothing and line 30's sixteen rows of forty spaces blank
+ * columns 0-39 outright - the full-width case that does not lose its last character, because
+ * the left margin is 0. HCOLOR is COM's 1 and `$3CD` is 0, so the menu is green and normal
+ * video.
+ *
+ * Measured row and column positions, rather than traced:
+ *
+ * | 0-based row | column | |
+ * | --- | --- | --- |
+ * | 1 | 15 | END GAME, from line 40's HTAB 16 |
+ * | 4, 5, 6 | 6 | the three options, from `TAB( 7)` |
+ * | 9 | 0 | ENTER CHOICE. |
+ */
 
-  hires.hcolor(3);
-  hires.text('CAREER SUMMARY', 13, 10);
+type H = import('../engine/hires').Hires;
+
+/** Lines 30-70. */
+export function drawEndMenu(hires: H): void {
   hires.hcolor(1);
-  hires.text(`SYSTEMS CONQUERED: ${conquered}/20`, 4, 12);
-  hires.text(`SYSTEMS VISITED : ${visited}/20`, 4, 13);
-  hires.text(`TOTAL CREDITS   : ${Math.floor(state.credits)}`, 4, 14);
-  hires.text(`TROOPS ON BOARD : ${state.forces.troops}`, 4, 15);
-  hires.text(`HULL INTEGRITY  : ${hullPct}%`, 4, 16);
-  hires.text(`STARDATE        : ${state.stardate.toFixed(1)}`, 4, 17);
-  hires.hcolor(5);
-  hires.text(`CONDITION: ${state.condition.toUpperCase()}`, 4, 18);
+  // 30: FOR J = 1 TO 16: VTAB J: PRINT <40 spaces>
+  for (let r = 1; r <= 16; r++) hires.text(' '.repeat(40), 1, r);
+  // 40
+  hires.text('END GAME', 16, 2);
+  // 50, 60
+  hires.text('1) SAVE GAME', 7, 5);
+  hires.text('2) CONTINUE PRESENT GAME', 7, 6);
+  hires.text('3) END GAME', 7, 7);
+  // 70 - the trailing spaces are part of the string and the cursor sits after them.
+  hires.text('ENTER CHOICE.  ', 1, 10);
 }
+
+/** Line 190's refusal and line 210's confirmation, both printed under the prompt. */
+export function drawEndSaveResult(hires: H, inAtmosphere: boolean): void {
+  hires.hcolor(1);
+  if (inAtmosphere) {
+    hires.text('YOU MUST BE IN ORBIT TO SAVE GAME', 1, 12);
+  } else {
+    hires.text('GAME SAVED.', 1, 12);
+  }
+}
+
+/**
+ * Lines 200-204, the save.
+ *
+ * It copies the nine bytes at 29467-29475 - X, Y, Z, pitch, bank and heading - into
+ * 38211-38219, sets 38391 to 77 and 38392 to the current planet, then BSAVEs P/F, PLANET
+ * FILE and SHIP'S DATA.
+ *
+ * Note where the ninth byte lands: **38219**. The planets-surrendered table is `38219 + P`
+ * for P = 1 to 20, which is 38220 to 38239, so the saved heading sits in the slot a
+ * one-based index never reaches. They are adjacent, not overlapping - which is why that
+ * table is indexed from 1 rather than 0.
+ */
+export const END_SAVE_BYTES = { from: 29467, to: 38211, count: 9 } as const;
 
 export async function endScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input } = ctx;
   setScene('end');
 
-  const allConquered = state.planets.every(p => p.surrendered);
-
   for (;;) {
-    hires.hgr();
+    drawEndMenu(hires);
+    const k = await input.waitForKey();
+    const c = String.fromCharCode(k & 0x7f);
 
-    if (allConquered) {
-      hires.hcolor(3);
-      for (let j = 0; j < 5; j++) {
-        const rx = Math.floor(Math.random() * 260) + 10;
-        const ry = Math.floor(Math.random() * 170) + 10;
-        hires.hplot(rx, ry);
-      }
+    // 70: anything outside 1-3 redraws from line 30.
+    if (c !== '1' && c !== '2' && c !== '3') continue;
 
-      hires.hcolor(5);
-      hires.text('*** CONGRATULATIONS! ***', 8, 1);
-      hires.hcolor(3);
-      hires.text('ALL STAR SYSTEMS', 10, 3);
-      hires.text('ARE UNDER YOUR CONTROL!', 7, 4);
-      hires.text('THE GALAXY IS YOURS!', 8, 5);
-    } else {
-      hires.hcolor(3);
-      hires.text('END GAME', 16, 2);
+    if (c === '1') {
+      // 190
+      drawEndSaveResult(hires, state.atmosphere);
+      glog('end', state.atmosphere ? 'cannot save in atmosphere' : 'game saved');
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
     }
-
-    drawStats(hires, state);
-
-    hires.hcolor(1);
-    drawOptions(hires, [
-      { key: '1', label: 'SAVE GAME' },
-      { key: '2', label: 'CONTINUE PRESENT GAME' },
-      { key: '3', label: 'END GAME' },
-    ], 5, 20);
-
-    drawPrompt(hires, 8, 20);
-
-    const c = await getChoice(input, hires, 1, 3);
-
-    if (c === 1) {
-      if (!state.inOrbit) {
-        hires.hcolor(5);
-        hires.text('YOU MUST BE IN ORBIT', 2, 14);
-        hires.text('TO SAVE GAME.', 2, 15);
-        await new Promise(r => setTimeout(r, 2000));
-      } else {
-        state.savedGameSentinel = 77;
-        saveGame(state);
-        hires.hcolor(1);
-        hires.text('GAME SAVED.', 2, 14);
-        glog('save', 'game saved to localStorage');
-        await new Promise(r => setTimeout(r, 2000));
-      }
-    } else if (c === 2) {
-      return scenes.run('starshipSimulator');
-    } else if (c === 3) {
-      hires.hgr();
-      hires.hcolor(3);
-      if (allConquered) {
-        hires.text('YOU HAVE CONQUERED', 9, 4);
-        hires.text('THE ENTIRE GALAXY!', 9, 5);
-      } else {
-        hires.text('GAME OVER', 16, 4);
-      }
-
-      drawStats(hires, state);
-
-      hires.hcolor(5);
-      hires.text('A NEW LEGEND BEGINS...', 8, 22);
-      glog('endGame', `game ended conquered=${state.planets.filter(p => p.surrendered).length} credits=${Math.floor(state.credits)}`);
-      localStorage.removeItem('spaceVikingsSave');
-      await new Promise(r => setTimeout(r, 5000));
-      return scenes.run('start');
+    if (c === '2') {
+      // 110-120
+      glog('end', 'continue');
+      return scenes.run('galaxyMap');
     }
+    // 100: FOR J = 1 TO 5000: POKE J,0: NEXT: END - the original wipes memory and halts.
+    glog('end', 'game ended');
+    return scenes.run('start');
   }
-}
-
-function saveGame(state: import('../engine/gameState').GameState): void {
-  const data = {
-    x: state.x, y: state.y, z: state.z,
-    pitch: state.pitch, bank: state.bank, heading: state.heading,
-    speed: state.speed, energy: state.energy,
-    hyperdriveActive: state.hyperdriveActive,
-    commanderMode: state.commanderMode,
-    atmosphere: state.atmosphere, inOrbit: state.inOrbit,
-    planetIndex: state.planetIndex, shipKind: state.shipKind,
-    stardate: state.stardate, credits: state.credits,
-    planetSurrendered: state.planetSurrendered,
-    weaponMode: state.weaponMode, condition: state.condition,
-    shieldsOn: state.shieldsOn, autopilot: state.autopilot,
-    laserType: state.laserType, pendingConquestCollectionPlanet: state.pendingConquestCollectionPlanet,
-    planetVitality: state.planetVitality, shipVitality: state.shipVitality,
-    planetVitalityLimit: state.planetVitalityLimit, shipDestructionLimit: state.shipDestructionLimit,
-    missilesRemaining: state.missilesRemaining,
-    laserOperational: state.laserOperational,
-    enemyShips: state.enemyShips,
-    savedGameSentinel: state.savedGameSentinel,
-    missileMode: state.missileMode,
-    antiFighterTurrets: state.antiFighterTurrets,
-    jumpDistance: state.jumpDistance,
-    forceRedraw: state.forceRedraw,
-    shoreLeaveMode: state.shoreLeaveMode,
-    damage: { ...state.damage },
-    forces: { ...state.forces },
-    loot: { ...state.loot },
-    planets: state.planets.map(p => ({ ...p })),
-    navDestination: state.navDestination,
-    commanderMapTarget: state.commanderMapTarget,
-  };
-  localStorage.setItem('spaceVikingsSave', JSON.stringify(data));
 }

@@ -26,7 +26,7 @@ import { recallScene, drawRecall, recallMessage } from '../scenes/recall';
 import { shoreLeaveScene, drawShoreLeavePay, drawShoreLeaveCryogenics } from '../scenes/shoreLeave';
 import { groundForcesScene, drawGroundForcesMenu, drawGroundForcesBattle } from '../scenes/groundForces';
 import { collectScene, drawCollectMessage, drawCollectSuccess, awardLoot } from '../scenes/collect';
-import { endScene } from '../scenes/end';
+import { endScene, drawEndMenu } from '../scenes/end';
 import { hyperdriveScene } from '../scenes/hyperdrive';
 import { orbitScene } from '../scenes/orbit';
 import { reentryScene } from '../scenes/reentry';
@@ -103,7 +103,7 @@ function boot(): void {
   (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments,
     ShapeRenderer, decodeShapeTableJson,
     parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW,
-    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp };
+    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();

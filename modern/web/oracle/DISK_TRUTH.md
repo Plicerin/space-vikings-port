@@ -2367,6 +2367,58 @@ it, so both are gone.
 
 ---
 
+## END
+
+`END.bas`, the save/quit menu, reached from COM by 4 (COM line 132). `probe_end.mjs`
+captures it; `end_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| END's own rows 0-15 | **0 of 35,840 pixels differ** |
+| the whole page | **0 of 53,760** |
+
+Three options - SAVE GAME, CONTINUE PRESENT GAME, END GAME - over the instrument panel,
+which it never touches.
+
+### The window is COM's, and that decides the clear
+
+END's own `POKE 33,40` changes nothing: COM line 128 has already set
+`POKE 32,0: POKE 33,40: POKE 34,0: POKE 35,24`. Left margin **0**, so line 30's sixteen rows
+of forty spaces blank columns 0-39 outright - the full-width case that keeps its last
+character, unlike SUPPLY's at left margin 1. Measured: column 39 is empty across rows 0-15.
+
+`$E4` reads 42 for HCOLOR 1 and `$3CD` reads 0, so the menu is green and normal video.
+
+Positions, measured rather than traced: END GAME on 0-based row 1 column 15 (line 40's
+`HTAB 16`), the three options on rows 4, 5 and 6 at column 6 (`TAB( 7)`), and ENTER CHOICE.
+on row 9 at column 0.
+
+### Where the save puts things
+
+```
+200 POKE 38211, PEEK(29467): ... : POKE 38218, PEEK(29474)
+202 POKE 38219, PEEK(29475)
+204 POKE 38391,77: POKE 38392, PEEK(38209)
+210 ... BSAVE P/F,A$97E1,L$140 ... BSAVE PLANET FILE,A$954C,L$AF ... BSAVE SHIP'S DATA ,A38150,L54
+```
+
+Nine bytes - X, Y, Z, pitch, bank and heading from 29467-29475 - into 38211 to **38219**.
+
+That last address is worth noting. The planets-surrendered table is `38219 + P` for P = 1 to
+20, which is 38220 to 38239, so the saved heading occupies the slot a one-based index never
+reaches. They are adjacent rather than overlapping, and that is why the table is indexed
+from 1 instead of 0.
+
+Line 190 refuses to save in atmosphere; line 100's END GAME zeroes memory from 1 to 5000 and
+halts.
+
+### What the port had
+
+A `CAREER SUMMARY` block - systems conquered, systems visited, total credits, troops on
+board, hull integrity, stardate and condition - none of which END prints.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -2374,9 +2426,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Four of the 23 programs.** END and the four SHIP # n I.D. programs are extracted and
-  readable but nothing has been compared against them. STATUS, GALAXY MAP, RADAR,
-  GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X and DMG are done.
+- **Three of the 23 programs.** The four SHIP # n I.D. programs are extracted and readable
+  but nothing has been compared against them. STATUS, GALAXY MAP, RADAR,
+  GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG and END are done.
 - **Why one empty inverse PRINT whitens a whole page.** S/X line 5 does it, measured; the
   mechanism in the character generator is not derived.
 - **EX line 6's XDRAW.** The port draws the five flash shapes rather than XORing them, which
