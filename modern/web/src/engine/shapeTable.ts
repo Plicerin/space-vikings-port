@@ -160,6 +160,52 @@ export function measureSequentialBounds(table: ShapeTable): ShapeBounds {
   };
 }
 
+/**
+ * The pixels DRAW would light, without a screen to light them on.
+ *
+ * ShapeRenderer.draw() now calls this, so there is still one traversal and it is the one
+ * checked against the ROM by oracle/shape_parity.mjs. Pulled out because the canvas overlay
+ * in vectorRenderer.ts has to draw the panel needles and has no Hires to plot into.
+ */
+export function shapePixels(
+  table: ShapeTable,
+  index: number,
+  x: number,
+  y: number,
+  opts: { rot?: number; scale?: number } = {},
+): Array<[number, number]> {
+  const shape = table.shapes[index];
+  if (!shape) return [];
+  const angle = (opts.rot ?? 0) * ROT_STEP_RAD;
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  const s = opts.scale ?? 1;
+  const out: Array<[number, number]> = [];
+  let cx = x;
+  let cy = y;
+  for (const v of shape) {
+    const ux = DIR_DX[v.dir];
+    const uy = DIR_DY[v.dir];
+    const nx = cx + (ux * cosA - uy * sinA) * s;
+    const ny = cy + (ux * sinA + uy * cosA) * s;
+    if (v.plot) {
+      // A plot vector lights the pen's CURRENT position and then moves, so i runs to
+      // stepCount exclusive - see the note on plotSegment.
+      const stepCount = Math.max(1, Math.ceil(Math.max(Math.abs(nx - cx), Math.abs(ny - cy))));
+      const inv = 1 / stepCount;
+      for (let i = 0; i < stepCount; i++) {
+        out.push([
+          Math.round(cx + (nx - cx) * i * inv),
+          Math.round(cy + (ny - cy) * i * inv),
+        ]);
+      }
+    }
+    cx = nx;
+    cy = ny;
+  }
+  return out;
+}
+
 export class ShapeRenderer {
   rot = 0; // 0..63
   scale = 1; // 1..
@@ -168,25 +214,8 @@ export class ShapeRenderer {
 
   /** DRAW shape AT x, y — anchor pen at (x, y) and traverse vectors. */
   draw(table: ShapeTable, index: number, x: number, y: number): void {
-    const shape = table.shapes[index];
-    if (!shape) return;
-    const angle = this.rot * ROT_STEP_RAD;
-    const cosA = Math.cos(angle);
-    const sinA = Math.sin(angle);
-    const s = this.scale;
-    let cx = x;
-    let cy = y;
-    for (const v of shape) {
-      const ux = DIR_DX[v.dir];
-      const uy = DIR_DY[v.dir];
-      // Rotate then scale.
-      const dx = (ux * cosA - uy * sinA) * s;
-      const dy = (ux * sinA + uy * cosA) * s;
-      const nx = cx + dx;
-      const ny = cy + dy;
-      if (v.plot) this.plotSegment(cx, cy, nx, ny);
-      cx = nx;
-      cy = ny;
+    for (const [px, py] of shapePixels(table, index, x, y, { rot: this.rot, scale: this.scale })) {
+      this.hires.hplot(px, py);
     }
   }
 

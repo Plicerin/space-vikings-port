@@ -1,5 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
-import { ShapeRenderer } from '../engine/shapeTable';
+import { ShapeRenderer, shapePixels } from '../engine/shapeTable';
 import { setScene, log as glog } from '../engine/gameLog';
 
 /**
@@ -270,4 +270,33 @@ export function erasePanelNeedles(
   r.draw(shapes, 25, 136, vy);
   r.draw(shapes, 24, ex, 133);
   r.draw(shapes, 24, sx, 133);
+}
+
+/** The same four needles as pixels, for targets that are not a Hires. */
+export function panelNeedlePixels(
+  shapes: import('../engine/shapeTable').ShapeTable,
+  n: PanelNeedles,
+): Array<[number, number]> {
+  const { tx, vy, sx, ex } = needlePositions(n);
+  return [
+    ...shapePixels(shapes, 12, tx, 133),
+    ...shapePixels(shapes, 13, 136, vy),
+    ...shapePixels(shapes, 12, sx, 133),
+    ...shapePixels(shapes, 12, ex, 133),
+  ];
+}
+
+/**
+ * Where the loaded shape table lives once a scene has fetched it.
+ *
+ * The canvas overlay needs the same table the cockpit does, and threading it through the
+ * overlay's own data interface would mean changing that interface. The cockpit sets this
+ * when it loads its assets; anything that draws the panel reads it.
+ */
+let loadedPanelShapes: import('../engine/shapeTable').ShapeTable | null = null;
+export function setPanelShapes(t: import('../engine/shapeTable').ShapeTable): void {
+  loadedPanelShapes = t;
+}
+export function getPanelShapes(): import('../engine/shapeTable').ShapeTable | null {
+  return loadedPanelShapes;
 }

@@ -7,7 +7,7 @@ import {
 } from '../engine/math3d';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import type { ShapeTable } from '../engine/shapeTable';
-import { drawPanelNeedles, erasePanelNeedles } from './instruments';
+import { drawPanelNeedles, erasePanelNeedles, setPanelShapes } from './instruments';
 import type { PanelNeedles } from './instruments';
 import {
   computeShipPointScale,
@@ -163,7 +163,10 @@ const shapeR = new ShapeRenderer(hires);
 // every pass of the flight loop.
 let panelShapes: ShapeTable | null = null;
 void (async () => {
-  try { panelShapes = decodeShapeTableJson(await loader.json('data/shapes/shape-table.json')); }
+  try {
+    panelShapes = decodeShapeTableJson(await loader.json('data/shapes/shape-table.json'));
+    setPanelShapes(panelShapes);
+  }
   catch { /* no table: the needles stay off rather than being guessed at */ }
 })();
 let assetsReady = false;

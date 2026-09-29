@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import type { ShipBytecodeOp } from './shipBytecode';
 import { parseShipBytecode } from './shipBytecode';
 import type { GameState } from './gameState';
-import { ENERGY_FULL } from './gameState';
+import { getPanelShapes, panelNeedlePixels } from '../scenes/instruments';
 import type { Loader } from './loader';
 
 const SHIP_CORE = 0xf6fbff;
@@ -533,24 +533,29 @@ export class VectorRenderer {
     line(123, 128, 123, 183);
     line(157, 128, 157, 183);
 
-    const spdFrac = Math.max(0, Math.min(1, state.speed / 120));
-    const spdEnd = 5 + Math.round(spdFrac * 112);
-    for (let yy = 132; yy <= 144; yy++) fillLine(5, spdEnd, yy, '#ff8a2a');
-
-    // $9537 is a 0-63 byte, not a 0-2000 pool: SHORE LEAVE 2525 refills it to 63 where
-    // every other system gets 100, and the machine reads 63 on a fresh ship. The disk
-    // draws a needle here rather than a bar - shape 13 at 199 + E, see drawPanelNeedles -
-    // so this block is still the port's own reading of the panel, now at the right scale.
-    const eFrac = Math.max(0, Math.min(1, state.energy / ENERGY_FULL));
-    const eEnd = 163 + Math.round(eFrac * 112);
-    for (let yy = 132; yy <= 144; yy++) fillLine(163, eEnd, yy, '#22dd55');
-
-    const dHeading = 0;
-    const dPitch = 0;
-    const turnX = Math.round(140 + Math.max(-15, Math.min(15, dHeading * 8)));
-    const climbY = Math.round(155 + Math.max(-12, Math.min(12, dPitch * 6)));
-    line(turnX, 130, turnX, 138, '#ff8a2a');
-    line(135, climbY, 145, climbY, '#ff8a2a');
+    // STARSHIP SIMULATOR lines 159, 170, 173 and 180 - the four needles, same as drawHUD.
+    //
+    // What stood here was a second copy of the port's own reading of this part of the panel:
+    // speed and energy as filled bars, and the bank and pitch needles as rate-of-change
+    // markers at 140 + dHeading * 8 and 155 + dPitch * 6, with both deltas hardcoded to 0 so
+    // they never moved at all. The disk drives all four off bytes - TX off the bank byte, VY
+    // off the pitch byte, SX off PEEK(38157) and EX off PEEK(38199).
+    //
+    // No erase pass here: this overlay repaints from scratch every frame, so line 159's
+    // shapes 25 and 26 have nothing to rub out.
+    const panelShapes = getPanelShapes();
+    if (panelShapes) {
+      const dot = Math.max(1, Math.round(gw / 280));
+      ctx.fillStyle = '#ffffff';   // line 175 sets HCOLOR= 3 before line 180 draws
+      for (const [nx, ny] of panelNeedlePixels(panelShapes, {
+        bank: state.bank,
+        pitch: state.pitch,
+        speed: Math.max(0, Math.min(120, Math.round(state.speed))),
+        energy: Math.round(state.energy),
+      })) {
+        ctx.fillRect(sx(nx), sy(ny), dot, dot);
+      }
+    }
 
     const pill = (px: number, py: number, on: boolean, color: string): void => {
       if (on) {
