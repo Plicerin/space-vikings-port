@@ -1745,6 +1745,75 @@ evidence yet for anything better. Deriving `$6000`'s line drawing is an open que
 
 ---
 
+## GROUND FORCES
+
+`GROUND FORCES.bas`, reached from COM by 2 - COM line 127. `probe_groundforces.mjs`
+captures it; `groundforces_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| the menu screen | **0 of 53,760 pixels differ** |
+| the battle screen's layout | **2,138 of 2,138 pixels** |
+
+The rest of the program is combat resolution driven by `RND`, and there is nothing to
+compare it against pixel by pixel.
+
+### The menu is drawn on top of COM's screen
+
+It never clears and never fills. Line 12 blanks rows 1-12 with printed spaces and line 13
+draws the same box COM does - so what is on the page is **COM's screen with a hole punched
+in the left-hand column**. COM's twelve readouts are still down the right, its 40-character
+line is still at row 14, and the `HCOLOR= 6` flood is still behind all of it.
+
+Three things carry over from COM with no code in GROUND FORCES to set them:
+
+- **The text window.** `POKE 32,1` / `POKE 33,21` are COM's, so line 12's eighteen spaces
+  land on columns 1-18 and every `PRINT` starts at column 1.
+- **HCOLOR.** It lives in the hi-res routines' zero page, not in a BASIC variable, so `RUN`
+  does not reset it. `$E4` reads **42** = `$2A` = HCOLOR 1 when the menu holds at line 60 -
+  COM's line 90. The box and all the menu text are green.
+- **The inverse flag.** `$3CD` is 0 on arrival, so the menu is normal video.
+
+Comparing this screen means replaying the whole chain: the panel, line 210's lamps, line
+180's needles, COM including its line 8 erase, and then the menu.
+
+### The battle screen
+
+Line 100 takes the window full width and 17 rows deep and blanks rows 0-15; 110 sets
+`HCOLOR= 5` and draws the box, and nothing changes the colour again, so every label is
+orange. Line 150's `POKE 973,255` comes **after** the labels, so they are normal video and
+everything printed afterwards is inverse - which is what line 170's four rows of spaces
+produce: the solid white band the narrative prints into.
+
+The line numbers run 120, 130, 140, 145, so `PROBABILITY` and `OF SUCCESS :` are printed
+after `COMPUTER` and `PROJECTION` even though they sit above them on screen.
+
+The port had the geometry right and the rest wrong: white and green instead of orange, and
+`GROUND FORCES`, `OF SUCCESS:`, `COMPUTER` and `STATUS` where the original prints
+` GROUND FORCES`, `OF SUCCESS :`, ` COMPUTER ` and `  STATUS  ` - the padding is part of the
+string and shows, because the text is opaque.
+
+### The combat, which cannot be compared
+
+Lines 500-690 resolve the battle. Recorded here because it is readable and the port's
+version was not derived from it:
+
+```
+550 VIC = RND(1) * (10 * TECH): IF VIC < 20 THEN T1 = TECH * 3: T2 = 500 + (RND(1) * 20)
+    T3 = 200 + (RND(1) * 5): X = RND(1) * (12 / (TECH + .5))
+555 T1 = 1: T2 = 200 * (RND(1) * 5): T3 = 500 + (RND(1) * 5): X = -(RND(1) * (10 / (TECH + .5)))
+572 PS = 100 / (SP + .01): PS = PS * VP
+575 X = X + (PEEK(38203) - 3)
+580 VP = VP + X
+660 IF VP = > SP THEN ... "THE PLANET HAS SURRENDERED!": POKE 38208,1: POKE 38219 + PEEK(38209),1
+```
+
+`SP` is `PEEK(38150)` and `VP` is `PEEK(38160)`; line 575 is where troop morale enters, as
+`morale - 3`. Line 4001 clamps the displayed probability to 100. None of this is checked
+against the port.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -1752,9 +1821,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Fourteen of the 23 programs.** GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT,
-  RECALL, EX, S/X, DMG, END and the four SHIP # n I.D. programs are extracted and readable
-  but nothing has been compared against them. STATUS, GALAXY MAP and RADAR are done.
+- **Thirteen of the 23 programs.** SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX,
+  S/X, DMG, END and the four SHIP # n I.D. programs are extracted and readable but nothing
+  has been compared against them. STATUS, GALAXY MAP, RADAR and GROUND FORCES are done.
+- **GROUND FORCES' combat resolution.** Lines 500-690 are readable and are now quoted in
+  this file, but the port's version was not derived from them and has not been checked.
 - **The renderer's own line drawing.** `$6000` plots segments in machine code that has not
   been disassembled, and RADAR proves it is not the same routine as Applesoft's HPLOT TO.
   `Hires.segment()` is a placeholder for it.

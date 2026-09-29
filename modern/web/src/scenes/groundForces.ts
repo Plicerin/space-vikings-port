@@ -1,5 +1,7 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { drawOptions, drawPrompt, getChoice, writeLines, clearLines } from '../engine/menu';
+import { drawComMainScreen, comStatusBytes } from './com';
+import type { ShapeTable } from '../engine/shapeTable';
 import { setScene, log as glog } from '../engine/gameLog';
 import { chooseCommanderScene, isCurrentPlanetConquered, markPlanetConquered } from '../engine/commander';
 import type { GameState } from '../engine/gameState';
@@ -12,40 +14,107 @@ async function commanderWait(state: GameState, ms: number): Promise<void> {
   await wait(state.commanderMode ? Math.min(ms, 60) : ms);
 }
 
+
+
+/**
+ * The battle screen's fixed layout - lines 100, 110, 120, 130, 140 and 145.
+ *
+ * Line 100 takes the window full width and 17 rows deep (`POKE 32,0: POKE 33,40: POKE 34,0:
+ * POKE 35,16`) and blanks rows 0-15 with printed spaces. Those are still normal video -
+ * line 150's `POKE 973,255` comes afterwards, so everything below is inverse and this is
+ * not.
+ *
+ * HCOLOR 5 is set once at line 110 and never changed, so the box and every label are orange.
+ *
+ * The line numbers run 120, 130, 140, 145, so PROBABILITY and OF SUCCESS are printed after
+ * COMPUTER and PROJECTION even though they sit above them.
+ */
+export function drawGroundForcesBattle(hires: import('../engine/hires').Hires): void {
+  // 100
+  hires.hcolor(1);
+  for (let r = 1; r <= 16; r++) hires.text(' '.repeat(40), 1, r);
+  // 110
+  hires.hcolor(5);
+  hires.line(7, 12, 271, 12);
+  hires.line(271, 12, 271, 76);
+  hires.line(271, 76, 7, 76);
+  hires.line(7, 76, 7, 12);
+  // 120
+  hires.text(' GROUND FORCES', 13, 2);
+  hires.text('BATTLE IN', 8, 4);
+  hires.text('PROGRESS', 8, 5);
+  // 130
+  hires.text('FIGHTERS:', 24, 4);
+  hires.text('TRANSPORTS:', 22, 5);
+  hires.text('TROOPS:', 26, 6);
+  hires.text('TANKS:', 27, 7);
+  hires.text('MISSILES:', 24, 8);
+  // 140
+  hires.text(' COMPUTER ', 8, 10);
+  hires.text('  STATUS  ', 25, 10);
+  hires.text('PROJECTION', 8, 11);
+  // 145
+  hires.text('PROBABILITY', 5, 7);
+  hires.text('OF SUCCESS :', 6, 8);
+}
+
+/**
+ * GROUND FORCES' menu - lines 12, 13, 30, 40 and 50.
+ *
+ * Reached from COM by 2 (COM line 127). It does not clear the screen and it does not fill:
+ * line 12 blanks rows 1-12 with printed spaces and line 13 draws the same box COM does, over
+ * the top of COM's own screen. COM's twelve readouts down the right survive, and so does the
+ * HCOLOR 6 flood and the 40-character line COM prints at row 14.
+ *
+ * The window is COM's as well - `POKE 32,1` / `POKE 33,21` - so line 12's eighteen spaces
+ * land on columns 1 to 18, and every PRINT starts at column 1.
+ *
+ * HCOLOR carries over too, because it lives in the hi-res routines' zero page rather than in
+ * a BASIC variable and RUN does not touch it. $E4 reads 42 = $2A when GROUND FORCES holds at
+ * line 60, which is HCOLOR 1 - COM's line 90. So the box and all of this text are green, not
+ * the white the port used for the title.
+ */
+export function drawGroundForcesMenu(hires: import('../engine/hires').Hires): void {
+  hires.hcolor(1);
+  // 12: FOR C = 2 TO 13: VTAB C: PRINT <18 spaces>
+  for (let r = 2; r <= 13; r++) hires.text(' '.repeat(18), 2, r);
+  // 13
+  hires.line(1, 1, 139, 1);
+  hires.line(139, 1, 139, 110);
+  hires.line(139, 110, 1, 110);
+  hires.line(1, 110, 1, 1);
+  hires.text('  GROUND FORCES', 2, 2);
+  // 30, 40, 50 - nine PRINTs from row 3, with the blank line 13's trailing PRINT leaves.
+  const options = [
+    '1) ATTACK PLANET', '2) RECALL TROOPS', '3) SHORE LEAVE',
+    '4) ENLIST TROOPS', '5) SELL LOOT', '6) REPAIR/RESTOCK',
+    '7) ESTABLISH BASE', '8) CRYOGENICS', '9) RETURN',
+  ];
+  for (let i = 0; i < options.length; i++) hires.text(options[i], 2, 4 + i);
+}
+
 export async function groundForcesScene(
   ctx: SceneContext,
   scenes: SceneManager,
 ): Promise<void> {
-  const { hires, state, input, audio } = ctx;
+  const { hires, state, input, audio, loader } = ctx;
   setScene('groundForces');
 
-  for (;;) {
-    hires.hgr();
-    hires.hcolor(1);
-    hires.line(1, 1, 139, 1);
-    hires.line(139, 1, 139, 110);
-    hires.line(139, 110, 1, 110);
-    hires.line(1, 110, 1, 1);
+  // COM's line 8 erase needs the shape table; without it the two needle tracks stay.
+  let shapes: ShapeTable | null = null;
+  try {
+    shapes = (await import('../engine/shapeTable')).decodeShapeTableJson(
+      await loader.json('data/shapes/shape-table.json'),
+    );
+  } catch { /* the erase is skipped */ }
 
-    hires.hcolor(3);
-    hires.text('GROUND FORCES', 4, 2);
-    hires.hcolor(1);
+  for (;;) {
+    // GROUND FORCES never clears the screen - it is chained from COM and draws over what COM
+    // left, which is why the twelve readouts and the bottom labels are still on the page.
+    drawComMainScreen(hires, comStatusBytes(state), shapes);
+    drawGroundForcesMenu(hires);
 
     const hasBase = state.planets[state.planetIndex].hasBase;
-
-    drawOptions(hires, [
-      { key: '1', label: 'ATTACK PLANET' },
-      { key: '2', label: 'RECALL TROOPS' },
-      { key: '3', label: 'SHORE LEAVE' },
-      { key: '4', label: 'ENLIST TROOPS' },
-      { key: '5', label: 'SELL LOOT' },
-      { key: '6', label: 'REPAIR/RESTOCK' },
-      { key: '7', label: 'ESTABLISH BASE' },
-      { key: '8', label: 'CRYOGENICS' },
-      { key: '9', label: 'RETURN' },
-    ], 4, 2);
-
-    drawPrompt(hires, 14, 2);
 
     if (state.commanderMode) {
       const next = chooseCommanderScene(state);
@@ -145,34 +214,11 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
   const { hires, state, input, audio } = ctx;
 
   hires.hgr();
-  hires.hcolor(5);
-  hires.line(7, 12, 271, 12);
-  hires.line(271, 12, 271, 76);
-  hires.line(271, 76, 7, 76);
-  hires.line(7, 76, 7, 12);
-
-  hires.hcolor(3);
-  hires.text('GROUND FORCES', 13, 2);
-  hires.text('BATTLE IN', 8, 4);
-  hires.text('PROGRESS', 8, 5);
+  drawGroundForcesBattle(hires);
 
   if (state.planetSurrendered) {
     state.planetVitality = 25;
   }
-
-  hires.hcolor(1);
-  hires.text('FIGHTERS:', 24, 4);
-  hires.text('TRANSPORTS:', 22, 5);
-  hires.text('TROOPS:', 26, 6);
-  hires.text('TANKS:', 27, 7);
-  hires.text('MISSILES:', 24, 8);
-
-  hires.text('PROBABILITY', 5, 7);
-  hires.text('OF SUCCESS:', 6, 8);
-
-  hires.text('COMPUTER', 8, 10);
-  hires.text('STATUS', 25, 10);
-  hires.text('PROJECTION', 8, 11);
 
   state.forces.troopLocation = 1;
   state.forces.troopPlanetIndex = state.planetIndex;
