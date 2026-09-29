@@ -6,11 +6,22 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import type { ShipBytecodeOp } from './shipBytecode';
 import { parseShipBytecode } from './shipBytecode';
 import type { GameState } from './gameState';
+import { ENERGY_FULL } from './gameState';
 import type { Loader } from './loader';
 
 const SHIP_CORE = 0xf6fbff;
 const SHIP_HALO = 0x72dfff;
 const SHIP_ACCENT = 0xffab57;
+
+export interface VectorOverlayData {
+  projectiles: Array<{ x: number; y: number; z: number }>;
+  laserBolts: Array<{ x1: number; y1: number; x2: number; y2: number; age: number }>;
+  fighters: Array<{ screenX: number; screenY: number; shapeIdx: number }>;
+  flashes: Array<{ timer: number; type: string }>;
+  surrenderMsgTimer: number;
+  enemyAlive: boolean;
+  enemyPos: { x: number; y: number; z: number };
+}
 
 function createVectorLineMaterial(color: number, opacity: number): THREE.LineBasicMaterial {
   const material = new THREE.LineBasicMaterial({
@@ -205,16 +216,44 @@ function createStarField(): THREE.Group {
   return group;
 }
 
+function projectToScreen(
+  camPos: THREE.Vector3,
+  lookDir: THREE.Vector3,
+  upDir: THREE.Vector3,
+  point: THREE.Vector3,
+  fov: number,
+  aspect: number,
+): { x: number; y: number; visible: boolean } {
+  const rel = point.clone().sub(camPos);
+  const fwdDist = rel.dot(lookDir);
+  if (fwdDist <= 0) return { x: 0, y: 0, visible: false };
+
+  const right = new THREE.Vector3().crossVectors(lookDir, upDir).normalize();
+  const screenUp = new THREE.Vector3().crossVectors(right, lookDir).normalize();
+
+  const xOffset = rel.dot(right);
+  const yOffset = rel.dot(screenUp);
+
+  const halfFov = (fov * Math.PI) / 360;
+  const scale = (280 * 0.5) / (Math.tan(halfFov) * fwdDist);
+
+  return {
+    x: 140 + xOffset * scale,
+    y: 96 - yOffset * scale * aspect,
+    visible: true,
+  };
+}
+
 export class VectorRenderer {
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private composer: EffectComposer;
   private canvas: HTMLCanvasElement;
+  private hudCanvas: HTMLCanvasElement;
+  private hudCtx: CanvasRenderingContext2D;
   private container: HTMLElement;
   private stage: HTMLCanvasElement | null;
-  private running = false;
-  private animFrame = 0;
   private time = 0;
 
   private starField: THREE.Group;
@@ -224,9 +263,9 @@ export class VectorRenderer {
 
   private enemyShipGroup: THREE.Group = new THREE.Group();
   private activeShipOps: ShipBytecodeOp[] | null = null;
-  private enemyPos = new THREE.Vector3(400, -100, -3500);
-
-  containerRect: { width: number; height: number } = { width: 280, height: 192 };
+  private atmosphere = false;
+  private lookDir = new THREE.Vector3();
+  private upDir = new THREE.Vector3(0, 1, 0);
 
   constructor(container: HTMLElement, stage: HTMLCanvasElement | null) {
     this.container = container;
@@ -239,6 +278,16 @@ export class VectorRenderer {
     this.canvas.style.height = '100%';
     this.canvas.style.display = 'none';
     this.canvas.style.zIndex = '2';
+
+    this.hudCanvas = document.createElement('canvas');
+    this.hudCanvas.style.position = 'absolute';
+    this.hudCanvas.style.inset = '0';
+    this.hudCanvas.style.width = '100%';
+    this.hudCanvas.style.height = '100%';
+    this.hudCanvas.style.display = 'none';
+    this.hudCanvas.style.zIndex = '3';
+    this.hudCanvas.style.pointerEvents = 'none';
+    this.hudCtx = this.hudCanvas.getContext('2d')!;
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
@@ -255,7 +304,6 @@ export class VectorRenderer {
     this.scene.fog = new THREE.FogExp2(0x000000, 0.0035);
 
     this.camera = new THREE.PerspectiveCamera(55, 280 / 192, 0.1, 3000);
-    this.camera.rotation.order = 'YXZ';
 
     const ambient = new THREE.AmbientLight(0xcde6ff, 0.65);
     this.scene.add(ambient);
@@ -291,6 +339,7 @@ export class VectorRenderer {
     this.world.add(this.enemyShipGroup);
 
     container.appendChild(this.canvas);
+    container.appendChild(this.hudCanvas);
     window.addEventListener('resize', this.handleResize);
   }
 
@@ -299,9 +348,10 @@ export class VectorRenderer {
     const w = Math.round(rect.width);
     const h = Math.round(rect.height);
     if (w < 1 || h < 1) return;
-    this.containerRect = { width: w, height: h };
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
+    this.hudCanvas.width = w;
+    this.hudCanvas.height = h;
   };
 
   async loadShip(loader: Loader, shipKind: number): Promise<void> {
@@ -314,46 +364,76 @@ export class VectorRenderer {
     }
   }
 
-  setEnemyPos(x: number, y: number, z: number): void {
-    this.enemyPos.set(x, y, z);
+  setAtmosphere(atmosphere: boolean): void {
+    this.atmosphere = atmosphere;
   }
 
   show(): void {
     this.canvas.style.display = 'block';
+    this.hudCanvas.style.display = 'block';
     if (this.stage) this.stage.style.display = 'none';
-    if (!this.running) {
-      this.running = true;
-      this.handleResize();
-      this.renderLoop(performance.now());
-    }
+    this.handleResize();
   }
 
   hide(): void {
     this.canvas.style.display = 'none';
+    this.hudCanvas.style.display = 'none';
     if (this.stage) this.stage.style.display = 'block';
-    this.running = false;
-    cancelAnimationFrame(this.animFrame);
   }
 
   get visible(): boolean {
     return this.canvas.style.display !== 'none';
   }
 
-  update(state: GameState, pitchRad: number, headingRad: number, enemyAlive: boolean): void {
-    this.camera.position.set(state.x * 0.001, state.y * 0.001, state.z * 0.001);
-    this.camera.rotation.y = headingRad;
-    this.camera.rotation.x = pitchRad;
+  render(
+    state: GameState,
+    pitchRad: number,
+    headingRad: number,
+    dt: number,
+    showControls: boolean,
+    overlay: VectorOverlayData,
+  ): void {
+    this.updateScene(state, pitchRad, headingRad, overlay);
+    this.composer.render();
+    this.drawOverlay(state, pitchRad, headingRad, dt, showControls, overlay);
+  }
 
-    this.planetModel.position.set(0, 0, 0);
-    const planetDist = this.camera.position.length();
-    const planetTooClose = planetDist < 8;
-    this.planetModel.visible = !planetTooClose;
-    if (!planetTooClose) {
-      const planetScale = Math.max(0.05, Math.min(4, 50 / planetDist));
-      this.planetModel.scale.setScalar(planetScale);
+  private updateScene(
+    state: GameState,
+    pitchRad: number,
+    headingRad: number,
+    overlay: VectorOverlayData,
+  ): void {
+    this.camera.position.set(state.x * 0.001, state.y * 0.001, state.z * 0.001);
+
+    const cosP = Math.cos(pitchRad);
+    this.lookDir.set(
+      cosP * Math.sin(headingRad),
+      Math.sin(pitchRad),
+      cosP * Math.cos(headingRad),
+    ).normalize();
+    const lookTarget = this.camera.position.clone().add(this.lookDir);
+    this.camera.lookAt(lookTarget);
+
+    this.planetModel.visible = !this.atmosphere;
+    if (!this.atmosphere) {
+      const openingAnchor = this.camera.position.clone().add(this.lookDir.clone().multiplyScalar(10));
+      const cameraRight = new THREE.Vector3().crossVectors(this.lookDir, this.camera.up).normalize();
+      const cameraUp = this.camera.up.clone().normalize();
+      this.planetModel.position.copy(openingAnchor)
+        .addScaledVector(cameraRight, -1.8)
+        .addScaledVector(cameraUp, 0.7);
+      const planetDist = this.camera.position.length();
+      const planetTooClose = planetDist < 8 && state.z >= -5000;
+      if (planetTooClose) {
+        this.planetModel.visible = false;
+      } else {
+        const planetScale = state.z < -5000 ? 1.8 : Math.max(0.05, Math.min(4, 50 / planetDist));
+        this.planetModel.scale.setScalar(planetScale);
+      }
     }
 
-    if (enemyAlive && this.activeShipOps) {
+    if (overlay.enemyAlive && this.activeShipOps) {
       const modelNeedsRebuild = this.enemyShipGroup.children.length === 0;
       if (modelNeedsRebuild) {
         while (this.enemyShipGroup.children.length) {
@@ -365,7 +445,7 @@ export class VectorRenderer {
         this.enemyShipGroup.add(shipModel);
       }
 
-      const ePos = this.enemyPos.clone().multiplyScalar(0.001);
+      const ePos = new THREE.Vector3(overlay.enemyPos.x * 0.001, overlay.enemyPos.y * 0.001, overlay.enemyPos.z * 0.001);
       this.enemyShipGroup.position.copy(ePos);
 
       const dist = this.camera.position.distanceTo(ePos);
@@ -381,16 +461,275 @@ export class VectorRenderer {
     this.planetModel.rotation.x = 0.18 + Math.sin(this.time * 0.2) * 0.04;
   }
 
-  private renderLoop = (now: number) => {
-    if (!this.running) return;
-    this.composer.render();
-    this.animFrame = requestAnimationFrame(this.renderLoop);
-  };
+  private drawOverlay(
+    state: GameState,
+    pitchRad: number,
+    headingRad: number,
+    _dt: number,
+    showControls: boolean,
+    overlay: VectorOverlayData,
+  ): void {
+    const ctx = this.hudCtx;
+    const w = this.hudCanvas.width;
+    const h = this.hudCanvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const gw = Math.round(h * (280 / 192));
+    const gx = Math.round((w - gw) / 2);
+    const sx = (x: number) => gx + Math.round((x / 280) * gw);
+    const sy = (y: number) => Math.round((y / 192) * h);
+
+    if (!state.atmosphere && state.z < -5000) {
+      ctx.fillStyle = '#f6fbff';
+      const planetX = 70;
+      const planetY = 55;
+      const radiusX = 27;
+      const radiusY = 19;
+      for (let i = 0; i < 48; i += 1) {
+        const a = (i / 48) * Math.PI * 2;
+        ctx.fillRect(sx(planetX + Math.cos(a) * radiusX), sy(planetY + Math.sin(a) * radiusY), 2, 2);
+      }
+      for (const latitude of [-0.55, -0.2, 0.18, 0.52]) {
+        const halfWidth = radiusX * Math.cos(latitude);
+        const y = planetY + Math.sin(latitude) * radiusY;
+        for (let i = 0; i < 20; i += 1) {
+          const a = (i / 20) * Math.PI * 2;
+          ctx.fillRect(sx(planetX + Math.cos(a) * halfWidth), sy(y + Math.sin(a) * 2.5), 2, 2);
+        }
+      }
+    }
+
+    ctx.font = `${Math.max(7, Math.round(h / 24))}px Consolas, monospace`;
+    ctx.textBaseline = 'top';
+
+    const txt = (text: string, col: number, row: number, color = '#22dd55') => {
+      ctx.fillStyle = color;
+      ctx.fillText(text, sx((col - 1) * 7), sy((row - 1) * 8));
+    };
+
+    const line = (x1: number, y1: number, x2: number, y2: number, color = '#22dd55') => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx(x1), sy(y1));
+      ctx.lineTo(sx(x2), sy(y2));
+      ctx.stroke();
+    };
+
+    const fillLine = (x1: number, x2: number, y: number, color = '#22dd55') => {
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(sx(x1), sy(y));
+      ctx.lineTo(sx(x2), sy(y));
+      ctx.stroke();
+    };
+
+    // ---- Instrument panel ----
+    line(123, 145, 1, 145);
+    line(1, 145, 1, 128);
+    line(1, 128, 279, 128);
+    line(279, 128, 279, 145);
+    line(279, 145, 157, 145);
+    line(123, 128, 123, 183);
+    line(157, 128, 157, 183);
+
+    const spdFrac = Math.max(0, Math.min(1, state.speed / 120));
+    const spdEnd = 5 + Math.round(spdFrac * 112);
+    for (let yy = 132; yy <= 144; yy++) fillLine(5, spdEnd, yy, '#ff8a2a');
+
+    // $9537 is a 0-63 byte, not a 0-2000 pool: SHORE LEAVE 2525 refills it to 63 where
+    // every other system gets 100, and the machine reads 63 on a fresh ship. The disk
+    // draws a needle here rather than a bar - shape 13 at 199 + E, see drawPanelNeedles -
+    // so this block is still the port's own reading of the panel, now at the right scale.
+    const eFrac = Math.max(0, Math.min(1, state.energy / ENERGY_FULL));
+    const eEnd = 163 + Math.round(eFrac * 112);
+    for (let yy = 132; yy <= 144; yy++) fillLine(163, eEnd, yy, '#22dd55');
+
+    const dHeading = 0;
+    const dPitch = 0;
+    const turnX = Math.round(140 + Math.max(-15, Math.min(15, dHeading * 8)));
+    const climbY = Math.round(155 + Math.max(-12, Math.min(12, dPitch * 6)));
+    line(turnX, 130, turnX, 138, '#ff8a2a');
+    line(135, climbY, 145, climbY, '#ff8a2a');
+
+    const pill = (px: number, py: number, on: boolean, color: string): void => {
+      if (on) {
+        ctx.fillStyle = color;
+        ctx.fillRect(sx(px), sy(py), sx(px + 11) - sx(px), sy(py + 6) - sy(py));
+      } else {
+        ctx.strokeStyle = '#ffffff';
+        ctx.strokeRect(sx(px), sy(py), sx(px + 11) - sx(px), sy(py + 6) - sy(py));
+      }
+    };
+
+    pill(6, 152, !state.autopilot, '#22dd55');
+    pill(71, 152, state.autopilot, '#22dd55');
+    pill(6, 160, state.weaponMode === 'missile', '#22dd55');
+    pill(71, 160, state.weaponMode === 'laser', '#22dd55');
+    pill(200, 152, state.inOrbit, '#22dd55');
+    const condColor = state.condition === 'green' ? '#22dd55' : state.condition === 'blue' ? '#3a8cff' : '#ff8a2a';
+    pill(261, 152, state.damage.hullPct < 100, '#ff8a2a');
+    pill(200, 160, true, condColor);
+    pill(261, 160, state.shieldsOn, '#22dd55');
+    pill(6, 168, state.damage.radarPct > 0, '#22dd55');
+    pill(71, 168, state.damage.hyperdrivePct > 0, '#22dd55');
+
+    txt(' SPEED ', 4, 18);
+    txt('TURN', 19, 18);
+    txt(' ENERGY ', 30, 18);
+    txt('MANUAL', 4, 20);
+    txt('AUTO', 13, 20);
+    txt('ORBIT', 24, 20);
+    txt('DAMAGE', 32, 20);
+    txt('MISSILE', 4, 21);
+    txt('LASER', 13, 21);
+    txt('COND', 24, 21);
+    txt('SHIELD', 32, 21);
+    txt('RADAR', 4, 22);
+    txt('H/DRIVE', 13, 22);
+
+    const fmt = (n: number) => String(Math.round(n / 2)).padEnd(6);
+    txt(fmt(state.x), 1, 23, '#ffffff');
+    txt(fmt(state.y), 7, 23, '#ffffff');
+    txt(fmt(state.z), 13, 23, '#ffffff');
+    const hd = ((headingRad * 180) / Math.PI).toFixed(0).padEnd(4);
+    const pd = ((pitchRad * 180) / Math.PI).toFixed(0).padEnd(4);
+    txt(hd, 25, 23, '#ffffff');
+    txt(pd, 34, 23, '#ffffff');
+
+    if (state.enemyShips > 0 && !state.atmosphere) {
+      txt(`ENEMY:${state.enemyShips}`, 1, 1, '#ff8a2a');
+    }
+    if (state.planetSurrendered) {
+      txt('SURRENDERED', 1, 2, '#22dd55');
+    }
+    if (state.missilesRemaining > 0) {
+      txt(`MIS:${state.missilesRemaining}`, 30, 1, '#22dd55');
+    }
+    if (state.shipVitality > state.shipDestructionLimit && state.shipKind !== 0) {
+      txt('SHIP DMG', 1, 3, '#ff8a2a');
+    }
+
+    // ---- Gameplay overlay ----
+    // Target reticle
+    txt('-[ ]-', 18, 8, '#ff8a2a');
+
+    // Projectiles
+    ctx.fillStyle = '#ffffff';
+    for (const p of overlay.projectiles) {
+      const pp = this.projectToOverlay(p.x, p.y, p.z);
+      if (pp.visible && pp.y >= 0 && pp.y < 124) {
+        ctx.fillRect(sx(Math.round(pp.x)), sy(Math.round(pp.y)), 2, 1);
+      }
+    }
+
+    // Laser bolts
+    for (const b of overlay.laserBolts) {
+      ctx.strokeStyle = b.age < 0.08 ? '#ff8a2a' : '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx(b.x1), sy(b.y1));
+      ctx.lineTo(sx(b.x2), sy(b.y2));
+      ctx.stroke();
+    }
+
+    // Fighters
+    for (const f of overlay.fighters) {
+      const fx = sx(Math.round(f.screenX));
+      const fy = sy(Math.round(f.screenY));
+      ctx.strokeStyle = '#22dd55';
+      ctx.lineWidth = 1;
+      if (f.shapeIdx === 8) {
+        ctx.beginPath();
+        ctx.moveTo(fx - 3, fy); ctx.lineTo(fx + 3, fy);
+        ctx.stroke();
+      } else if (f.shapeIdx === 9) {
+        ctx.beginPath();
+        ctx.moveTo(fx, fy - 3); ctx.lineTo(fx, fy + 3);
+        ctx.moveTo(fx - 2, fy); ctx.lineTo(fx + 2, fy);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(fx - 2, fy); ctx.lineTo(fx + 2, fy);
+        ctx.moveTo(fx, fy - 2); ctx.lineTo(fx, fy + 2);
+        ctx.stroke();
+      }
+    }
+
+    // Flashes
+    for (const fl of overlay.flashes) {
+      if (fl.type === 'explosion') {
+        ctx.fillStyle = '#ff8a2a';
+        for (let fy = 0; fy < 40; fy++) {
+          ctx.fillRect(
+            sx(Math.round(Math.random() * 279)),
+            sy(Math.round(Math.random() * 124)),
+            2, 2,
+          );
+        }
+      } else {
+        line(0, 60, 279, 60, '#ff8a2a');
+        line(0, 64, 279, 64, '#ff8a2a');
+      }
+    }
+
+    // Surrender message
+    if (overlay.surrenderMsgTimer > 0) {
+      txt('THE PLANET HAS SURRENDERED', 4, 13, '#ffffff');
+    }
+
+    // Controls overlay
+    if (showControls) {
+      const key = (k: string, desc: string, r: number) => {
+        txt(` ${k} = ${desc}`, 2, r, '#ff8a2a');
+      };
+      key('V', 'TOGGLE 3D MODE', 3);
+      key('\u2190\u2192', 'TURN', 4);
+      key('\u2191\u2193', 'PITCH', 5);
+      key('1-4', 'SPEED', 6);
+      key('SPC', 'FIRE', 7);
+      key('W', 'WEAPON', 8);
+      key('S', 'SHIELD', 9);
+      key('B', 'CONDITION', 10);
+      key('R', 'RADAR', 11);
+      key('H', 'HYPERDRIVE', 12);
+      key('C', 'COM', 13);
+      key('O', 'ORBIT', 14);
+      key('A', 'AUTO', 15);
+      key('ESC', 'HIDE', 16);
+    }
+
+    ctx.font = `${Math.max(6, Math.round(h / 28))}px Consolas, monospace`;
+    txt('VECTOR MODE PRESS V TO EXIT', 6, 1, '#3a8cff');
+  }
+
+  private projectToOverlay(x: number, y: number, z: number): { x: number; y: number; visible: boolean } {
+    const aspect = 280 / 192;
+    const rel = new THREE.Vector3(x * 0.001, y * 0.001, z * 0.001).sub(this.camera.position);
+    const fwdDist = rel.dot(this.lookDir);
+    if (fwdDist <= 0) return { x: 0, y: 0, visible: false };
+
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    const screenUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
+
+    const xOffset = rel.dot(right);
+    const yOffset = rel.dot(screenUp);
+
+    const halfFov = (55 * Math.PI) / 360;
+    const scale = (280 * 0.5) / (Math.tan(halfFov) * fwdDist);
+
+    return {
+      x: 140 + xOffset * scale,
+      y: 96 - yOffset * scale * aspect,
+      visible: true,
+    };
+  }
 
   destroy(): void {
     this.hide();
     window.removeEventListener('resize', this.handleResize);
     this.renderer.dispose();
     this.canvas.remove();
+    this.hudCanvas.remove();
   }
 }
