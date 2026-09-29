@@ -1531,8 +1531,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
-- **`vectorRenderer.ts`'s energy gauge** still divides by 2000. Left alone because that file
-  carries another agent's uncommitted work.
 - **Sound.** SOUND GEN (`$9276`), LASER (`$92D1`) and EXPL (`$9270`) have never been
   disassembled or listened to. `audio.ts` says outright that it approximates them.
 - **Game logic.** Combat, damage, the economy, ground assaults - the BASIC for all of it is
@@ -1562,6 +1560,6 @@ no longer does.
 
 ### Smaller
 
-- **Names for the flags.** `38164`, `38199`, `38207`, `38208`, `38210` and the rest are used
+- **Names for the flags.** `38164`, `38207`, `38208`, `38210` and the rest are used
   correctly because their use sites are known, but what the original's author called them
   is not.
