@@ -11,7 +11,8 @@ import { decodeShapeTableJson, ShapeRenderer } from '../engine/shapeTable';
 export async function shapeDemoScene(ctx: SceneContext, _scenes: SceneManager): Promise<void> {
   const { hires, loader } = ctx;
   const json = await loader.json<{ shapes: Array<{ id: number; raw_bytes: string }> }>(
-    'data/shapes/planet-0.json',
+    // The real Applesoft shape table: ENEMY I.A24580.L68 at $7FFF, 26 shapes.
+    'data/shapes/shape-table.json',
   );
   const table = decodeShapeTableJson(json);
   const renderer = new ShapeRenderer(hires);

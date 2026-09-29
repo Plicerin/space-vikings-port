@@ -1205,12 +1205,14 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Things in the port with no counterpart on the disk
 
-- **`renderPlanet()`'s procedural disc.** Measured, the original draws no planet body in
-  flight; this is the only drawn thing left with nothing behind it.
-- **The fabricated shape tables.** `cockpit.ts` still loads `ship-N.json` and
-  `planet-N.json` as `enemyTable`, and those are an Apple shape-table decoder misapplied to
-  3D vector data - `ship-1.json` declares offsets `[0, 1, 44, 1, 171]`, and a shape table's
-  offsets cannot point into its own header. The real table is `shape-table.json`.
+Both of the ones that were here are gone: `renderPlanet()`'s procedural disc, and the
+fabricated `ship-N.json` / `planet-N.json` shape tables, which have been deleted along with
+the code that read them. Everything drawn in flight now comes from the disk.
+
+One thing in that area is left, and it is not fabricated - `enemySourceBitmap` comes from an
+AppleWin state dump (`data/debug/applewin-space-vikings-state.json`), a real capture of
+unverified provenance. It is only reached when the bytecode path produces nothing, which it
+no longer does.
 
 ### Smaller
 

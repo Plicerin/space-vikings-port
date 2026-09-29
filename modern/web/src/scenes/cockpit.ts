@@ -5,7 +5,7 @@ import {
   pitchByteToRad,
   v3scale, v3len, v3dot, v3normalize, v3cross,
 } from '../engine/math3d';
-import { decodeShapeTableJson, measureShapeBounds, ShapeRenderer, ShapeTable } from '../engine/shapeTable';
+import { ShapeRenderer } from '../engine/shapeTable';
 import {
   computeShipPointScale,
   decodeShipPointJson,
@@ -151,13 +151,10 @@ let planetSourceBitmap: Bitmap | null = null;
 let planetSourceBounds: BitmapBounds | null = null;
 let bombardmentSourceBitmap: Bitmap | null = null;
 let bombardmentSourceBounds: BitmapBounds | null = null;
-let enemyTable: ShapeTable | null = null;
 let enemyPointSprite: ShipPointSprite | null = null;
 let enemySourceBitmap: Bitmap | null = null;
 let enemySourceBounds: BitmapBounds | null = null;
 let enemyBytecodeOps: ShipBytecodeOp[] | null = null;
-let planetTable: ShapeTable | null = null;
-let planetPayload: PlanetPayloadJson | null = null;
 const shapeR = new ShapeRenderer(hires);
 let assetsReady = false;
 
@@ -167,18 +164,17 @@ const displayShipKind: 0 | 1 | 3 | 4 = effectiveShipKind >= 1 ? effectiveShipKin
 let assetsReadyPromise: Promise<void> = Promise.resolve();
 if (displayShipKind >= 1) {
   assetsReadyPromise = (async () => {
+    // planet-N.json is not loaded any more. Its "shapes" came from running an Apple
+    // shape-table decoder over 3D vector data - ship-1.json declares offsets
+    // [0, 1, 44, 1, 171], and a shape table's offsets cannot point into its own header -
+    // and nothing reads them now that the ground wireframe comes from the disk.
     try {
       const planetAssetIndex = Math.max(0, Math.min(20, state.planetIndex));
-      const json = await loader.json<any>(`data/shapes/planet-${planetAssetIndex}.json`);
-      planetPayload = json as PlanetPayloadJson;
-      planetTable = decodeShapeTableJson(json);
-      try {
-        const hgr = await loader.json<PlanetHgrJson>(`data/debug/planet-${planetAssetIndex}-state9023-bombardment-hgr.json`);
-        const sourcePage = hgr.videoPageHint === 'page1' ? hgr.page1 : hgr.page2;
-        bombardmentSourceBitmap = decodeApple2HiresPage(sourcePage);
-        bombardmentSourceBounds = findBitmapBounds(bombardmentSourceBitmap);
-      } catch { /* source-backed bombardment state not generated for every planet yet */ }
-    } catch { /* planet fallback below still renders a visible body */ }
+      const hgr = await loader.json<PlanetHgrJson>(`data/debug/planet-${planetAssetIndex}-state9023-bombardment-hgr.json`);
+      const sourcePage = hgr.videoPageHint === 'page1' ? hgr.page1 : hgr.page2;
+      bombardmentSourceBitmap = decodeApple2HiresPage(sourcePage);
+      bombardmentSourceBounds = findBitmapBounds(bombardmentSourceBitmap);
+    } catch { /* source-backed bombardment state not generated for every planet yet */ }
 
     try {
       const json = await loader.json<{ bytes: number[] }>('data/shapes/starfield-bytecode.json');
@@ -195,11 +191,6 @@ if (displayShipKind >= 1) {
       enemyBytecodeOps = parseShipBytecode(json.bytes);
       state.enemyShapeLoaded = enemyBytecodeOps.length > 0;
     } catch { /* bytecode asset not generated for every ship kind yet */ }
-    try {
-      const json = await loader.json<any>(`data/shapes/ship-${displayShipKind}.json`);
-      enemyTable = decodeShapeTableJson(json);
-      state.enemyShapeLoaded = enemyTable.shapes.length > 0 || state.enemyShapeLoaded;
-    } catch { /* shape not found — combat still works, just no sprite */ }
     try {
       const json = await loader.json<any>(`data/shapes/ship-${displayShipKind}-points.json`);
       enemyPointSprite = decodeShipPointJson(json);
@@ -661,11 +652,11 @@ const enemy = spawnEnemy(state);
           bombardmentSourceBounds,
         );
       } else {
+        // No planet body: measured, the original draws none in flight. What you see out
+        // there is the star table, and once RE has run, the planet's ground wireframe -
+        // both of which renderStarfield() draws from the disk's own data. There used to be
+        // a procedural disc here, at a hardcoded position, with nothing behind it.
         renderStarfield(cam);
-        if (state.z < -5000) {
-          drawPlanetPointCloud(hires, 70, 55, 32, state.planetIndex);
-        }
-        renderPlanet(cam);
         renderEnemyShip(cam);
         const solSpaceView = state.planetIndex === 0 && !state.atmosphere;
         if (solSpaceView) {
@@ -696,35 +687,6 @@ const enemy = spawnEnemy(state);
       ));
     }
 
-    function renderPlanet(cam: Camera) {
-      // Opening capture of the disk places planet 1 at this source-space
-      // center relative to the START simulator position.
-      const nearPlanetCoords = v3(200, 90, 0);
-      const dp = project(cam, nearPlanetCoords);
-      if (!dp.visible || dp.depth >= 20000) return;
-      const pScale = Math.max(0.02, Math.min(10, 50000 / Math.max(1, dp.depth)));
-      shapeR.rot = 0;
-      shapeR.scale = pScale;
-      hires.hcolor(3);
-      if (planetTable && planetTable.shapes.length > 0) {
-        // Apple II planet tables contain invisible positioning shapes; the
-        // original DRAW traversal keeps the pen position across the table.
-        shapeR.drawSequential(planetTable, Math.round(dp.x), Math.round(dp.y));
-        // The recovered table preserves the source marks but not the final
-        // screen-space body outline; retain the source-style projected cloud
-        // so the opening planet remains a coherent disk at this distance.
-        drawPlanetPointCloud(hires, Math.round(dp.x), Math.round(dp.y), 32, state.planetIndex);
-      } else {
-        drawPlanetPointCloud(
-          hires,
-          Math.round(dp.x),
-          Math.round(dp.y),
-          Math.max(4, pScale * 7),
-          state.planetIndex + 1,
-          1,
-        );
-      }
-    }
 
     function renderEnemyShip(cam: Camera) {
       enemyVisible = false;
@@ -744,21 +706,7 @@ const enemy = spawnEnemy(state);
       const desiredPx = Math.max(12, Math.min(24, 80000 / Math.max(1, ep.depth)));
       const shipDrawX = Math.round(ep.x);
       const shipDrawY = clamp(Math.round(ep.y), 22, 86);
-      const shipShapeIndex = selectRenderableShipShapeIndex(enemyTable, displayShipKind);
-      if (displayShipKind !== 3 && shipShapeIndex >= 0 && enemyTable) {
-        const shipShape = enemyTable.shapes[shipShapeIndex];
-        const shipBounds = measureShapeBounds(shipShape);
-        const sourceWidth = Math.max(1, (shipBounds?.max_x ?? 0) - (shipBounds?.min_x ?? 0));
-        const sourceHeight = Math.max(1, (shipBounds?.max_y ?? 0) - (shipBounds?.min_y ?? 0));
-        shapeR.scale = Math.max(0.01, Math.min(2, desiredPx / Math.max(sourceWidth, sourceHeight)));
-        const anchorX = Math.round(
-          shipDrawX - (((shipBounds?.min_x ?? 0) + (shipBounds?.max_x ?? 0)) * 0.5 * shapeR.scale),
-        );
-        const anchorY = Math.round(
-          shipDrawY - (((shipBounds?.min_y ?? 0) + (shipBounds?.max_y ?? 0)) * 0.5 * shapeR.scale),
-        );
-        shapeR.draw(enemyTable, shipShapeIndex, anchorX, anchorY);
-      } else if (enemyPointSprite && enemyPointSprite.shapes.length > 0) {
+      if (enemyPointSprite && enemyPointSprite.shapes.length > 0) {
         const scale = computeShipPointScale(enemyPointSprite.bounds, desiredPx);
         renderShipPointSprite(hires, enemyPointSprite, shipDrawX, shipDrawY, scale);
       } else if (enemyBytecodeOps) {
@@ -823,26 +771,12 @@ const enemy = spawnEnemy(state);
     }
 
     function renderFighters() {
-      const shapeTable = enemyTable;
-      const useSprites = shapeTable && shapeTable.shapes.length >= 2;
+      // The sprite branch here read ship-N.json, which is not a shape table; the line
+      // fallback below is what the port actually has for fighters.
 
       for (const f of fighters) {
         const fx = Math.round(f.screenX);
         const fy = Math.round(f.screenY);
-
-        if (useSprites) {
-          const shapeIdx = f.shapeIdx;
-          const spriteIndex = shapeIdx === 8 ? 1 : shapeIdx === 9 ? 2 : 1;
-          if (spriteIndex < shapeTable!.shapes.length) {
-            shapeR.rot = shapeIdx === 8 ? 0 : shapeIdx === 9 ? 12 : 52;
-            shapeR.scale = 0.55;
-            const anchorX = fx;
-            const anchorY = fy;
-            hires.hcolor(3);
-            shapeR.draw(shapeTable!, spriteIndex, anchorX, anchorY);
-            continue;
-          }
-        }
 
         hires.hcolor(1);
         if (f.shapeIdx === 8) {
@@ -1221,35 +1155,6 @@ function drawPlanetFallback(
   drawPlanetPointCloud(hires, cx, cy, radius, 1, 0.72);
 }
 
-export function drawPlanetPayload(
-  hires: import('../engine/hires').Hires,
-  cx: number,
-  cy: number,
-  payload: PlanetPayloadJson,
-  scale: number,
-): void {
-  const points: [number, number][] = [];
-  for (const shape of payload.shapes) {
-    for (const point of shape.points) points.push(point);
-  }
-  if (points.length === 0) return;
-  const xs = points.map(point => point[0]);
-  const ys = points.map(point => point[1]);
-  const centerX = (Math.min(...xs) + Math.max(...xs)) * 0.5;
-  const centerY = (Math.min(...ys) + Math.max(...ys)) * 0.5;
-  for (const shape of payload.shapes) {
-    for (let i = 1; i < shape.points.length; i++) {
-      const a = shape.points[i - 1];
-      const b = shape.points[i];
-      hires.line(
-        cx + (a[0] - centerX) * scale,
-        cy + (a[1] - centerY) * scale,
-        cx + (b[0] - centerX) * scale,
-        cy + (b[1] - centerY) * scale,
-      );
-    }
-  }
-}
 
 export let planetRotationTime = 0;
 
@@ -1351,41 +1256,6 @@ function projectSpherePoint(
   };
 }
 
-function selectRenderableShipShapeIndex(
-  table: ShapeTable | null,
-  shipKind: number,
-): number {
-  if (!table || table.shapes.length === 0) return -1;
-
-  let best = -1;
-  let bestPlotCount = -1;
-  let bestMaxDim = -1;
-  for (let i = 0; i < table.shapes.length; i++) {
-    const shape = table.shapes[i];
-    const minLen = shipKind === 1 ? 8 : 10;
-    if (shape.length < minLen) {
-      continue;
-    }
-    const metrics = shapeRenderMetrics(shape);
-    if (metrics.plotCount < (shipKind === 1 ? 4 : 5)) {
-      continue;
-    }
-
-    // The original BLOADed ship payloads contain one dominant hull shape plus
-    // smaller helper/detail shapes. Picking by density can select the wrong
-    // tiny fragment (notably on SHIP #4), so prefer the largest drawable hull.
-    if (
-      metrics.plotCount > bestPlotCount
-      || (metrics.plotCount === bestPlotCount && metrics.maxDim > bestMaxDim)
-    ) {
-      bestPlotCount = metrics.plotCount;
-      bestMaxDim = metrics.maxDim;
-      best = i;
-    }
-  }
-
-  return best;
-}
 
 function shapeRenderMetrics(shape: Shape): { plotCount: number; maxDim: number } {
   let x = 0;
