@@ -1177,32 +1177,43 @@ comes from the data.
 
 ## Open questions
 
-- What `CSN`/`SN`/`M1`/`M2` at `$6006-$600D` compute exactly - the sine and cosine tables
-  are in SPACE SIMULATOR ASSEMBLY and have not been disassembled.
-- What `CALL CA` (`$9023`, SPACE SIMULATOR ASSEMBLY) draws, and how. This is the renderer;
-  none of it is understood yet.
-- The meaning of the flags the BASIC peeks: `38157` (speed), `38164`, `38199`, `38205`,
-  `38207`, `38208`, `38209`, `38210`, `38282+n`. Only their use is known, not their names.
-- Which ship number `J = PEEK(38205)` selects, and what `DEBRIS` replaces it for.
-- What the `P/F-M` record fields mean - no use site read yet.
-- What `$953C-$954B` holds. `SHIP'S DATA-M` is only 54 bytes (`$9506-$953B`), so a new game
-  leaves that gap untouched, yet `PEEK(38209)` (`$9541`, the current planet) lives in it and
-  is read on the first pass through flight. Something in the assembly must write it.
-- Everything about flight rendering. The parity harness covers one static screen; nothing
-  that moves has been compared.
-- What `CALL 38402` (TRANLIT.OBJ0) draws into the gauge boxes.
-- The renderer's fixed-point arithmetic. The geometry is right - 98.3% of the original's
-  pixels have a port pixel adjacent - but exact pixels need its integer maths, not a float
-  reimplementation of the same formula.
-- What opcode 3 means. The harness prefers "draw and continue" at 73.6% over 72.6% and
-  72.2% for the alternatives, which is not much of a margin.
-- Exact pixel overlap, everywhere. Geometry is now 98-100% within a pixel for ground and
-  ships; landing on the same pixel needs the renderer's fixed-point arithmetic rather than
-  a float reimplementation of the same formula.
-- `renderPlanet()`'s procedural disc, which is now the only drawn thing in flight with no
-  counterpart on the disk.
-- What state `$6000` needs before it will draw. Snapshot and replay sidesteps the question
-  rather than answering it.
-- What opcodes 1, 2 and 3 mean in the ship bytecode. 1 behaves as a move and 2 as a line,
-  but 3 is unexplained.
-- What the `PLANET # n` files at `$7300` are. They are not shape tables either.
+Answered ones have been removed from this list rather than left to accumulate. What follows
+is what is genuinely not known, roughly in order of how much it matters.
+
+### Whole parts of the game have never been looked at
+
+- **Eighteen of the 23 programs.** COM, GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE,
+  STATUS, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
+  programs are extracted and readable but nothing has been compared against them. Every
+  parity harness so far covers flight and the cockpit panel.
+- **Sound.** SOUND GEN (`$9276`), LASER (`$92D1`) and EXPL (`$9270`) have never been
+  disassembled or listened to. `audio.ts` says outright that it approximates them.
+- **Game logic.** Combat, damage, the economy, ground assaults - the BASIC for all of it is
+  in `captured/disk/` and none of it has been checked against the port.
+
+### Rendering, where the remaining error is
+
+- **Exact pixel overlap.** Geometry is 98-100% within a pixel for ground and ships, and the
+  extents match, but landing on the *same* pixel needs the renderer's fixed-point
+  arithmetic rather than a float reimplementation of the same formula. Ships 72.2% exact,
+  ground 67.5%, stars 38.9%.
+- **`CALL 38402`** (TRANLIT.OBJ0) fills the four gauge boxes on the panel. Not disassembled.
+- **Opcode 3** in the model bytecode. The harness prefers "draw and continue" at 73.6%
+  against 72.6% and 72.2%, which is not much of a margin to conclude from.
+- **What state `$6000` needs before it will draw.** Snapshot and replay sidesteps the
+  question rather than answering it.
+
+### Things in the port with no counterpart on the disk
+
+- **`renderPlanet()`'s procedural disc.** Measured, the original draws no planet body in
+  flight; this is the only drawn thing left with nothing behind it.
+- **The fabricated shape tables.** `cockpit.ts` still loads `ship-N.json` and
+  `planet-N.json` as `enemyTable`, and those are an Apple shape-table decoder misapplied to
+  3D vector data - `ship-1.json` declares offsets `[0, 1, 44, 1, 171]`, and a shape table's
+  offsets cannot point into its own header. The real table is `shape-table.json`.
+
+### Smaller
+
+- **Names for the flags.** `38164`, `38199`, `38207`, `38208`, `38210` and the rest are used
+  correctly because their use sites are known, but what the original's author called them
+  is not.
