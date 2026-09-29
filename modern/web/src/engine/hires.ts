@@ -258,33 +258,75 @@ export class Hires {
   }
 
   /**
-   * $6DD5's line, run in the units it actually uses: half-columns, 1..139.
+   * $6DD5's line, in the units and with the error term it actually uses.
    *
-   * `segment()` below runs the same Bresenham in the Apple's 280 columns and lights one
-   * pixel a step, which is close but not the same thing. The disk steps a half-column at a
-   * time and paints whatever pair the table names, so the rightmost half-column lights
-   * pixels 276 and 277 where a 280-column walk stops at 276 - and a diagonal advances two
-   * pixels across per row rather than one.
+   * Two things separate this from a textbook Bresenham over the same half-columns.
+   *
+   * **The octant split.** `$6E07 SEC / SBC $B9 / BCC $6E2B` compares |dy| against dx after
+   * `$6E38` has swapped the ends so x always runs left to right. Shallow (|dy| < dx) goes to
+   * `$6E4F`, steep to `$70C6` or `$7044` depending on the sign, and the two carry the error
+   * the opposite way round.
+   *
+   * **The error term is an eight-bit accumulator, not a signed remainder.**
+   *
+   *     $6E4F  LDA #$00 / SEC / SBC $B9 / SEC / ROR A / STA $B8   ; shallow: ((-dx) >> 1) | $80
+   *     $70C6  LDA $BA / CLC / ROR A / STA $B8                    ; steep:   |dy| >> 1
+   *
+   * Shallow then adds |dy| per half-column and, on the carry out, steps the row and takes dx
+   * back off. The threshold is 256 and the correction is dx, which is not the same as letting
+   * the byte wrap: 255 + 28 leaves 214, not 27. Over dx columns that crosses exactly |dy|
+   * times, which is the line. Steep subtracts dx per row and advances a half-column on the
+   * borrow, adding |dy| back. Both run `dx + 1` or `|dy| + 1` times, counted by `DEX / BEQ`
+   * straight after the plot, so the last step never advances.
+   *
+   * Those deltas were read off the machine rather than the page - watching $B8 through one
+   * shallow line gives -13, +15, +28, +56, -41 for dx 69 and dy 28, which is |dy| per column
+   * and dx off at each crossing and nothing else.
+   *
+   * The disk does not plot a half-column at a time: `$6E58` fetches the mask and hands it to
+   * one of seven run builders - `$6E9A`, `$6EAD`, `$6F03`, `$6F35`, `$6F49`, `$6F9C`,
+   * `$6FD5`, chosen by `$6E60-$6E92` on which bits the mask starts at - which walk the same
+   * recurrence accumulating bits until the row changes or the byte fills, so that `$6E95` can
+   * `ORA` a whole run in with one store. The steep loops rotate the mask two bits at a time
+   * (`$70FC ROL A / ROL A`) instead of re-indexing. That is a store-count optimisation: the
+   * pixels are whatever the recurrence names, which is what this walks directly.
    */
   segment6DD5(x1: number, y1: number, x2: number, y2: number): void {
     let x0 = Math.round(x1);
     let y0 = Math.round(y1);
     let xe = Math.round(x2);
     let ye = Math.round(y2);
-    // $6DF5 LDA $B5 / SEC / SBC $B3 / BCC $6E38 - it always runs left to right.
+    // $6DF5's BCC $6E38: the ends are swapped so x runs left to right.
     if (xe < x0) { const tx = x0; x0 = xe; xe = tx; const ty = y0; y0 = ye; ye = ty; }
-    const dx = Math.abs(xe - x0);
-    const dy = -Math.abs(ye - y0);
-    const sx = x0 < xe ? 1 : -1;
-    const sy = y0 < ye ? 1 : -1;
-    let err = dx + dy;
-    for (;;) {
-      this.halfColumn(x0, y0);
-      if (x0 === xe && y0 === ye) break;
-      const e2 = 2 * err;
-      if (e2 >= dy) { err += dy; x0 += sx; }
-      if (e2 <= dx) { err += dx; y0 += sy; }
+    const dx = xe - x0;
+    const dyRaw = ye - y0;
+    const dy = Math.abs(dyRaw);
+    const ydir = dyRaw < 0 ? -1 : 1;    // $6E1C negates dy and takes the other row step
+    let x = x0;
+    let y = y0;
+
+    if (dy < dx) {                      // $6E07 BCC $6E2B - shallow
+      let err = ((((256 - dx) & 0xff) >> 1) | 0x80) & 0xff;
+      for (let n = dx + 1; n > 0; n--) {
+        this.halfColumn(x, y);
+        x++;
+        err += dy;                      // $6EA0 CLC / ADC $BA
+        if (err > 0xff) {               // $6EA2 BCS - the run ends here
+          y += ydir;
+          err -= dx;                    // and the carry path takes dx back off
+        }
+      }
+    } else {                            // $6E0C JMP $70C6 / $6E28 JMP $7044 - steep
+      let err = (dy >> 1) & 0xff;
+      for (let n = dy + 1; n > 0; n--) {
+        this.halfColumn(x, y);
+        y += ydir;                      // $70DF - one row every time round
+        const diff = err - dx;          // $70EA SEC / SBC $B9
+        if (diff >= 0) err = diff;      // $70F1 BCS $70D4 - same half-column
+        else { err = (diff + dy) & 0xff; x++; }   // $70F3 ADC $BA, then ROL A / ROL A
+      }
     }
+    this.dirty = true;
   }
 
   segment(x1: number, y1: number, x2: number, y2: number): void {
