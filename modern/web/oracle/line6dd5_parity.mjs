@@ -47,8 +47,16 @@ for (const e of errors.slice(0, 3)) console.log('page error:', e);
 // framebuffer for. They are counted apart rather than averaged in.
 const wraps = (l) => 95 - l.a[1] < 0 || 95 - l.b[1] < 0;
 
+// $691E clamps x to +/-69 and y to +/-62 before $68A1 adds the offsets, so the only endpoints
+// the renderer can ever hand $6DD5 have sx in -69..69 and sy in -28..96. The sweep goes wider
+// on purpose - a rule that only holds inside the reachable box is worth knowing about - but
+// the two are counted apart, because being exact everywhere the machine can reach is the
+// claim, and being exact on inputs it cannot produce is a bonus.
+const reachable = (l) => [l.a, l.b].every(([sx, sy]) => sx >= -69 && sx <= 69 && sy >= -28 && sy <= 96);
+
 let exact = 0, sumBoth = 0, sumDisk = 0, sumPort = 0;
 let exactOn = 0, onN = 0, sumBothOn = 0, sumDiskOn = 0;
+let exactR = 0, rN = 0, sumBothR = 0, sumDiskR = 0;
 const worst = [];
 lines.forEach((l, i) => {
   const disk = new Set(l.pixels.map(([x, y]) => y * 280 + x));
@@ -58,8 +66,9 @@ lines.forEach((l, i) => {
   sumBoth += both; sumDisk += disk.size; sumPort += port.size;
   const ok = both === disk.size && both === port.size;
   if (ok) exact++;
-  else worst.push({ a: l.a, b: l.b, disk: disk.size, port: port.size, both, wrap: wraps(l) });
+  else worst.push({ a: l.a, b: l.b, disk: disk.size, port: port.size, both, wrap: wraps(l), reach: reachable(l) });
   if (!wraps(l)) { onN++; sumBothOn += both; sumDiskOn += disk.size; if (ok) exactOn++; }
+  if (reachable(l)) { rN++; sumBothR += both; sumDiskR += disk.size; if (ok) exactR++; }
 });
 worst.sort((x, y) => (y.disk + y.port - 2 * y.both) - (x.disk + x.port - 2 * x.both));
 
@@ -68,6 +77,10 @@ console.log('');
 console.log(`  lines identical pixel for pixel   ${exact} of ${lines.length}`);
 console.log(`  disk pixels the port also lights  ${sumBoth} of ${sumDisk}  (${(100 * sumBoth / sumDisk).toFixed(1)}%)`);
 console.log(`  pixels the port lights            ${sumPort}`);
+console.log('');
+console.log(`  of the lines $68A1 can actually produce (${rN} of ${lines.length}):`);
+console.log(`    identical pixel for pixel       ${exactR} of ${rN}`);
+console.log(`    disk pixels the port lights     ${sumBothR} of ${sumDiskR}  (${(100 * sumBothR / sumDiskR).toFixed(1)}%)`);
 console.log('');
 console.log(`  of the lines that stay on the page (${onN} of ${lines.length}):`);
 console.log(`    identical pixel for pixel       ${exactOn} of ${onN}`);
@@ -78,5 +91,5 @@ console.log('     endpoints                 disk  port  shared');
 for (const w of worst.slice(0, 8)) {
   console.log(`     ${JSON.stringify(w.a).padEnd(11)}->${JSON.stringify(w.b).padEnd(12)} ` +
     `${String(w.disk).padStart(5)} ${String(w.port).padStart(5)} ${String(w.both).padStart(7)}` +
-    (w.wrap ? '   (runs off the page)' : ''));
+    (w.wrap ? '   (off the page)' : '') + (w.reach ? '' : '   ($68A1 cannot produce this)'));
 }

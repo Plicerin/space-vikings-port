@@ -50,11 +50,16 @@ for (let i = 0; i <= 7; i++) {
  *     $6DC8  LDX $B3 / LDA $6BC2,X    ; the byte within the row
  *     $6DD1  LDA $6C4E,X              ; and the bits to OR into it
  *
- * Every mask has exactly two bits set, which is what makes a point two pixels wide. Twenty
- * of the 140 set bit 7, and bit 7 is not a pixel - it picks the palette pair - so one
- * half-column in seven lights a single pixel rather than a pair. That is not a rounding
- * artefact to smooth over: it is the pattern the disk draws, and the capture decodes it the
- * same way, seven pixels to a byte with bit 7 ignored.
+ * Every one of the first 140 masks has exactly two bits set, which is what makes a point two
+ * pixels wide. Twenty of them set bit 7, and bit 7 is not a pixel - it picks the palette pair
+ * - which $6D8F handles by carrying the second dot into the next byte, so the pair stays
+ * contiguous either way and a half-column lights screen pixels 2x and 2x + 1.
+ *
+ * 256 entries are kept because $B3 is a byte and the machine indexes it with no bound: past
+ * 139 each table simply runs into whatever follows it, which for $6BC2 is the mask table at
+ * $6C4E. Nothing $68A1 can return reaches there - it clamps x to +/-69, so a half-column is
+ * 1 to 139 - but transcribing the bytes costs nothing and avoids inventing a limit the
+ * routine does not have.
  *
  * Read off the flight snapshot.
  */
@@ -66,6 +71,12 @@ export const HALF_COLUMN_BYTE: readonly number[] = [
   22, 23, 23, 23, 24, 24, 24, 24, 25, 25, 25, 26, 26, 26, 26, 27, 27, 27, 28, 28,
   28, 28, 29, 29, 29, 30, 30, 30, 30, 31, 31, 31, 32, 32, 32, 32, 33, 33, 33, 34,
   34, 34, 34, 35, 35, 35, 36, 36, 36, 36, 37, 37, 37, 38, 38, 38, 38, 39, 39, 39,
+  3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24,
+  96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6,
+  24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192,
+  6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48,
+  192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12,
+  48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192,
 ];
 
 export const HALF_COLUMN_MASK: readonly number[] = [
@@ -76,7 +87,57 @@ export const HALF_COLUMN_MASK: readonly number[] = [
   192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12,
   48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3,
   12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96,
+  162, 0, 169, 0, 157, 0, 64, 157, 0, 65, 157, 0, 66, 157, 0, 67, 157, 0, 68, 157,
+  0, 69, 157, 0, 70, 157, 0, 71, 157, 0, 72, 157, 0, 73, 157, 0, 74, 157, 0, 75,
+  157, 0, 76, 157, 0, 77, 157, 0, 78, 157, 0, 79, 157, 0, 80, 157, 0, 81, 157, 0,
+  82, 157, 0, 83, 157, 0, 84, 157, 0, 85, 157, 0, 86, 157, 0, 87, 157, 0, 88, 157,
+  0, 89, 157, 0, 90, 157, 0, 91, 157, 0, 92, 157, 0, 93, 157, 0, 94, 157, 0, 95,
+  232, 232, 232, 208, 155, 96, 200, 177, 155, 240, 9, 170, 202, 240, 40, 202,
 ];
+
+/** 1..139 is everything $68A1 can produce; past that the tables run into their neighbours. */
+export const HALF_COLUMNS = 140;
+
+/**
+ * $6B92 - the row table, and the bytes just past it.
+ *
+ * `$6DB5` turns a row into a screen address:
+ *
+ *     $6DB5  LDA $B4 / ROR A / ROR A / AND #$3E / TAY      ; 2 * ((y >> 3) & 31)
+ *     $6DBC  LDA $B4 / AND #$07 / ASL A / ASL A            ; (y & 7) * 4
+ *     $6DC2  CLC / ADC $6B93,Y / STA $9A                   ; + the row's high byte
+ *     $6DC8  LDX $B3 / LDA $6BC2,X / ADC $6B92,Y / TAY     ; + its low byte, + that carry
+ *
+ * The table holds 24 entries, $4000 to $43D0 - hi-res page 2 - and the index is masked to 31,
+ * not 23. A row of 192 or more therefore reads **past the end of it**, into the half-column
+ * byte table at $6BC2, and computes an address from whatever is there. That is not a guard
+ * that fails safe; it is arithmetic on the wrong bytes, and the renderer draws at the result.
+ *
+ * 64 bytes are kept here so any row byte 0..255 can be indexed the way the machine does.
+ */
+const ROW_TABLE: readonly number[] = [
+  0, 64, 128, 64, 0, 65, 128, 65, 0, 66, 128, 66, 0, 67, 128, 67,
+  40, 64, 168, 64, 40, 65, 168, 65, 40, 66, 168, 66, 40, 67, 168, 67,
+  80, 64, 208, 64, 80, 65, 208, 65, 80, 66, 208, 66, 80, 67, 208, 67,
+  0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4,
+];
+
+/** Page 2, which is where $6B92 points and where the renderer draws. */
+const PAGE_LO = 0x4000;
+const PAGE_HI = 0x6000;
+
+/**
+ * Screen address back to a row and a byte, or -1 for one of the eight bytes per block that
+ * the display never fetches. Built from the same interleave the table encodes.
+ */
+const ADDR_TO_CELL = (() => {
+  const m = new Int32Array(PAGE_HI - PAGE_LO).fill(-1);
+  for (let y = 0; y < 192; y++) {
+    const base = ((y & 7) << 10) | (((y >> 3) & 7) << 7) | ((y >> 6) * 40);
+    for (let b = 0; b < 40; b++) m[base + b] = y * 40 + b;
+  }
+  return m;
+})();
 
 export class Hires {
   private displayCtx: CanvasRenderingContext2D;
@@ -228,68 +289,123 @@ export class Hires {
    *   that swap one case in ten came out a row off.
    */
   /**
-   * One half-column: the pair of pixels $6DB5's tables name.
+   * OR one byte into the page, at a raw address, the way `ORA ($99),Y / STA ($99),Y` does.
    *
-   * `ORA ($99),Y / STA ($99),Y` - the mask is OR-ed in, so nothing already lit is cleared.
-   *
-   * Twenty of the 140 masks set bit 7, and bit 7 is not a pixel. $6D8F handles those by
-   * carrying the second dot into the next byte:
-   *
-   *     $6DA2  BMI $6DA9              ; the mask has bit 7
-   *     $6DA9  ORA ($99),Y / STA      ; this byte - which lights bit 6 alone
-   *     $6DAD  INY / LDA #$01 / ORA   ; and bit 0 of the one after it
-   *
-   * so the pair is contiguous either way. Working it through for all 140 entries, a
-   * half-column lights exactly screen pixels `2x` and `2x + 1` - the tables are that, taken
-   * apart into a byte and a mask.
+   * `$99` is zero - `$6140` clears `$7C-$9C` and nothing in the renderer ever writes it - so
+   * the address is simply `$9A` and Y. An address that is not a byte the display fetches,
+   * which includes every address outside page 2, is written in memory and never seen; the
+   * capture cannot see it either, so it is dropped here.
    */
-  halfColumn(xh: number, y: number): void {
-    if (xh < 0 || xh >= HALF_COLUMN_BYTE.length || y < 0 || y >= H) return;
-    const base = HALF_COLUMN_BYTE[xh] * 7;
-    const mask = HALF_COLUMN_MASK[xh];
-    const paint = (x: number): void => {
-      if (x < 0 || x >= W) return;
+  private orByte(hi: number, lo: number, mask: number): void {
+    const cell = ADDR_TO_CELL[(((hi << 8) | lo) - PAGE_LO) & 0xffff];
+    if (cell === undefined || cell < 0) return;
+    const y = (cell / 40) | 0;
+    const base = (cell % 40) * 7;
+    for (let bit = 0; bit < 7; bit++) {
+      if (!(mask & (1 << bit))) continue;
+      const x = base + bit;
+      if (x < 0 || x >= W) continue;
       const argb = this.argbAt(x);
       if (argb) this.buf[y * W + x] = argb;
-    };
-    for (let bit = 0; bit < 7; bit++) if (mask & (1 << bit)) paint(base + bit);
-    if (mask & 0x80) paint(base + 7);          // $6DAD INY / LDA #$01
+    }
+  }
+
+  /** $6DB5 - a half-column and a row byte into `$9A` and Y. */
+  private address6DB5(xh: number, yByte: number): { hi: number; lo: number } {
+    const y = yByte & 0xff;
+    const t = 2 * ((y >> 3) & 0x1f);
+    const sum = ((y & 7) * 4) + ROW_TABLE[t + 1];
+    const hi = sum & 0xff;
+    const lo = (HALF_COLUMN_BYTE[xh] + ROW_TABLE[t] + (sum > 0xff ? 1 : 0)) & 0xff;
+    return { hi, lo };
+  }
+
+  /**
+   * One row down or up, as the plot loops do it: by address, not by recomputing from y.
+   *
+   * `$70DF ADC #$04 / CMP #$60 / BCS $711F` adds $400 and, past the end of the page, folds:
+   *
+   *     $7123  SEC / TYA / SBC #$80 / TAY / LDA $9A / SBC #$1B      ; - $1B80
+   *     $7134  SBC #$58 / TAY / LDA $9A / SBC #$1F                  ; - $1F58, at $9A = $63
+   *
+   * and `$705D` is the mirror, `SBC #$04 / CMP #$40 / BCC $709D`, adding $1B80 or $1F58 back.
+   * `$6FEA` does the same for the shallow loops through a byte patched at `$6FED`.
+   *
+   * Both folds read `$9A` **before** the add or subtract - the store only happens after - so
+   * the step is `old - $1B80`, not `old + $400 - $1B80`. That reproduces row 7 to row 8:
+   * $5C00 becomes $4080, which is $1B80 down, and not $1780.
+   */
+  private stepRow(hi: number, lo: number, down: boolean): { hi: number; lo: number } {
+    if (down) {
+      const a = (hi + 4) & 0xff;
+      if (a < 0x60) return { hi: a, lo };                       // $701C BCC
+      if (a === 0x63 && lo >= 0x80) {                           // $7033 CMP #$80, BMI takes the other
+        const nl = (lo - 0x58) & 0xff;
+        return { hi: (hi - 0x1f - (lo >= 0x58 ? 0 : 1)) & 0xff, lo: nl };
+      }
+      const nl = (lo - 0x80) & 0xff;
+      return { hi: (hi - 0x1b - (lo >= 0x80 ? 0 : 1)) & 0xff, lo: nl };
+    }
+    const a = (hi - 4) & 0xff;
+    if (a >= 0x40 && hi >= 4) return { hi: a, lo };              // $7064 BCC
+    if (a === 0x3c && lo < 0x80) {                               // $70B0 BPL takes the other
+      const s2 = lo + 0x58;
+      return { hi: (hi + 0x1f + (s2 > 0xff ? 1 : 0)) & 0xff, lo: s2 & 0xff };
+    }
+    const s2 = lo + 0x80;
+    return { hi: (hi + 0x1b + (s2 > 0xff ? 1 : 0)) & 0xff, lo: s2 & 0xff };
+  }
+
+  /**
+   * One half-column: the pair of pixels $6DB5's tables name.
+   *
+   * Twenty of the 140 masks set bit 7, and bit 7 is not a pixel. $6D8F carries the second dot
+   * into the next byte - `$6DA9 ORA / $6DAD INY / LDA #$01 / ORA` - so the pair stays
+   * contiguous; a half-column lights screen pixels `2x` and `2x + 1`.
+   */
+  halfColumn(xh: number, y: number): void {
+    if (xh < 0 || xh >= HALF_COLUMN_BYTE.length) return;
+    const { hi, lo } = this.address6DB5(xh, y);
+    const mask = HALF_COLUMN_MASK[xh];
+    this.orByte(hi, lo, mask);
+    if (mask & 0x80) this.orByte(hi, (lo + 1) & 0xff, 0x01);     // $6DAD INY
     this.dirty = true;
   }
 
   /**
    * $6DD5's line, in the units and with the error term it actually uses.
    *
-   * Two things separate this from a textbook Bresenham over the same half-columns.
-   *
    * **The octant split.** `$6E07 SEC / SBC $B9 / BCC $6E2B` compares |dy| against dx after
-   * `$6E38` has swapped the ends so x always runs left to right. Shallow (|dy| < dx) goes to
-   * `$6E4F`, steep to `$70C6` or `$7044` depending on the sign, and the two carry the error
-   * the opposite way round.
+   * `$6E38` has swapped the ends so x always runs left to right. Shallow goes to `$6E4F`,
+   * steep to `$70C6` or `$7044` depending on the sign.
    *
    * **The error term is an eight-bit accumulator, not a signed remainder.**
    *
    *     $6E4F  LDA #$00 / SEC / SBC $B9 / SEC / ROR A / STA $B8   ; shallow: ((-dx) >> 1) | $80
    *     $70C6  LDA $BA / CLC / ROR A / STA $B8                    ; steep:   |dy| >> 1
    *
-   * Shallow then adds |dy| per half-column and, on the carry out, steps the row and takes dx
-   * back off. The threshold is 256 and the correction is dx, which is not the same as letting
-   * the byte wrap: 255 + 28 leaves 214, not 27. Over dx columns that crosses exactly |dy|
-   * times, which is the line. Steep subtracts dx per row and advances a half-column on the
-   * borrow, adding |dy| back. Both run `dx + 1` or `|dy| + 1` times, counted by `DEX / BEQ`
-   * straight after the plot, so the last step never advances.
+   * Shallow adds |dy| per half-column and, on the carry out, steps the row and takes dx back
+   * off. The threshold is 256 and the correction is dx, which is not the same as letting the
+   * byte wrap: 255 + 28 leaves 214, not 27. Over dx columns that crosses exactly |dy| times.
+   * Steep subtracts dx per row and advances a half-column on the borrow, adding |dy| back.
+   * Both run `dx + 1` or `|dy| + 1` times, counted by `DEX / BEQ` straight after the plot.
    *
    * Those deltas were read off the machine rather than the page - watching $B8 through one
    * shallow line gives -13, +15, +28, +56, -41 for dx 69 and dy 28, which is |dy| per column
    * and dx off at each crossing and nothing else.
    *
-   * The disk does not plot a half-column at a time: `$6E58` fetches the mask and hands it to
-   * one of seven run builders - `$6E9A`, `$6EAD`, `$6F03`, `$6F35`, `$6F49`, `$6F9C`,
-   * `$6FD5`, chosen by `$6E60-$6E92` on which bits the mask starts at - which walk the same
-   * recurrence accumulating bits until the row changes or the byte fills, so that `$6E95` can
-   * `ORA` a whole run in with one store. The steep loops rotate the mask two bits at a time
-   * (`$70FC ROL A / ROL A`) instead of re-indexing. That is a store-count optimisation: the
-   * pixels are whatever the recurrence names, which is what this walks directly.
+   * **The address is walked, not recomputed.** `$6E58` calls `$6DB5` once; after that the
+   * loops add or subtract $400 and fold at the page edges. A line whose end is a row of -1 -
+   * which is where an endpoint clipped against `y = z` lands - therefore does not stop, it
+   * carries on into whatever the fold produces.
+   *
+   * The disk does not plot a half-column at a time either: `$6E58` hands the mask to one of
+   * seven run builders - `$6E9A`, `$6EAD`, `$6F03`, `$6F35`, `$6F49`, `$6F9C`, `$6FD5`,
+   * chosen by `$6E60-$6E92` on which bits the mask starts at - which walk this same
+   * recurrence accumulating bits so `$6E95` can `ORA` a whole run in with one store, and the
+   * steep loops rotate the mask two bits at a time (`$70FC ROL A / ROL A`) instead of
+   * re-indexing. That is a store-count optimisation; the pixels are whatever the recurrence
+   * names, which is what this walks directly.
    */
   segment6DD5(x1: number, y1: number, x2: number, y2: number): void {
     let x0 = Math.round(x1);
@@ -299,31 +415,57 @@ export class Hires {
     // $6DF5's BCC $6E38: the ends are swapped so x runs left to right.
     if (xe < x0) { const tx = x0; x0 = xe; xe = tx; const ty = y0; y0 = ye; ye = ty; }
     const dx = xe - x0;
-    const dyRaw = ye - y0;
+    // $6DFE LDA $B6 / SEC / SBC $B4 / BCC $6E1C is an eight-bit subtract of eight-bit rows,
+    // and that is not the same as subtracting the signed numbers. A row of -1 is 255 to the
+    // machine, so a line from row 61 to row -1 runs 194 rows **down** and off the bottom of
+    // the page, not 62 rows up. Getting this wrong draws a different line entirely.
+    const y0b = y0 & 0xff;
+    const yeb = ye & 0xff;
+    const dyRaw = yeb - y0b;
     const dy = Math.abs(dyRaw);
     const ydir = dyRaw < 0 ? -1 : 1;    // $6E1C negates dy and takes the other row step
     let x = x0;
-    let y = y0;
+    if (x < 0 || x >= HALF_COLUMN_BYTE.length) return;
+    // $6E58 JSR $6DB5 - the address is taken once and then walked, which is why a row past
+    // the end of the page keeps going somewhere rather than stopping.
+    let addr = this.address6DB5(x, y0b);
+    const down = ydir > 0;
+    const paint = (): void => {
+      const mask = HALF_COLUMN_MASK[x];
+      this.orByte(addr.hi, addr.lo, mask);
+      if (mask & 0x80) this.orByte(addr.hi, (addr.lo + 1) & 0xff, 0x01);
+    };
+    const nextColumn = (): void => {
+      if (x + 1 < HALF_COLUMN_BYTE.length) {
+        addr.lo = (addr.lo + HALF_COLUMN_BYTE[x + 1] - HALF_COLUMN_BYTE[x]) & 0xff;  // the INY
+      }
+      x++;
+    };
 
     if (dy < dx) {                      // $6E07 BCC $6E2B - shallow
       let err = ((((256 - dx) & 0xff) >> 1) | 0x80) & 0xff;
       for (let n = dx + 1; n > 0; n--) {
-        this.halfColumn(x, y);
-        x++;
+        paint();
+        nextColumn();
+        if (x >= HALF_COLUMN_BYTE.length) break;
         err += dy;                      // $6EA0 CLC / ADC $BA
         if (err > 0xff) {               // $6EA2 BCS - the run ends here
-          y += ydir;
+          addr = this.stepRow(addr.hi, addr.lo, down);
           err -= dx;                    // and the carry path takes dx back off
         }
       }
     } else {                            // $6E0C JMP $70C6 / $6E28 JMP $7044 - steep
       let err = (dy >> 1) & 0xff;
       for (let n = dy + 1; n > 0; n--) {
-        this.halfColumn(x, y);
-        y += ydir;                      // $70DF - one row every time round
+        paint();
+        addr = this.stepRow(addr.hi, addr.lo, down);   // $70DF - a row every time round
         const diff = err - dx;          // $70EA SEC / SBC $B9
-        if (diff >= 0) err = diff;      // $70F1 BCS $70D4 - same half-column
-        else { err = (diff + dy) & 0xff; x++; }   // $70F3 ADC $BA, then ROL A / ROL A
+        if (diff >= 0) err = diff;      // $70F1 BCS $70D4 - the same half-column
+        else {                          // $70F3 ADC $BA, then ROL A / ROL A
+          err = (diff + dy) & 0xff;
+          nextColumn();
+          if (x >= HALF_COLUMN_BYTE.length) break;
+        }
       }
     }
     this.dirty = true;
