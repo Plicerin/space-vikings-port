@@ -45,7 +45,7 @@ const rendered = await page.evaluate(({ bytes, jobs }) => {
     const h = new Hires(c);
     h.hgr();
     h.hcolor(3);
-    const proj = projectShipWorld(ops, j.camera, j.heading, j.pitch, null, j.opcode3);
+    const proj = projectShipWorld(ops, j.camera, j.heading, j.pitch, null);
     drawShipWorld(h, proj);
     return { on: Array.from(h.snapshot().on), segments: proj.segments.length, culled: proj.culled };
   });
@@ -53,7 +53,7 @@ const rendered = await page.evaluate(({ bytes, jobs }) => {
   bytes: shipBytes,
   jobs: states.map((s) => ({
     camera: { x: CAM.x, y: CAM.y, z: s.z },
-    heading: s.heading, pitch: s.pitch, opcode3: process.env.OP3 || 'draw',
+    heading: s.heading, pitch: s.pitch,
   })),
 });
 await browser.close();
@@ -84,7 +84,12 @@ for (let i = 0; i < states.length; i++) {
   if (!r.on) { console.log(`  ${s.label.padEnd(8)}  (the port produced no projection)`); continue; }
   const diskOn = new Uint8Array(HGR_W * HGR_H);
   for (const [x, y] of s.points) diskOn[y * HGR_W + x] = 1;
+  // The golden is a difference of two renders, so a ship pixel that falls on a star is not in
+  // it - the disk draws it, but it is lit with the ship removed too. Mask the port with the
+  // same background, or a port that draws those pixels correctly is charged for them: at
+  // camera z -6401 that is (120,83), (121,83), (104,84) and (105,84), all of them stars.
   const portOn = Uint8Array.from(r.on);
+  for (const [x, y] of s.background ?? []) portOn[y * HGR_W + x] = 0;
   let both = 0, portLit = 0, differ = 0;
   let pminX = HGR_W, pmaxX = -1, pminY = HGR_H, pmaxY = -1;
   for (let k = 0; k < diskOn.length; k++) {

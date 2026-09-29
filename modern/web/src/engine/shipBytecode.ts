@@ -392,6 +392,7 @@ export function measureModelCentre(ops: ShipBytecodeOp[]): ProjVec3 | null {
  * those) and opcode 3 ends a run - it is drawn as a line like 2, but the pen lifts after,
  * which is the reading that matches the shapes the disk produces.
  *
+ * Opcode 3 is a spur and opcode 0 does not lift the pen; see the dispatch table below.
  * The transform is the disk's own, in fixed point: `diskPipeline.ts` builds the matrix the
  * way $654E and $6631 do and divides the way $68A1 does. `view` carries the two things the
  * display list supplies per object that the camera arguments do not - the bank angle and the
@@ -403,7 +404,6 @@ export function projectShipWorld(
   headingByte: number,
   pitchByte: number,
   origin?: ProjVec3 | null,
-  opcode3: 'lift' | 'draw' | 'move' = 'draw',
   view?: Partial<Omit<ObjectView, 'camera' | 'pitch' | 'heading'>>,
 ): ShipWorldProjection {
   const objectView: ObjectView = {
@@ -423,56 +423,66 @@ export function projectShipWorld(
 
   const segments: ShipWorldSegment[] = [];
   const dots: ShipProjectedPoint[] = [];
-  let pen: ProjVec3 | null = null;
-  let culled = 0, clippedAway = 0;
+  let culled = 0;
+  let clippedAway = 0;
 
-  for (const op of ops) {
-    if (op.kind !== 'vector') continue;
-    // Camera space first, and keep it: a segment is clipped against the near plane in
-    // three dimensions, before the divide. Projecting each vertex and dropping the ones
-    // behind the camera loses every segment that straddles it, which over a ground plane
-    // is most of them.
-    const d = toCameraSpaceFixed(
-      { x: op.x + shift.x, y: op.y + shift.y, z: op.z + shift.z },
-      camera, matrix,
-    );
+  // $6162's dispatch: `LDA ($9B),Y / CMP #$12 / ASL A / TAX / JMP ($6076,X)`, eighteen
+  // handlers. Four of them make up a model:
+  //
+  //   0  $622E  a lone point - transformed into slot A, plotted if its outcode is clear,
+  //             and the run is left alone. It does not lift the pen.
+  //   1  $61B7  a fresh line: slot A from this vertex, slot B from the NEXT one, and the
+  //             next one's own opcode byte is never read. It consumes fourteen bytes.
+  //   2  $61EC  continue: `LDA $6F,X / STA $5F,X` puts the saved endpoint in slot A and
+  //             this vertex in slot B, then saves this vertex as the new endpoint.
+  //   3  $6212  `LDA $6F,X / STA $67,X` puts the saved endpoint in slot **B** and this
+  //             vertex in slot A, and $618E never runs - so the endpoint does not move.
+  //             It is a spur: draw out to somewhere and stay where you were.
+  //   4  $62BE  `STA $7C`, and $61CA/$61D9 read it: with it set, a segment that needs
+  //             clipping is dropped instead. The ships carry 0 and DEBRIS carries 1.
+  //
+  // The endpoint is saved by $618E before the clipper touches anything, so a run continues
+  // from the unclipped vertex.
+  let savedEnd: ProjVec3 | null = null;         // $70-$76
+  let noClip = 0;                               // $7C
 
-    if (op.opcode === 0) {                              // a point on its own
-      // $61A9's outcode first: $68A1 wraps outside |x| <= z and |y| <= z, so a point the
-      // frustum rejects would otherwise fold back into the middle of the picture.
-      const q = outcode67EF(d) ? null : projectCameraSpaceFixed(d, objectView.ops);
-      if (!q) culled++;
-      else dots.push(q);
-      pen = null;
+  const toCam = (op: ShipBytecodeVectorOp): ProjVec3 => toCameraSpaceFixed(
+    { x: op.x + shift.x, y: op.y + shift.y, z: op.z + shift.z }, camera, matrix,
+  );
+  const drawSeg = (a: ProjVec3, b: ProjVec3): void => {
+    const kept = clipFrustum61B7(a, b, noClip);
+    if (!kept) { clippedAway++; return; }
+    const pa = projectCameraSpaceFixed(kept.a, objectView.ops);
+    const pb = projectCameraSpaceFixed(kept.b, objectView.ops);
+    if (!pa || !pb) { culled++; return; }
+    segments.push({ from: pa, to: pb });
+  };
+
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i];
+    if (op.kind === 'set-state') { noClip = op.state; continue; }   // $62BE
+    if (op.kind !== 'vector') break;                                // $7F ends the model
+    const v = toCam(op);
+
+    if (op.opcode === 0) {                                          // $622E
+      const q = outcode67EF(v) ? null : projectCameraSpaceFixed(v, objectView.ops);
+      if (q) dots.push(q); else culled++;
       continue;
     }
-    if (op.opcode === 1) { pen = d; continue; }         // start a run
-    if (op.opcode === 3 && opcode3 === 'move') { pen = d; continue; }
-    if (pen) {                                          // 2 and 3 draw
-      // $61B7: reject or clip in camera space, against |x| <= z and |y| <= z, before any
-      // divide. This is what keeps the disk's close-range ship inside its box - the near
-      // plane alone is not enough, because $68A1 wraps on the side planes too.
-      const near = clipFrustum61B7(pen, d);
-      if (!near) {
-        culled++;
-      } else {
-        const pa = projectCameraSpaceFixed(near.a, objectView.ops);
-        const pb = projectCameraSpaceFixed(near.b, objectView.ops);
-        if (!pa || !pb) {
-          culled++;
-        } else {
-          // And that is the whole of it. $6DD5 adds 70 to x, takes 95 - y, and goes straight
-          // into its Bresenham - there is no screen-space clip in the renderer at all. The
-          // frustum has already bounded sx to +/-69 and sy to -28..96, so every point $68A1
-          // returns is on the page by construction.
-          segments.push({ from: pa, to: pb });
-        }
-      }
+    if (op.opcode === 1) {                                          // $61B7
+      const next = ops[i + 1];
+      if (!next || next.kind !== 'vector') break;
+      const b = toCam(next);
+      savedEnd = b;                                                 // $618E, before the clip
+      drawSeg(v, b);
+      i++;                                                          // both vertices consumed
+      continue;
     }
-    // The pen advances to the unclipped point, so the next segment starts where the model
-    // says it does.
-    pen = (op.opcode === 3 && opcode3 === 'lift') ? null : d;
+    if (!savedEnd) continue;                                        // no run to continue
+    if (op.opcode === 2) { drawSeg(savedEnd, v); savedEnd = v; continue; }   // $61EC
+    drawSeg(v, savedEnd);                                           // $6212 - the endpoint stays
   }
+
   return { segments, dots, culled, clippedAway };
 }
 

@@ -104,16 +104,22 @@ for (const st of STATES) {
     `${String(bo.n).padStart(11)}   ` + (bo.n ? `x ${bo.minX}-${bo.maxX}, y ${bo.minY}-${bo.maxY}` : '(nothing)') +
     (extra ? `   [${extra} px present only without the ship]` : ''));
   fs.writeFileSync(`captured/ship/${st.label}.png`, toPng(ship));
-  golden.push({ ...st, lit: bo.n, bounds: bo, points: (() => {
+  const pixels = (src) => {
     const pts = [];
-    for (let y = 0; y < HGR_H; y++) for (let x = 0; x < HGR_W; x++) if (ship[y * HGR_W + x]) pts.push([x, y]);
+    for (let y = 0; y < HGR_H; y++) for (let x = 0; x < HGR_W; x++) if (src[y * HGR_W + x]) pts.push([x, y]);
     return pts;
-  })() });
+  };
+  // The background as well. A ship pixel that falls on a star is lit in both renders, so the
+  // difference drops it - the disk draws it, this capture cannot see it, and a port that
+  // draws it correctly looks wrong. Recording the background lets the comparison mask the
+  // port the same way instead of counting those as errors.
+  golden.push({ ...st, lit: bo.n, bounds: bo, points: pixels(ship), background: pixels(b) });
 }
 
 fs.writeFileSync('captured/ship/golden.json', JSON.stringify({
   source: 'the original renderer at $6000, replayed from captured/snapshot/flight.bin',
   isolation: 'rendered twice per state, the second with $7F written at $7879 (an empty model); the difference is the ship',
+  background: 'the no-ship render, per state, so a comparison can mask the port the same way the difference masks the disk',
   page: 'hi-res page 2', states: golden,
 }) + '\n');
 console.log(`\nwrote captured/ship/golden.json and ${golden.length} PNGs`);
