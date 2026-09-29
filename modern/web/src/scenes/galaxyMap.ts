@@ -1,200 +1,234 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
+import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
+import type { ShapeTable } from '../engine/shapeTable';
 
-function drawPlanetDot(hires: import('../engine/hires').Hires, x: number, y: number, visited: boolean, surrendered: boolean): void {
-  const sx = Math.round(x);
-  const sy = Math.round(y);
+/**
+ * GALAXY MAP, from GALAXY MAP.bas lines 3000-3320.
+ *
+ * Reached from COM by 1 for CENTRAL COMPUTER then 3 - COM line 265's
+ * `IF C = 3 THEN GOSUB 3000`, and COM 3000 is `PRINT " ": PRINT "RUN GALAXY MAP"`.
+ *
+ * The three coordinate tables are one block read three ways (line 3020):
+ *
+ *     M = 38366
+ *     X(P) = PEEK(M + P)   Y(P) = PEEK((M + P) - 21)   Z(P) = PEEK((M + P) - 42)
+ *
+ * which is the same `M` the hyperdrive cost uses, and the reason that cost only sees X.
+ */
 
-  if (surrendered) {
-    hires.hcolor(2);
-    hires.hplot(sx, sy - 2);
-    hires.hplot(sx - 2, sy);
-    hires.hplot(sx, sy);
-    hires.hplot(sx + 2, sy);
-    hires.hplot(sx, sy + 2);
-  } else if (visited) {
-    hires.hcolor(5);
-    hires.hplot(sx - 1, sy - 1);
-    hires.hplot(sx, sy - 1);
-    hires.hplot(sx + 1, sy - 1);
-    hires.hplot(sx - 1, sy);
-    hires.hplot(sx, sy);
-    hires.hplot(sx + 1, sy);
-    hires.hplot(sx - 1, sy + 1);
-    hires.hplot(sx, sy + 1);
-    hires.hplot(sx + 1, sy + 1);
-  } else {
-    hires.hplot(sx, sy);
-    hires.hplot(sx + 1, sy);
-    hires.hplot(sx, sy + 1);
+/** Lines 15100-15130. COM's spelling; STATUS line 10000 has 16 as GROOMBRIDGE 1618. */
+const STAR_NAMES = [
+  'SOL', 'ALPHA CENTAURI', "BARNARD'S STAR", 'WOLF 359', 'LUYTEN',
+  'LALANDE 21185', 'SIRIUS', 'VARCAR', 'XANADON', 'EPSILON ERIDANA',
+  'CYGNI', 'PROCYON', 'TAU CETI', 'LACAILLE 9352', 'LARSEN-C',
+  'GROOMBRIDGE 168', 'KRUGER 60', 'EPSILON INDI', 'ARGO', 'SHIVANDA',
+];
+
+export interface GalaxyStar {
+  /** PEEK(38366 + P), PEEK(38345 + P), PEEK(38324 + P). */
+  x: number;
+  y: number;
+  z: number;
+  /** PEEK(38219 + P). Line 3066 tests it against 1 exactly - see the note below. */
+  secured: number;
+}
+
+export interface GalaxyMapData {
+  /** Twenty stars, P = 1..20 in order. */
+  stars: GalaxyStar[];
+  /** PEEK(38209), 1-based - the one line 3075 boxes. */
+  here: number;
+}
+
+/** Lines 3030-3050: which shape a star gets, by its Z. BASIC shape numbers. */
+export function starShape(z: number): number {
+  if (z < 12) return 6;
+  if (z > 11 && z < 16) return 5;
+  return 1;
+}
+
+/** Lines 3060 and 3065. */
+export function starPosition(s: GalaxyStar): { x: number; y: number } {
+  return { x: s.x * 10 - 35, y: s.y * 5 };
+}
+
+type H = import('../engine/hires').Hires;
+
+/**
+ * Lines 3010-3100, in order. Pure, so oracle/galaxymap_parity.mjs can diff it against the
+ * original's page.
+ *
+ * The cursor is not part of this. Line 3120 XDRAWs shape 12 at the paddle position and line
+ * 3200 XDRAWs it away again, so it toggles forever - drawGalaxyCursor does that separately.
+ */
+export function drawGalaxyMap(hires: H, shapes: ShapeTable, d: GalaxyMapData): void {
+  hires.hgr();
+
+  // 3010
+  hires.hcolor(1);
+  hires.line(1, 1, 1, 190);
+  hires.line(1, 190, 279, 190);
+  hires.line(279, 190, 279, 1);
+  hires.line(279, 1, 1, 1);
+
+  const r = new ShapeRenderer(hires);
+  r.rot = 0;
+  r.scale = 1;
+
+  // 3025-3080
+  for (let p = 1; p <= 20; p++) {
+    const s = d.stars[p - 1];
+    if (!s) continue;
+    hires.hcolor(3);
+    const { x, y } = starPosition(s);
+    // 3066. The test is `= 1`, not "non-zero": SOL's byte reads 100 on a fresh disk, so it
+    // is drawn white like any other star and only the box at 3075 marks it.
+    if (s.secured === 1) hires.hcolor(2);
+    r.draw(shapes, starShape(s.z) - 1, x, y);
+    // 3075
+    if (p === d.here) {
+      hires.hcolor(2);
+      hires.line(x - 5, y + 5, x + 5, y + 5);
+      hires.line(x + 5, y + 5, x + 5, y - 5);
+      hires.line(x + 5, y - 5, x - 5, y - 5);
+      hires.line(x - 5, y - 5, x - 5, y + 5);
+    }
   }
-}
 
-function drawCrosshair(hires: import('../engine/hires').Hires, x: number, y: number): void {
+  // 3090. Nothing changes HCOLOR after this, so line 3100's text is orange too.
   hires.hcolor(5);
-  hires.hplot(x, y - 2);
-  hires.hplot(x, y - 1);
-  hires.hplot(x, y);
-  hires.hplot(x, y + 1);
-  hires.hplot(x, y + 2);
-  hires.hplot(x - 2, y);
-  hires.hplot(x - 1, y);
-  hires.hplot(x + 1, y);
-  hires.hplot(x + 2, y);
+  hires.line(1, 150, 279, 150);
+
+  // 3100. The window is rows 19-23 (POKE 34,19 / POKE 35,23) and VTAB 20 puts the cursor on
+  // row 19; HTAB is absolute, so HTAB 15 and HTAB 8 are 0-based columns 14 and 7.
+  hires.text('GALAXY MAP', 15, 20);
+  hires.text('--PRESS SPACE TO RETURN--', 8, 21);
 }
 
-export async function galaxyMapScene(
-  ctx: SceneContext,
-  scenes: SceneManager,
-): Promise<void> {
-  const { hires, state, input } = ctx;
+/**
+ * Line 3120's XDRAW 12. Over the map's black background that is a plain draw.
+ *
+ * PX is a float - line 3110 is `PX = PDL(0) * 1.19` - and Applesoft truncates the AT
+ * coordinates to integers before drawing. Passing the float through and letting each plotted
+ * pixel round put the whole cursor one column right at PX = 148.75.
+ */
+export function drawGalaxyCursor(hires: H, shapes: ShapeTable, px: number, py: number): void {
+  const r = new ShapeRenderer(hires);
+  r.rot = 0;
+  r.scale = 1;
+  hires.hcolor(3);
+  r.draw(shapes, 11, Math.trunc(px), Math.trunc(py));
+}
+
+/** Lines 3115-3117, the clamps on the paddle reading. */
+export function clampCursor(px: number, py: number): { px: number; py: number } {
+  let x = px;
+  let y = py;
+  if (y > 145) y = 145;
+  if (x < 10) x = 10;
+  if (x > 270) x = 270;
+  if (y < 10) y = 10;
+  return { px: x, py: y };
+}
+
+/**
+ * Lines 3215-3240: which star, if any, the cursor is over. 0 for none.
+ *
+ * Line 3215 adds 35 back to PX before testing, undoing the shift line 3065 applied when
+ * drawing. The Y test is asymmetric - `<= Y(P)` and `>= Y(P) - 1` - so it catches the star's
+ * own row and the one above, while X is plus or minus 1.
+ */
+export function starUnderCursor(stars: GalaxyStar[], px: number, py: number): number {
+  const x = Math.floor((px + 35) / 10);
+  const y = Math.floor(py / 5);
+  for (let p = 1; p <= 20; p++) {
+    const s = stars[p - 1];
+    if (!s) continue;
+    if (x <= s.x + 1 && x >= s.x - 1 && y <= s.y && y >= s.y - 1) return p;
+  }
+  return 0;
+}
+
+/** Lines 3300-3320. Unlike the hyperdrive's D1, this one really does use all three axes. */
+export function lightYears(stars: GalaxyStar[], from: number, to: number): number {
+  const a = stars[from - 1];
+  const b = stars[to - 1];
+  if (!a || !b) return 0;
+  const dx = Math.abs(a.x - b.x);
+  const dy = Math.abs(a.y - b.y);
+  const dz = Math.abs(a.z - b.z);
+  return Math.floor(Math.sqrt(dx * dx + dy * dy + dz * dz));
+}
+
+export function galaxyMapDataFrom(state: import('../engine/gameState').GameState): GalaxyMapData {
+  return {
+    stars: state.planets.map((p) => ({
+      x: p.x,
+      y: p.y,
+      z: p.z,
+      // The port keeps this as a boolean; the disk's byte is not one - SOL's reads 100, and
+      // line 3066 only colours a star when it is exactly 1.
+      secured: p.surrendered ? 1 : 0,
+    })),
+    here: state.planetIndex + 1,
+  };
+}
+
+export async function galaxyMapScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
+  const { hires, state, input, loader } = ctx;
   setScene('galaxyMap');
 
+  let shapes: ShapeTable | null = null;
+  try {
+    shapes = decodeShapeTableJson(await loader.json('data/shapes/shape-table.json'));
+  } catch {
+    /* without the table there are no stars to draw */
+  }
+  if (!shapes) return scenes.run('com');
+
+  const d = galaxyMapDataFrom(state);
+  let px = 140;
+  let py = 75;
+
   for (;;) {
-    hires.hgr();
-    hires.hcolor(1);
-    hires.line(1, 1, 1, 190);
-    hires.line(1, 190, 279, 190);
-    hires.line(279, 190, 279, 1);
-    hires.line(279, 1, 1, 1);
+    drawGalaxyMap(hires, shapes, d);
+    drawGalaxyCursor(hires, shapes, px, py);
+    const k = await input.waitForKey();
+    const ch = String.fromCharCode(k & 0x7f).toUpperCase();
 
-    for (let p = 0; p < 20; p++) {
-      const planet = state.planets[p];
-      const sx = planet.x * 10 - 35;
-      const sy = planet.y * 5;
-
-      drawPlanetDot(hires, sx, sy, planet.visited, planet.surrendered);
-
-      if (planet.visited && p !== state.planetIndex && p > 0) {
-        hires.hcolor(1);
-        const label = planet.name.toUpperCase().slice(0, 8);
-        hires.text(label, sx / 8 - 2, sy / 8 + 6);
-      }
-
-      if (p === state.planetIndex) {
-        hires.hcolor(2);
-        hires.line(sx - 5, sy + 5, sx + 5, sy + 5);
-        hires.line(sx + 5, sy + 5, sx + 5, sy - 5);
-        hires.line(sx + 5, sy - 5, sx - 5, sy - 5);
-        hires.line(sx - 5, sy - 5, sx - 5, sy + 5);
-      }
+    if (ch === ' ') {
+      glog('galaxyMap', 'return');
+      return scenes.run('com');
     }
 
-    hires.hcolor(1);
-    hires.text('GALAXY MAP', 15, 1);
-    hires.hcolor(3);
-    hires.text(`STARDATE: ${state.stardate.toFixed(1)}`, 2, 2);
-
-    const conquered = state.planets.filter(p => p.surrendered).length;
-    hires.text(`CONQUERED: ${conquered}/20`, 26, 2);
-
-    hires.hcolor(1);
-    hires.text('LEGEND:', 2, 3);
-    hires.hcolor(2);
-    hires.text('+', 10, 3);
-    hires.hcolor(1);
-    hires.text(':CONQUERED', 12, 3);
-    hires.hcolor(5);
-    hires.text('*', 24, 3);
-    hires.hcolor(1);
-    hires.text(':VISITED', 26, 3);
-    hires.hcolor(1);
-    hires.text('.:UNKNOWN', 37, 3);
-
-    hires.hcolor(3);
-    hires.text('ARROWS:MOVE  ENTER:SELECT  SPACE:EXIT', 4, 4);
-
-    hires.hcolor(5);
-    hires.line(1, 33, 279, 33);
-
-    if (state.commanderMode && state.commanderMapTarget !== null) {
-      const target = state.planets[state.commanderMapTarget];
+    if (ch === 'I') py -= 5;
+    else if (ch === 'M') py += 5;
+    else if (ch === 'J') px -= 5;
+    else if (ch === 'K') px += 5;
+    else if (k === 13) {
+      const p = starUnderCursor(d.stars, px, py);
       hires.hcolor(5);
-      hires.text(`COMMAND TARGET: ${target.name.toUpperCase()}`.slice(0, 38), 1, 22);
-      glog('commander', `galaxy map target ${target.name}`);
-      await new Promise(r => setTimeout(r, 60));
-      return scenes.run('hyperdrive');
-    }
-
-    let cursorX = 140;
-    let cursorY = 75;
-
-    for (;;) {
-      const dx = input.isDown('ArrowLeft') ? -3 : input.isDown('ArrowRight') ? 3 : 0;
-      const dy = input.isDown('ArrowUp') ? -3 : input.isDown('ArrowDown') ? 3 : 0;
-      cursorX = Math.max(10, Math.min(270, cursorX + dx));
-      cursorY = Math.max(33, Math.min(185, cursorY + dy));
-
-      drawCrosshair(hires, cursorX, cursorY);
-
-      const k = input.peekKey();
-      if (k > 0) {
-        input.clearKey();
-        const ch = String.fromCharCode(k & 0x7f).toUpperCase();
-
-        if (k === 0x8d || ch === '\r' || k === 13) {
-          const px = (cursorX + 35) / 10;
-          const py = cursorY / 5;
-          let found = -1;
-          for (let p = 0; p < 20; p++) {
-            const planet = state.planets[p];
-            if (Math.abs(px - planet.x) <= 2 && Math.abs(py - planet.y) <= 1) {
-              found = p;
-              break;
-            }
-          }
-
-          if (found >= 0) {
-            const currentPlanet = state.planets[state.planetIndex];
-            const targetPlanet = state.planets[found];
-            const x1 = Math.abs(currentPlanet.x - targetPlanet.x);
-            const y1 = Math.abs(currentPlanet.y - targetPlanet.y);
-            const z1 = Math.abs(currentPlanet.z - targetPlanet.z);
-            const dist = Math.sqrt(x1 * x1 + y1 * y1 + z1 * z1);
-
-            hires.hcolor(1);
-            hires.text(`${targetPlanet.name.toUpperCase()}`, 1, 21);
-            hires.text(`LOC: ${targetPlanet.x} ${targetPlanet.y} ${targetPlanet.z}`, 1, 22);
-            hires.text(`DIST: ${Math.round(dist)} L/Y`, 1, 23);
-
-            glog('galaxyMap', `selected ${targetPlanet.name} dist=${Math.round(dist)}`);
-
-            if (targetPlanet.visited || targetPlanet.surrendered) {
-              hires.text(`POP: ${targetPlanet.population}  TECH: ${targetPlanet.defense}`, 1, 24);
-              hires.text('FURTHER INFO? (Y/N)', 19, 24);
-            } else {
-              hires.text('NO FURTHER INFO', 1, 24);
-            }
-
-            if (targetPlanet.visited || targetPlanet.surrendered) {
-              const info = await input.waitForKey();
-              const infoCh = String.fromCharCode(info & 0x7f).toUpperCase();
-              if (infoCh === 'Y') {
-                state.commanderMapTarget = found;
-                return scenes.run('com');
-              }
-            }
-          } else {
-            hires.hcolor(1);
-            hires.text('NO STAR SYSTEM THERE  ', 1, 21);
-          }
-        } else if (ch === ' ' || ch === 'X' || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')) {
-          return scenes.run('starshipSimulator');
-        }
+      if (p === 0) {
+        // 3240
+        hires.text('THERE IS NO STAR SYSTEM THERE, SIR.', 2, 22);
+        await new Promise((res) => setTimeout(res, 1200));
+        continue;
       }
-
-      await new Promise(r => setTimeout(r, 50));
-
-      hires.hcolor(0);
-      hires.hplot(cursorX, cursorY - 2);
-      hires.hplot(cursorX, cursorY - 1);
-      hires.hplot(cursorX, cursorY);
-      hires.hplot(cursorX, cursorY + 1);
-      hires.hplot(cursorX, cursorY + 2);
-      hires.hplot(cursorX - 2, cursorY);
-      hires.hplot(cursorX - 1, cursorY);
-      hires.hplot(cursorX + 1, cursorY);
-      hires.hplot(cursorX + 2, cursorY);
+      const s = d.stars[p - 1];
+      // 3250, 3320
+      hires.text(`STAR SYSTEM : ${STAR_NAMES[p - 1]}`, 2, 22);
+      hires.text(`LOC. : ${s.x} ${s.y} ${s.z} : DISTANCE = ${lightYears(d.stars, d.here, p)} L/Y`, 2, 23);
+      // 3260
+      hires.text('DO YOU WISH FURTHER INFORMATION?', 2, 24);
+      const a = await input.waitForKey();
+      if (String.fromCharCode(a & 0x7f).toUpperCase() === 'Y') {
+        state.commanderMapTarget = p - 1;
+        glog('galaxyMap', `info on ${STAR_NAMES[p - 1]}`);
+        return scenes.run('com');
+      }
+      continue;
     }
+    ({ px, py } = clampCursor(px, py));
   }
 }

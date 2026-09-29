@@ -1596,6 +1596,85 @@ SHORE LEAVE line 2500 names them. They never report damage.
 
 ---
 
+## GALAXY MAP
+
+`GALAXY MAP.bas` lines 3000-3320, reached from flight by C, then 1 for CENTRAL COMPUTER,
+then 3 - COM line 265's `IF C = 3 THEN GOSUB 3000`, and COM 3000 is `RUN GALAXY MAP`.
+`probe_galaxymap.mjs` captures it; `galaxymap_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| the map | **0 of 53,760 pixels differ** |
+| the paddle cursor | **13 of 13 pixels, none missing, none extra** |
+
+Exact on the first comparison, which has not happened before on this disk.
+
+### The three coordinate tables are one block read three ways
+
+```
+3020 FOR P = 1 TO 20:X(P) = PEEK(M + P):Y(P) = PEEK((M + P) - 21):Z(P) = PEEK((M + P) - 42): NEXT P
+```
+
+with `M = 38366`. This is where the addresses for the port's planet coordinates come from,
+and it is the line that proves H/D 10010 is a copy-paste bug: the hyperdrive cost assigns
+`X1`, `Y1` and `Z1` all three from `PEEK(38366 + ...)`, missing the `- 21` and `- 42`.
+
+### How a star is drawn
+
+- **Shape by Z** (3030-3050): `Z < 12` gives shape 6, `11 < Z < 16` gives 5, `Z > 15` gives 1.
+- **Position** (3060, 3065): `X = X(P) * 10 - 35`, `Y = Y(P) * 5`.
+- **Colour** (3066): `IF PEEK(38219 + P) = 1 THEN HCOLOR= 2`, otherwise the HCOLOR 3 set at
+  3025.
+- **The current system** (3075) gets a violet box, `HPLOT X-5,Y+5 TO X+5,Y+5 TO X+5,Y-5 TO
+  X-5,Y-5 TO X-5,Y+5`.
+
+**38219+P is not a boolean.** SOL's byte reads **100** on a fresh disk, and line 3066 tests
+`= 1` exactly, so SOL is drawn white like any other star and only the box marks it. The port
+models this field as `surrendered: boolean`, which cannot hold 100, so the two agree on a
+fresh game by luck rather than by construction. What else 38219+P carries is not known.
+
+Line 3090's `HPLOT 1,150 TO 279,150` sets `HCOLOR= 5` and nothing changes it afterwards, so
+line 3100's two labels are orange as well.
+
+### The cursor never stops moving, and Applesoft truncates AT
+
+Line 3120 XDRAWs shape 12 at the paddle position and line 3200 XDRAWs it away again, so the
+page alternates between two states forever and never settles. The probe separates them by
+sampling: over 41 reads, a pixel lit in every one is map and a pixel that ever goes dark is
+cursor. That found 13 cursor pixels, and the map underneath is what the parity run compares.
+
+Getting the cursor itself right needed one thing the listing does not say. `PX` is a float -
+line 3110 is `PX = PDL(0) * 1.19`, which read 148.75 in the capture - and **Applesoft
+truncates the AT coordinates before drawing**. Handing the float to the shape interpreter
+and letting each plotted pixel round put the whole cursor one column right.
+
+### Selecting a star
+
+```
+3215 PX = PX + 35
+3230 IF INT(PX / 10) < = X(P) + 1 AND INT(PX / 10) > = X(P) - 1
+     AND INT(PY / 5) < = Y(P) AND INT(PY / 5) > = Y(P) - 1 THEN GOTO 3250
+```
+
+Line 3215 adds back the 35 line 3065 subtracted. The test is not symmetric: X is plus or
+minus one, but Y catches only the star's own row and the one above.
+
+The distance at 3300-3320 is `INT(SQR(X1^2 + X2^2 + X3^2))` over all three axes - so the
+galaxy map measures distance properly while the hyperdrive, which charges for it, does not.
+
+### Two smaller things
+
+- **GALAXY MAP has its own lamp routine.** Lines 5000-5160 paint the panel indicators as
+  solid bars - `FOR J = LY TO LY + 4: HPLOT LX,J TO LX + 9,J` - at (7, 72, 200, 262) x
+  (153, 161). Those are the same eight lamps `CALL 38402` draws, in the same two rows, but a
+  few pixels wider and at slightly different columns. It runs only on the way out, from
+  lines 1 and 2, when returning to COM or the simulator.
+- **A `GOSUB 10000` that never fires.** `10000 IF T > 200 THEN POKE 973,255: RETURN` is
+  another use of the inverse flag, but nothing in the program sets `T` or calls 10000. Dead
+  code, left from whatever it was copied out of.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -1603,9 +1682,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Sixteen of the 23 programs.** GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY,
-  ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D. programs are
-  extracted and readable but nothing has been compared against them. STATUS is now done.
+- **Fifteen of the 23 programs.** RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D,
+  COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D. programs are extracted and
+  readable but nothing has been compared against them. STATUS and GALAXY MAP are done.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
