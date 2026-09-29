@@ -241,7 +241,7 @@ export function drawShipWireframe(
   centerY: number,
 ): void {
   for (const segment of projection.segments) {
-    hires.line(
+    hires.segment(
       Math.round(centerX + segment.from.x),
       Math.round(centerY + segment.from.y),
       Math.round(centerX + segment.to.x),
@@ -457,7 +457,7 @@ export function projectShipWorld(
 /** Draw a world-space projection. Coordinates are already screen coordinates. */
 export function drawShipWorld(hires: Hires, projection: ShipWorldProjection): void {
   for (const s of projection.segments) {
-    hires.line(Math.round(s.from.x), Math.round(s.from.y), Math.round(s.to.x), Math.round(s.to.y));
+    hires.segment(Math.round(s.from.x), Math.round(s.from.y), Math.round(s.to.x), Math.round(s.to.y));
   }
   // A lone point is two pixels wide on the disk, not one. probe_project.mjs put a single
   // vertex through the real renderer 54 times and it came back as a 2-pixel blob every

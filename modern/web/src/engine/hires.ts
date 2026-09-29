@@ -170,26 +170,89 @@ export class Hires {
     this.penY = y;
   }
 
-  line(x1: number, y1: number, x2: number, y2: number): void {
+  /**
+   * A line drawn by the renderer at $6000, not by Applesoft.
+   *
+   * These are two different routines on the disk and they do not agree. `line()` reproduces
+   * HPLOT TO, measured off RADAR's reticle. The 3D renderer plots its own segments in
+   * machine code, and that code has not been disassembled - so this keeps the textbook
+   * Bresenham the port has always used here rather than assuming the two match. Applying the
+   * HPLOT rule to ship wireframes cost 0.2 points of within-one-pixel agreement, which is
+   * the evidence that they are not the same routine.
+   */
+  segment(x1: number, y1: number, x2: number, y2: number): void {
     let x0 = Math.round(x1);
     let y0 = Math.round(y1);
-    const x1r = Math.round(x2);
-    const y1r = Math.round(y2);
-    const dx = Math.abs(x1r - x0);
-    const dy = -Math.abs(y1r - y0);
-    const sx = x0 < x1r ? 1 : -1;
-    const sy = y0 < y1r ? 1 : -1;
+    const xe = Math.round(x2);
+    const ye = Math.round(y2);
+    const dx = Math.abs(xe - x0);
+    const dy = -Math.abs(ye - y0);
+    const sx = x0 < xe ? 1 : -1;
+    const sy = y0 < ye ? 1 : -1;
     let err = dx + dy;
     const buf = this.buf;
-
     for (;;) {
-      if (x0 >= 0 && x0 < W && y0 >= 0 && y0 < H) {
-        buf[y0 * W + x0] = this.argbAt(x0);
-      }
-      if (x0 === x1r && y0 === y1r) break;
+      if (x0 >= 0 && x0 < W && y0 >= 0 && y0 < H) buf[y0 * W + x0] = this.argbAt(x0);
+      if (x0 === xe && y0 === ye) break;
       const e2 = 2 * err;
       if (e2 >= dy) { err += dy; x0 += sx; }
       if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+    this.dirty = true;
+  }
+
+  /**
+   * HPLOT TO.
+   *
+   * Not textbook Bresenham. Applesoft advances the major axis one step at a time and, in the
+   * column (or row) where the minor axis changes, lights **both** sides of the change, so the
+   * line is 4-connected rather than 8-connected. Measured off RADAR's reticle, which is the
+   * first diagonal line work on this disk: along `HPLOT 1,0 TO 131,59` the original lights 7
+   * and 8 at x 18, 14 and 15 at x 34, 18 and 19 at x 42, and a single pixel everywhere else.
+   * The doubles fall exactly where `floor(y(x + 1)) > floor(y(x))`, and it is floor, not
+   * round - at x 66 the true y is 29.50 and the original lights 29.
+   *
+   * Nothing before RADAR caught this, because every line COM, STATUS and GALAXY MAP draw is
+   * axis-aligned, where the two algorithms agree.
+   *
+   * The extra pixel is not emitted on the last step, which is what the original's endpoint
+   * does: `HPLOT 1,0 TO 131,59` lights 58 at x 130 and not 59.
+   */
+  line(x1: number, y1: number, x2: number, y2: number): void {
+    const ax = Math.round(x1);
+    const ay = Math.round(y1);
+    const bx = Math.round(x2);
+    const by = Math.round(y2);
+    const dx = bx - ax;
+    const dy = by - ay;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+    const steps = Math.max(adx, ady);
+    const buf = this.buf;
+    const put = (x: number, y: number): void => {
+      if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = this.argbAt(x);
+    };
+    if (steps === 0) { put(ax, ay); this.dirty = true; return; }
+    const sx = Math.sign(dx);
+    const sy = Math.sign(dy);
+    const majorIsX = adx >= ady;
+    const minorLen = majorIsX ? ady : adx;
+    for (let i = 0; i <= steps; i++) {
+      const cur = Math.floor((i * minorLen) / steps);
+      if (majorIsX) put(ax + i * sx, ay + cur * sy);
+      else put(ax + cur * sx, ay + i * sy);
+      if (i + 1 < steps) {
+        // Only when the row actually changes *inside* this column. If the ideal line crosses
+        // exactly on the boundary - `(i + 1) * minorLen` divisible by `steps` - the new row
+        // belongs to the next column and the original does not double. That is every 16th
+        // step of RADAR's `HPLOT 151,67 TO 279,123`, where 56/128 is exactly 7/16.
+        const nn = (i + 1) * minorLen;
+        const next = Math.floor(nn / steps);
+        if (next !== cur && nn % steps !== 0) {
+          if (majorIsX) put(ax + i * sx, ay + next * sy);
+          else put(ax + next * sx, ay + i * sy);
+        }
+      }
     }
     this.dirty = true;
   }

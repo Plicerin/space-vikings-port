@@ -1675,6 +1675,76 @@ galaxy map measures distance properly while the hyperdrive, which charges for it
 
 ---
 
+## RADAR, and how Applesoft draws a line
+
+`RADAR.bas`, reached from COM by 3 - COM line 133's
+`IF COM = 3 THEN POKE 38388,2: PRINT "RUN RADAR"`. `probe_radar.mjs` captures it;
+`radar_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| the reticle, lines 2005-2042 | **1,143 of 1,143 pixels, exact** |
+| the whole view, rows 0-123 | 96.7% exact, **98.7% within one pixel** |
+| the panel below | **0 of 19,040 differ** |
+
+### It borrows the flight renderer
+
+RADAR is the first program that does not draw its own world. Line 2000 saves the pitch,
+forces it to 63, moves the ship to Y = 20000 and levels the bank; 2005 CALLs 24576 - `$6000`
+- and 37936, and plots a reticle over whatever comes back. Line 2045 puts pitch and bank
+back and 2055 restores Y, so nothing survives it: the whole thing is a borrowed camera
+looking straight down from far above.
+
+```
+2000 P(1) = PEEK(P1): POKE P1,63:BV% = 20000: GOSUB 6000: POKE YI,LO%: POKE YI + 1,HI%
+     B(1) = PEEK(B1): POKE B1,0
+2005 ... CALL 24576: CALL 37936 ...
+```
+
+So the two halves of the screen have to be scored separately, and the split is exactly what
+you would expect: the reticle is BASIC line work and is exact, and the starfield behind it
+is the renderer, at the same 98.7% within a pixel the other renderer harnesses report.
+Averaging them would have hidden both.
+
+Line 2057 is COM line 8's needle-track erase again, verbatim - RADAR clears the same two
+tracks on the way out.
+
+### HPLOT TO is not Bresenham
+
+The reticle is the first diagonal line work on this disk. Everything COM, STATUS and GALAXY
+MAP draw is axis-aligned, where every line algorithm agrees, so nothing before this caught
+what the port was doing wrong.
+
+Along `HPLOT 1,0 TO 131,59` the original lights **two** pixels in some columns and one in
+others: 7 and 8 at x 18, 14 and 15 at x 34, 18 and 19 at x 42, but only 11 at x 26 and only
+29 at x 66. Textbook Bresenham takes a diagonal step when both error tests fire and never
+lights the corner; Applesoft steps one axis at a time and lights both sides of every row
+change, in the column where it happens.
+
+Two details fall out of the measurements and neither is guessable:
+
+- **It is floor, not round.** At x 66 the true y is 29.50 and the original lights 29.
+- **An exact crossing does not double.** Along `HPLOT 151,67 TO 279,123` the slope is
+  56/128, which is exactly 7/16, so every sixteenth step lands on a whole number - and at
+  those columns the original lights one pixel, not two. The new row belongs to the next
+  column. That was the last seven pixels of disagreement.
+
+The endpoint behaves the same way: `HPLOT 1,0 TO 131,59` lights 58 at x 130, not 58 and 59.
+
+### Two line routines, not one
+
+Applying that to everything cost ship wireframes 0.2 points of within-one-pixel agreement,
+which is the useful part of the result: **the disk has two line routines and they do not
+agree.** Applesoft's `HPLOT TO` draws the BASIC programs' line work; the renderer at `$6000`
+plots its own segments in machine code that has not been disassembled.
+
+`Hires.line()` is now the Applesoft one, measured. `Hires.segment()` keeps the textbook
+Bresenham for the 3D renderer, and `shipBytecode.ts` uses it - not because that is known to
+be right, but because it is what the existing numbers were measured against and there is no
+evidence yet for anything better. Deriving `$6000`'s line drawing is an open question.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -1682,9 +1752,12 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Fifteen of the 23 programs.** RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D,
-  COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D. programs are extracted and
-  readable but nothing has been compared against them. STATUS and GALAXY MAP are done.
+- **Fourteen of the 23 programs.** GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT,
+  RECALL, EX, S/X, DMG, END and the four SHIP # n I.D. programs are extracted and readable
+  but nothing has been compared against them. STATUS, GALAXY MAP and RADAR are done.
+- **The renderer's own line drawing.** `$6000` plots segments in machine code that has not
+  been disassembled, and RADAR proves it is not the same routine as Applesoft's HPLOT TO.
+  `Hires.segment()` is a placeholder for it.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
