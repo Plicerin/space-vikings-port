@@ -47,10 +47,32 @@ export function drawComMainScreen(hires: import('../engine/hires').Hires): void 
   // instrument panel is still standing underneath it - measured, the original's page has
   // 3,011 lit pixels there while clearing the buffer left the port with none.
   fillBackground(hires, 6, 0, 123);
+
+  // COM fills and then clears its text window over the fill, so the menu area is black and
+  // only the right-hand side keeps the background. Measured off the original's own page:
+  // columns 0-18 of rows 0-13 are blank, column 19 carries the box's right edge at x139,
+  // and columns 20 onwards are still HCOLOR 6. The few lit pixels in column 0 are the box's
+  // left edge at x1, not surviving fill.
+  //
+  // The extent is taken from the image rather than from WNDLFT/WNDWDTH, which read 1 and 21
+  // when COM settles - and the image says 0-based columns 0-19 over rows 0-13.
+  //
+  // That is not line 80's HOME. HOME clears the $400 text page, which is invisible while
+  // the hi-res screen is showing; only characters sent through COUT reach the character
+  // generator. The blanking is line 29, run while the window is still POKE 32,0 / POKE
+  // 33,40: fourteen printed lines of twenty spaces - one at row 0, twelve from VTAB 2,
+  // and one at row 13.
+  hires.clearTextCells(1, 1, 20, 14);
+
+  // COM.bas line 80 prints a 40-character line at row 15. Text is opaque, so it clears that
+  // row across the full width, and the labels sit on black rather than on the fill.
+  hires.clearTextCells(1, 15, 40, 1);
+
   drawMenuBox(hires);
 
   hires.hcolor(3);
-  hires.text('COMMAND MODE', 4, 2);
+  // COM line 100: PRINT TAB( 3);"COMMAND MODE" - which lands on 0-based column 2.
+  hires.text('COMMAND MODE', 3, 2);
 
   drawOptions(hires, [
     { key: '1', label: 'COMPUTER' },
@@ -60,7 +82,13 @@ export function drawComMainScreen(hires: import('../engine/hires').Hires): void 
     { key: '5', label: 'RETURN' },
   ], 4, 2);
 
-  drawPrompt(hires, 14, 2);
+  // Line 95's PRINT, line 100's title and its trailing PRINT, and line 110's five options
+  // and their trailing PRINT put COMMAND? on 0-based row 9, not 13.
+  drawPrompt(hires, 10, 2);
+
+  // COM.bas line 80, verbatim: VTAB 15: HTAB 1: PRINT "  COMPUTER DISPLAY      DAMAGE CONTROL  "
+  hires.hcolor(3);
+  hires.text('  COMPUTER DISPLAY      DAMAGE CONTROL  ', 1, 15);
 }
 
 async function showError(hires: import('../engine/hires').Hires, lines: string[], durationMs = 2500): Promise<void> {

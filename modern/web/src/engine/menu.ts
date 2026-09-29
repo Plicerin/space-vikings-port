@@ -19,9 +19,10 @@ export function writeLines(
   lines: string[],
   color = 1,
 ): void {
-  // Clear the area where the lines will be drawn to avoid overlapping text.
-  // Apple II screens are 40 columns wide; we clear the full width of the block.
-  const width = 40 - col + 1;
+  // Clear only as far as the longest line, not out to the right edge. Text is opaque -
+  // every cell written blanks itself - so clearing past the text only destroys background
+  // the original keeps: Applesoft's PRINT does not pad to the window width either.
+  const width = Math.max(0, ...lines.map((l) => l.length));
   clearLines(hires, col, row, width, lines.length);
   hires.hcolor(color);
   for (let i = 0; i < lines.length; i++) {
@@ -38,8 +39,7 @@ export function clearLines(hires: Hires, col: number, row: number, width: number
 }
 
 export function drawTitle(hires: Hires, row: number, col: number, title: string): void {
-  // Clear the line before drawing the title to avoid overlap.
-  clearLines(hires, col, row, 40 - col + 1, 1);
+  clearLines(hires, col, row, title.length, 1);
   hires.hcolor(3);
   hires.text(title, col, row);
 }
@@ -50,8 +50,7 @@ export function drawOptions(
   startRow: number,
   col: number,
 ): void {
-  // Clear the block before drawing options to avoid overlap.
-  const width = 40 - col + 1;
+  const width = Math.max(0, ...options.map((o) => `${o.key}) ${o.label}`.length));
   clearLines(hires, col, startRow, width, options.length);
   hires.hcolor(1);
   for (let i = 0; i < options.length; i++) {

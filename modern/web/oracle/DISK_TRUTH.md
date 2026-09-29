@@ -1192,9 +1192,9 @@ It draws on **page 1**, and the original's page has **11,468** lit pixels.
 
 | region | agreement |
 | --- | --- |
-| COM's own area, rows 0-123 | **70.3%** |
+| COM's own area, rows 0-123 | **90.2%** |
 | rows 124-191, the panel | **98.3%** |
-| whole page | 80.2% |
+| whole page | 93.0% |
 
 The two regions have to be counted separately. COM fills rows 0 to 123 and never touches
 what is below, so the **instrument panel is still standing underneath it**. The port's
@@ -1202,22 +1202,66 @@ what is below, so the **instrument panel is still standing underneath it**. The 
 cost 3,011 pixels - the panel region was 84.2% and is now 98.3%. What remains there is the
 gauge fill `CALL 38402` draws, which is a known gap.
 
+### How the original clears its background - and it is not HOME
+
+This was wrong at first. COM sets the text window with `POKE 32/33/34/35` and calls `HOME`
+several times, and the obvious reading is that each `HOME` blanks the window over the fill.
+It does not. `HOME` clears the `$400` text page, which is invisible while the hi-res screen
+is showing; **only characters sent through `COUT` reach the character generator**.
+
+So the blanking is done by printed spaces, and one line does all of it. Line 29:
+
+```
+HOME: PRINT "                    ": HOME: VTAB 2:
+FOR X = 1 TO 12: PRINT "                    ": NEXT:
+PRINT "                    ";: HOME: POKE 32,1
+```
+
+Fourteen printed lines of twenty spaces - one at row 0, twelve from `VTAB 2`, one at row 13
+- and they run while the window is still `POKE 32,0` / `POKE 33,40` from lines 21 and 25.
+That is **0-based columns 0-19 over rows 0-13**, exactly what the capture shows, and not
+what line 80's window (left 1, width 21, bottom 14) would have given.
+
+The clue was the capture itself: the cleared block is 20 columns wide and starts at column
+0, while `WNDLFT`/`WNDWDTH` read 1 and 21 when COM settles. The window registers are a red
+herring here; the printed strings are the truth.
+
+`Hires.clearTextCells(col, row, cols, rows)` does the blanking, and `com.ts` calls it once
+for line 29's block and once for line 80's 40-character row.
+
+**`HTAB` and `TAB( )` are absolute screen columns, not window-relative.** Line 100's
+`PRINT TAB( 3);"COMMAND MODE"` lands on 0-based column 2, not on `WNDLFT + 2 = 3`, and the
+readouts' `HTAB 23/29/35` land on 0-based columns 22/28/34. The left margin of an untabbed
+`PRINT` does honour `WNDLFT`: line 110's options start at 0-based column 1.
+
+With that, the layout follows from the listing without guessing. Line 95's `PRINT`, line
+100's title and its trailing `PRINT`, and line 110's five options and their trailing `PRINT`
+put `COMMAND?` on 0-based row 9 - the port had it on row 13.
+
+One port-side habit had to go with it. `menu.ts` cleared each block out to the right edge
+(`40 - col + 1`) before writing, which was harmless while text was transparent and destroys
+background now that it is opaque. Applesoft's `PRINT` does not pad either, so the clear now
+runs only as far as the longest line.
+
+Rows 0-13, columns 0-19 now agree pixel for pixel.
+
 ### What is still wrong in COM's own area
 
-The port draws **12,614** lit pixels against the original's 8,457, and the excess is nearly
-all background: 7,229 pixels are in the port only, 3,072 in the disk only.
+The twelve right-hand readouts, and nothing else. Lines 40-70 lay them out in a 3 x 4 grid:
 
-The row strips say what is happening. At rows 112 to 119 the port is solid
-`0101010101...` - `HCOLOR= 6` filled straight across - where the original has sparse text
-or nothing at all.
+- `H(1..12) = 23, 29, 35` repeating - 0-based columns 22, 28, 34
+- `V(1..12) = 2, 5, 8, 11` in blocks of three - 0-based rows 1, 4, 7, 10
+- line 70 loops `FOR J = 1 TO 2`, so each readout prints **two** lines, on that row and the
+  one below: rows 1-2, 4-5, 7-8 and 10-11
 
-The original fills, and then **clears its text windows over the fill**. COM sets the text
-window with `POKE 32/33/34/35` and calls `HOME` and prints blanks several times (lines 21,
-25, 29, 80), and through the hi-res character generator each of those writes black cells
-over the background. The port fills and does not clear.
+Each line is `T = PEEK(X): GOSUB 10000: VTAB V(I): HTAB H(I): READ T$: PRINT T$`, where `X`
+comes from `ST(1..12)` (set by the `GOSUB 15100` at line 12) and the strings come from the
+program's `DATA`. They are ship state, so they need the state model, not more text-window
+work.
 
-That is the next thing to fix in COM, and it needs the character generator's window
-handling, not just its glyphs.
+That accounts for all 787 disk-only and 2,634 port-only pixels that remain: the disk's
+readouts are `HCOLOR= 0` over the fill, so where the disk has dark glyph cells the port
+still has `HCOLOR= 6` background.
 
 ---
 
@@ -1231,8 +1275,8 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Seventeen of the 23 programs.** GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, STATUS,
   SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
   programs are extracted and readable but nothing has been compared against them.
-- **COM's text windows.** Its own area is at 70.3%; the port fills the background and does
-  not clear text windows over it the way the original does.
+- **COM's twelve readouts.** Its own area is at 90.2% and the text windows are exact; what
+  is left is the 3 x 4 grid of ship-state values from lines 40-70.
 - **Sound.** SOUND GEN (`$9276`), LASER (`$92D1`) and EXPL (`$9270`) have never been
   disassembled or listened to. `audio.ts` says outright that it approximates them.
 - **Game logic.** Combat, damage, the economy, ground assaults - the BASIC for all of it is
