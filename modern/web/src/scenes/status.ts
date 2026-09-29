@@ -39,7 +39,9 @@ export async function statusScene(ctx: SceneContext, scenes: SceneManager): Prom
   hires.hcolor(5);
   hires.line(1, 38, 279, 38);
 
-  const energyPct = Math.min(100, Math.round((state.energy / 2000) * 100));
+  // STATUS line 1255, verbatim: EN = PEEK(38199): EN = EN / 62: EN = INT(EN * 100).
+  // It divides by 62 while a full tank is 63, so the original reads 101% - not clamped.
+  const energyPct = Math.floor((state.energy / 62) * 100);
   hires.hcolor(1);
   hires.text('ENERGY', 1, 6);
   hires.text(`${energyPct}%`, 10, 6);

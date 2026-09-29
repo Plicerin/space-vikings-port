@@ -49,6 +49,19 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   const dy = Math.abs(src.y - dst.y);
   const dz = Math.abs(src.z - dst.z);
   const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+  // The jump cost, H/D lines 10010 and 10020:
+  //
+  //   10010 X1 = ABS(PEEK(38366 + PEEK(38209))) - ABS(PEEK(38366 + PEEK(38163)))
+  //         Y1 = <the same expression>: Z1 = <the same expression>
+  //   10020 D1 = INT(SQR(X1 ^ 2 + Y1 ^ 2 + Z1 ^ 2) + .6)
+  //
+  // 38366 is the X table - GALAXY MAP 3020 reads X, Y and Z from M, M - 21 and M - 42 with
+  // M = 38366 - and line 10010 reads the X expression into all three variables. Y and Z
+  // never enter the cost, so the sum under the root is 3 * X1 ^ 2 and D1 comes out as
+  // |dX| * sqrt(3), rounded. Copy-paste, by the look of it, but it is what the disk does.
+  const dxByte = dst.x - src.x;
+  const jumpCost = Math.floor(Math.sqrt(3 * dxByte * dxByte) + 0.6);
   state.jumpDistance = distance;
   glog('hyperdrive', `jumping to ${dst.name} dist=${distance.toFixed(1)}`);
 
@@ -147,7 +160,8 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
     requestAnimationFrame(frame);
   });
 
-  state.stardate += distance + 0.3;
+  // H/D line 6: SD = SD + D1 + .3 - the same D1, not the true distance.
+  state.stardate += jumpCost + 0.3;
   state.planetIndex = state.navDestination;
   state.navDestination = null;
   state.commanderMapTarget = null;
@@ -181,7 +195,7 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   state.pitch = 0;
   state.bank = 0;
 
-  state.energy = Math.max(0, state.energy - Math.ceil(distance));
+  state.energy = Math.max(0, state.energy - jumpCost);
 
   return scenes.run('starshipSimulator');
 }

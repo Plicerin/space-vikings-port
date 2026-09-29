@@ -52,7 +52,10 @@ export const HUD_LAYOUT = {
     },
     {
       startCol: 163,
-      endColExpr: (s: any) => 163 + Math.round(s.energy / 17.9),
+      // The energy byte is 0-63 ($9537), not the 0-2000 this file was written against.
+      // Note the disk draws a needle here, shape 13 at 199 + E - see drawPanelNeedles -
+      // not a bar; this whole block is the port's own reading of the panel.
+      endColExpr: (s: any) => 163 + Math.round((s.energy / 63) * 112),
       rows: [132, 144],
       color: 1, // white
     },

@@ -224,26 +224,12 @@ export interface PanelNeedles {
   pitch: number;
   /** S - PEEK(38157), 0-120. */
   speed: number;
-  /** E - PEEK(38199), 0-62. */
+  /** E - PEEK(38199), 0-63. */
   energy: number;
 }
 
 const HL = 255;
 
-/** STATUS line 1255 divides the energy byte by 62, so that is full scale on the disk. */
-export const DISK_ENERGY_FULL = 62;
-/**
- * The port's own starting energy, from gameState.ts. Not from the disk: the machine reads
- * 63 in $9537 on a fresh ship, and two separate uses of that byte agree on a 0-62 scale -
- * STATUS dividing by 62, and line 173's EX = 199 + E spanning the 199-260 needle track.
- * The port's 2000 came from the repo's own analysis and is an open question, so everything
- * that needs the disk's byte scales rather than comparing raw.
- */
-export const PORT_ENERGY_FULL = 2000;
-
-export function diskEnergyByte(portEnergy: number): number {
-  return Math.round((portEnergy / PORT_ENERGY_FULL) * DISK_ENERGY_FULL);
-}
 
 export function needlePositions(n: PanelNeedles): { tx: number; vy: number; sx: number; ex: number } {
   return {

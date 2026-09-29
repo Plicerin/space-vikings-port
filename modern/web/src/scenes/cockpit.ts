@@ -7,7 +7,7 @@ import {
 } from '../engine/math3d';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import type { ShapeTable } from '../engine/shapeTable';
-import { drawPanelNeedles, erasePanelNeedles, diskEnergyByte } from './instruments';
+import { drawPanelNeedles, erasePanelNeedles } from './instruments';
 import type { PanelNeedles } from './instruments';
 import {
   computeShipPointScale,
@@ -866,8 +866,9 @@ const enemy = spawnEnemy(state);
     clearPendingConquestCollection(state, state.planetIndex);
     state.planetVitalityLimit = 100;
   }
-  if (state.missilesRemaining < 2 || state.energy < 15) return;
-  state.energy = Math.max(0, state.energy - 15);
+  // No energy cost. The one write to 38199 anywhere on the disk is H/D line 15, so firing
+  // does not spend fuel - the 15 and 3 that used to be charged here were invented.
+  if (state.missilesRemaining < 2) return;
   glog('fire', `missile missiles=${state.missilesRemaining}`);
   const fwd = forwardVector(pitchRad, headingRad);
       const startPos = v3add(v3(state.x, state.y, state.z), v3scale(fwd, 100));
@@ -894,8 +895,7 @@ const enemy = spawnEnemy(state);
     clearPendingConquestCollection(state, state.planetIndex);
     state.planetVitalityLimit = 100;
   }
-  if (!state.laserOperational || state.damage.laserPct < 10 || state.energy < 3) return;
-  state.energy = Math.max(0, state.energy - 3);
+  if (!state.laserOperational || state.damage.laserPct < 10) return;
   glog('fire', `laser`);
   laserBolts.push({
         x1: 90, y1: 123, x2: 136, y2: 60,
@@ -1542,7 +1542,7 @@ function drawHUD(
       bank: state.bank,
       pitch: state.pitch,
       speed: Math.max(0, Math.min(120, Math.round(state.speed))),
-      energy: diskEnergyByte(state.energy),
+      energy: Math.round(state.energy),
     };
     if (prevNeedles) erasePanelNeedles(hires, panelShapes, prevNeedles);
     drawPanelNeedles(hires, panelShapes, needles);

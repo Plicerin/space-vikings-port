@@ -575,6 +575,76 @@ that needs the disk's byte now goes through `diskEnergyByte()`, which scales, so
 depends on which is right - but the port's energy model still does not match the disk.
 ---
 
+## The energy byte, settled
+
+`$9537` (38199) had been the port's `energy = 2000`, from the repo's own analysis. It is a
+small byte, and four things on the disk agree on the scale:
+
+| source | says |
+| --- | --- |
+| SHORE LEAVE 2525 | refills it to **63**, where every other system gets 100 |
+| STARSHIP SIMULATOR 173 | `EX = 199 + E`, on a track with ticks at x 199, 231, 261 |
+| COM `GOSUB 10000` | hides POWER LOW below **16** |
+| the machine | reads **63** on a fresh ship |
+
+SHORE LEAVE is the clearest, because it special-cases this one byte out of twelve. Its
+repair loop reads the line 2500 DATA in pairs and `J = 2` is ENERGY:
+
+```
+2510 PRINT "  REPAIR SHIP": FOR J = 1 TO 12: READ A$: READ LO
+2520 D = PEEK(LO): IF D < 100 AND J < > 10 AND J < > 2 THEN ... POKE LO,100
+2524 IF D < 63 AND J = 2 THEN D2 = 63 - D:D2 = D2 * (100 / 63)
+2525 IF D < 63 AND J = 2 THEN ... POKE LO,63
+```
+
+**STATUS is the odd one out, and it is the original that is wrong.** Line 1255 reads
+`EN = PEEK(38199): EN = EN / 62: EN = INT(EN * 100)` - divided by 62 while a full tank is
+63, so a full tank reads **101%**. The port reproduces that rather than clamping it.
+
+### Only the hyperdrive spends it
+
+Across all 23 programs there is exactly one write to 38199, at H/D line 15. Not firing, not
+damage, not time. The port had been charging 15 energy for a missile and 3 for a laser bolt;
+both were invented, and both are gone.
+
+H/D's whole use of it:
+
+```
+2  IF PEEK(38199) < > 0 THEN 5          ' zero means OUT OF ENERGY, ORBIT DECAYING, RUN S/X
+14 P = PEEK(38199):P = P - D1: IF P < 0 THEN P = 0
+15 POKE 38199,P
+```
+
+### The jump cost reads one axis three times
+
+```
+10010 X1 = ABS(PEEK(38366 + PEEK(38209))) - ABS(PEEK(38366 + PEEK(38163)))
+      Y1 = <the same expression>: Z1 = <the same expression>
+10020 D1 = INT(SQR(X1 ^ 2 + Y1 ^ 2 + Z1 ^ 2) + .6)
+```
+
+**38366 is the X table.** GALAXY MAP 3020 reads X, Y and Z from `M`, `M - 21` and `M - 42`
+with `M = 38366`, and the port's planet coordinates were extracted from exactly those three.
+Line 10010 reads the X expression into all three variables, so Y and Z never enter the cost:
+the sum under the root is `3 * X1 ^ 2`, and `D1` comes out as `|dX| * sqrt(3)`, rounded. Two
+planets at the same X cost nothing to travel between however far apart they are.
+
+It looks like copy-paste - the `- 21` and `- 42` that GALAXY MAP has are simply missing - but
+the port reproduces it, the way it reproduces the inverted warning lamps and STATUS's 101%.
+
+The same `D1` is the stardate cost: H/D line 6 is `SD = SD + D1 + .3`, not the true distance.
+
+### What this leaves
+
+`vectorRenderer.ts` still scales the energy gauge by 2000. That file has another agent's
+uncommitted work in it and was left alone; it needs the same one-line change.
+
+Nothing checks the *rate* at which the disk spends energy beyond the jump, because there is
+no other spend. What remains unknown is where a new game's 63 is written - START does not
+POKE 38199, so the opening value comes from a BLOAD rather than from BASIC.
+
+---
+
 ## Ships and shapes
 
 Two unrelated things live under "shapes" on this disk, and conflating them is what went
@@ -1458,12 +1528,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Seventeen of the 23 programs.** GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, STATUS,
   SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
   programs are extracted and readable but nothing has been compared against them.
-- **The port's energy scale.** `gameState.ts` starts it at 2000. Three things on the disk
-  say 0-62: STATUS line 1255 divides `$9537` by 62, STARSHIP SIMULATOR line 173 spans it
-  across the 199-260 needle track, and the machine reads 63 on a fresh ship. Everything that
-  needs the byte goes through `diskEnergyByte()`, so nothing depends on which is right, but
-  the model itself has not been reconciled and nothing else that consumes energy - burn
-  rate, hyperdrive cost, restocking - has been checked at all.
+- **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
+  program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
+  rides along in it, has not been traced.
+- **`vectorRenderer.ts`'s energy gauge** still divides by 2000. Left alone because that file
+  carries another agent's uncommitted work.
 - **Sound.** SOUND GEN (`$9276`), LASER (`$92D1`) and EXPL (`$9270`) have never been
   disassembled or listened to. `audio.ts` says outright that it approximates them.
 - **Game logic.** Combat, damage, the economy, ground assaults - the BASIC for all of it is

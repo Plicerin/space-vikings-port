@@ -2,7 +2,6 @@ import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 import { drawOptions, drawPrompt, getChoice, writeLines, clearLines } from '../engine/menu';
 import { ShapeRenderer } from '../engine/shapeTable';
-import { diskEnergyByte } from './instruments';
 
 const PLANET_NAMES = [
   'SOL', 'ALPHA CENTAURI', "BARNARD'S STAR", 'WOLF 359', 'LUYTEN',
@@ -115,7 +114,7 @@ export function comStatusBytes(
   return {
     38198: d.engine1Pct, 38197: d.engine2Pct, 38196: d.computerPct,
     38195: d.radarPct, 38194: d.envPct, 38193: d.hullPct,
-    [COM_ENERGY]: diskEnergyByte(state.energy),
+    [COM_ENERGY]: Math.round(state.energy),
     38200: d.shieldsPct, 38190: d.hyperdrivePct,
     38187: state.missilesRemaining, 38186: d.laserPct, 38185: d.comsPct,
   };

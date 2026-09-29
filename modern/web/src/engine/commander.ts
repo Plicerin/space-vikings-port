@@ -1,5 +1,6 @@
 import { log as glog } from './gameLog';
 import type { GameState } from './gameState';
+import { ENERGY_FULL, ENERGY_LOW } from './gameState';
 
 export function hasCargoLoot(state: GameState): boolean {
   const loot = state.loot;
@@ -12,7 +13,7 @@ export function needsCommanderService(state: GameState): boolean {
     || state.damage.shieldsPct < 35
     || state.damage.laserPct < 35
     || state.damage.hyperdrivePct < 50
-    || state.energy < 250
+    || state.energy < ENERGY_LOW
     || state.forces.transports < 2
     || state.forces.troops < 500;
 }
@@ -65,7 +66,8 @@ export function chooseCommanderBase(state: GameState): number {
 export function serviceCommanderShip(state: GameState): void {
   const beforeCredits = state.credits;
   state.missilesRemaining = 60;
-  state.energy = Math.max(state.energy, 2000);
+  // SHORE LEAVE line 2525 refills energy to 63, not to the 100 everything else gets.
+  state.energy = Math.max(state.energy, ENERGY_FULL);
   state.damage.engine1Pct = 100;
   state.damage.engine2Pct = 100;
   state.damage.computerPct = 100;

@@ -25,6 +25,11 @@ export type Condition = 'green' | 'blue' | 'red';
 /** Active weapon mode. Toggled by W key. */
 export type WeaponMode = 'missile' | 'laser';
 
+/** SHORE LEAVE line 2525 refills the energy byte to 63, not to 100 like everything else. */
+export const ENERGY_FULL = 63;
+/** COM's GOSUB 10000 hides the POWER LOW readout below this, so it is the disk's own "low". */
+export const ENERGY_LOW = 16;
+
 export interface DamageState {
   engine1Pct: number;
   engine2Pct: number;
@@ -288,9 +293,23 @@ export class GameState {
 
   /** Pending immediate re-assault recovery flag after defeat/retreat */
   
-  /** Ship energy (fuel) — starts at 2000, decremented by hyperdrive jumps.
-   *  When 0, hyperdrive is unavailable. */
-  energy = 2000;
+  /**
+   * Ship energy - the byte at $9537 (38199), and it is a small one.
+   *
+   * Four things on the disk agree on the scale. SHORE LEAVE's repair loop refills every
+   * system to 100 except this one, which line 2525 special-cases to **63** (`J = 2` is
+   * ENERGY in the line 2500 DATA). STARSHIP SIMULATOR line 173 puts the needle at
+   * `199 + E`, on a track whose tick marks are at x 199, 231 and 261. COM's POWER LOW
+   * readout gates on `< 16`. And the machine reads 63 in $9537 on a fresh ship.
+   *
+   * STATUS line 1255 is the odd one out: `EN = PEEK(38199): EN = EN / 62: EN = INT(EN*100)`
+   * divides by 62, so a full tank reads 101%. That is the original's arithmetic and the
+   * port reproduces it.
+   *
+   * **Only the hyperdrive spends it.** Across all 23 programs the one write to 38199 is
+   * H/D line 15. Nothing else - not firing, not damage, not time - touches it.
+   */
+  energy = ENERGY_FULL;
 
   /** Immediate re-assault recovery flag after ground-forces defeat.
    *  Set when assault fails, reset on conquest success. */
