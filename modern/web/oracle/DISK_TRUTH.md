@@ -2633,6 +2633,88 @@ the float one rather than replacing it.
 
 ---
 
+## The rotation chain, and where the port's focal lengths come from
+
+Watching every write to `$60` during one render points at `$67E6`/`$67E8`, the tail of
+`$67D4`. Its caller is the transform:
+
+```
+$6730  the model point from ($9B),Y minus $90-$95  -> $AB/$AC, $AD/$AE, $AF/$B0
+$675B  LDX #$AB / LDY #$7E / LDA #$A7 / JSR $633D   ; dx * m00 -> $A7
+$6764  LDX #$AD / LDY #$84 / LDA #$A9 / JSR $633D   ; dy * m01 -> $A9
+$676D  dz * $8A/$8B through $635C, then JSR $67D4   ; sum the three and store
+       ...twice more, with $80/$86/$8C and $82/$88/$8E
+$67D4  CLC / ADC $A7 ... ADC $A9 ... LDX $B2 / STA $01,X / STY $00,X / INC $B2 / INC $B2
+```
+
+So it is `camera = M . (p - origin)`, with M nine 16-bit Q15 entries at `$7E`, `$80`, `$82`,
+`$84`, `$86`, `$88`, `$8A`, `$8C`, `$8E`, and `$635C` - the Q15 multiply this file already
+had - doing the arithmetic.
+
+### The matrix is not a rotation. It scales each axis.
+
+Trapped from a live render at heading 0, pitch 0, it is **diagonal and not the identity**:
+
+| | dx | dy | dz |
+| --- | --- | --- | --- |
+| out x | 16123 | 0 | 0 |
+| out y | 0 | 32765 | 0 |
+| out z | 0 | 0 | 9539 |
+
+which as Q15 fractions is **0.4920, 0.9999, 0.2911**. The renderer squashes x to about half
+and z to under a third before it divides.
+
+### That is exactly where the port's fitted focal lengths came from
+
+`$68A1` scales the quotient by its clamp limits - 69 for x, 62 for y - and `$6DD5` doubles x
+when it plots. Applying those to the *world* ratio rather than the renderer's own:
+
+| | from the machine | the port's fit |
+| --- | --- | --- |
+| `FOCAL_X` | `69 x 2 x (0.4920 / 0.2911)` = **233** | 230.90 |
+| `FOCAL_Y` | `62 x (0.9999 / 0.2911)` = **213** | 212.80 |
+
+Two numbers that had been least-squares fits against captured frames, now derived from the
+machine code. The port's comment guessed that `FOCAL_Y / FOCAL_X` of 0.922 was the Apple's
+pixel aspect; it is not, it is `62 / 138` times `Sy / Sx`, and the pixel aspect never enters
+it.
+
+This also answers why the transcribed `$68A1` could not simply replace `projectCameraSpace()`:
+the machine's camera space is the port's, anisotropically scaled, so the two focal lengths
+differ by different factors - 1.673 for x and 3.432 for y.
+
+### How the matrix varies
+
+Sweeping heading and pitch, it is `S . R`, with `R` built from the machine's own trig:
+
+```
+  heading pitch     m00    m01    m02    m10    m11    m12    m20    m21    m22
+        0     0   16123      0      0      0  32765      0      0      0   9539
+       16     0   14720      0  -6121      0  32765      0   3721      0   8813
+       64     0       0      0 -15998      0  32765      0   9725      0      0
+        0    16   15932      0      0      0  30271  12537      0  -3650   8813
+       32    32   11399      0 -11311  16380  23167  16380   4862  -6746   4769
+```
+
+At pitch 16, `Sy cos` is 32765 x 0.9239 = 30271 exactly and `Sz cos` is 8813 exactly, so the
+shape is right. `m00` drifting from 16123 to 15932 across a pitch change that should not
+touch it - 1.2% - is the **sine and cosine being wrong outside the first quadrant**, which
+this file already records as up to 1.48%. The matrix is built with the disk's own broken
+trig, so a port that wants the same pixels has to use the same broken trig.
+
+### What is still not done
+
+The matrix **construction** - the code that turns `$7321` and `$7323` into those nine entries
+- has not been found. Ten combinations of heading and pitch are captured in
+`captured/rot/golden.json`, which is enough to check an implementation against but not to
+write one from.
+
+Until that is read, `toCameraSpace()` stays in floating point. The chain is now understood
+end to end in structure, and two of its three pieces are transcribed exactly - `$6DD5` and
+`$68A1` - but the third still needs reading rather than fitting.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
