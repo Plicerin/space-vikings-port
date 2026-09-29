@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { damageTick3000 } from '../engine/diskDamage';
 import { GameState } from '../engine/gameState';
 import {
   Camera, forwardVector, makeStarfield, project, Star, v3, v3add, v3sub,
@@ -585,22 +586,14 @@ const enemy = spawnEnemy(state);
           });
           audio.beep(1200, 30);
 
+          // The original has no per-bolt hit on the player: nothing in STARSHIP SIMULATOR
+          // tests whether an enemy's shot reaches you. Damage is the periodic tick at 3000,
+          // gated by 38205 or 38210, and ground fire, which 5098 sends into 3205 alone with
+          // L = 7 so it can only touch the shields. The flash stays; the invented
+          // `shields -= 0.5 + rnd * 2` and `hull -= rnd * 3` are gone.
           const dx = f.screenX - 140;
           const dy = f.screenY - 60;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 50) {
-            state.damage.shieldsPct -= 0.5 + Math.random() * 2;
-            state.damage.shieldsPct = Math.max(0, state.damage.shieldsPct);
-            if (!state.shieldsOn || state.damage.shieldsPct <= 10) {
-              state.damage.hullPct -= Math.random() * 3;
-              state.damage.hullPct = Math.max(0, state.damage.hullPct);
-              if (state.damage.hullPct <= 0) next = 'playerDeath';
-            }
-            if (!state.damage.pendingUpdate) {
-              state.damage.pendingUpdate = true;
-            }
-            flashes.push({ timer: 0.08, type: 'hit' });
-          }
+          if (Math.sqrt(dx * dx + dy * dy) < 50) flashes.push({ timer: 0.08, type: 'hit' });
         } else {
           f.firing = false;
         }
@@ -1010,66 +1003,55 @@ function onLaserHit() {
     }
 
   function enemyAttack(nearPlanet: boolean) {
-  // STARSHIP_SIM:3000-3360
-  glog('enemyAttack', `shields=${state.shieldsOn} hull=${state.damage.hullPct.toFixed(0)}`);
-  let dmg = false;
+    // Lines 3000-3381, in diskDamage.ts, transcribed from the listing and checked against a
+    // real flight. Two things were wrong here: the heavy branch is 3001 AND 3010, two rolls
+    // at .4, so 0.16 and not 0.4 - a damaging tick is 0.412 likely, where reading it as one
+    // roll gave 0.58 and took damage 40% too often - and the shield gate at 3205 tests the
+    // POKEd byte, so shields of 10.9 store as 10 and let the rest of the ship take it.
+    void nearPlanet;
+    const d = state.damage;
+    const r = damageTick3000({
+      shields: d.shieldsPct, radar: d.radarPct,
+      engine1: d.engine1Pct, engine2: d.engine2Pct,
+      computer: d.computerPct, laser: d.laserPct, hull: d.hullPct,
+    }, {
+      shieldsOn: state.shieldsOn,
+      // 38205, which 3000 tests against 38210: an enemy is out there, or you are in air.
+      enemyPresent: enemy.alive,
+      atmosphere: state.atmosphere,
+    });
 
-      // Ground fire — random explosion flashes
-      if (Math.random() < 0.4) {
-        flashes.push({ timer: 0.1 + Math.random() * 0.15, type: 'explosion' });
-        audio.beep(200, 50);
-        dmg = true;
-      }
+    // 3019 flashes `RND(1) * 5` times; 3032 flashes once. Both make a noise.
+    for (let i = 0; i < r.heavyFlashes; i++) {
+      flashes.push({ timer: 0.1 + Math.random() * 0.15, type: 'explosion' });
+    }
+    if (r.heavyBranch) audio.beep(200, 50);
+    if (r.lightBranch) {
+      laserBolts.push({ x1: 40 + Math.random() * 200, y1: 123, x2: 136, y2: 60, age: 0.08 });
+      laserBolts.push({ x1: 40 + Math.random() * 200, y1: 123, x2: 144, y2: 60, age: 0.08 });
+      audio.beep(300, 60);
+    }
+    if (!r.struck) return;
 
-      // Laser from planet
-      if (Math.random() < 0.3) {
-        laserBolts.push({
-          x1: 40 + Math.random() * 200, y1: 123,
-          x2: 136, y2: 60,
-          age: 0.08,
-        });
-        laserBolts.push({
-          x1: 40 + Math.random() * 200, y1: 123,
-          x2: 144, y2: 60,
-          age: 0.08,
-        });
-        audio.beep(300, 60);
-        dmg = true;
-      }
+    d.shieldsPct = r.damage.shields;
+    d.radarPct = r.damage.radar;
+    d.engine1Pct = r.damage.engine1;
+    d.engine2Pct = r.damage.engine2;
+    d.computerPct = r.damage.computer;
+    d.laserPct = r.damage.laser;
+    d.hullPct = r.damage.hull;
+    d.laserOperational = d.laserPct >= 10;
+    state.laserOperational = d.laserOperational;
 
-      if (!dmg) return;
-
-  // Apply damage to player ship (STARSHIP_SIM:3205-3360)
-  // Line 3205: shields always take damage first
-  state.damage.shieldsPct -= Math.random() * 1.1;
-  state.damage.shieldsPct = Math.max(0, state.damage.shieldsPct);
-  // If shields > 10 AND shields on, damage is absorbed — return
-  if (state.shieldsOn && state.damage.shieldsPct > 10) return;
-
-  // Shields depleted or off — damage all other systems
-  state.damage.radarPct -= Math.random() * 5;
-  state.damage.engine1Pct -= Math.random() * 5;
-  state.damage.engine2Pct -= Math.random() * 5;
-  state.damage.computerPct -= Math.random() * 5;
-  state.damage.laserPct -= Math.random() * 5;
-  state.damage.hullPct -= Math.random() * 4;
-  state.damage.laserOperational = state.damage.laserPct >= 10;
-  state.laserOperational = state.damage.laserOperational;
-
-        for (const key of Object.keys(state.damage)) {
-          if (key === 'pendingUpdate' || key === 'laserOperational') continue;
-          (state.damage as any)[key] = Math.max(0, (state.damage as any)[key]);
-        }
-
-        if (state.damage.hullPct <= 0) {
-          glog('destroy', `hull=0`);
-          next = 'playerDeath';
-        }
-
-  if (!state.damage.pendingUpdate) {
-    state.damage.pendingUpdate = true;
+    glog('enemyAttack', `shields=${state.shieldsOn} hull=${d.hullPct.toFixed(0)}` +
+      `${r.absorbedByShields ? ' absorbed' : ''}`);
+    if (r.destroyed) {
+      glog('destroy', 'hull=0');
+      next = 'playerDeath';
+    }
+    // 3360: the DMG screen only the first time damage gets through.
+    if (!d.pendingUpdate) d.pendingUpdate = true;
   }
-}
 
     function spawnFighter(originX: number, originY: number, originValid: boolean) {
       // STARSHIP_SIM:5000-5096

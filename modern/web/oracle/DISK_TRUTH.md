@@ -3374,6 +3374,106 @@ the harness reports the disk's own figures beside the port's so the two can be r
 
 ---
 
+## The damage model, and a byte that is not what it says
+
+Lines 3000-3381, with 5098, and they are reached from two places:
+
+```
+190  IF PEEK(38208) = 0 AND PEEK(38210) = 1 THEN GOSUB 3000:
+     IF RND(1) < .5 AND PEEK(38207) > 0 THEN GOSUB 5000
+192  IF PEEK(38208) = 0 AND X > -3500 AND X < 4500 AND Y > -3000 AND Y < 3000
+     AND Z > -6000 AND Z < 2000 THEN GOSUB 3000:
+     IF RND(1) < .6 AND PEEK(38207) > 0 THEN GOSUB 5000
+```
+
+so damage happens while the planet has not surrendered and the ship is either in atmosphere or
+inside a box around the planet, and ground fire may follow it if a battery is left at 38207.
+
+`3000` then gates twice, damages once, and returns:
+
+```
+3000 IF PEEK(38205) = 0 AND PEEK(38210) = 0 THEN RETURN
+3001 IF RND(1) > .4 THEN 3030
+3010 IF RND(1) > .4 THEN 3030
+3019 ...flash RND(1)*5 times, sound... DMG = 1
+3030 IF RND(1) > .3 THEN 3200
+3032 ...flash, sound... DMG = 1
+3200 IF DMG = 0 THEN RETURN
+3205 J = PEEK(38200) - (RND(1)*1.1): GOSUB 3380: POKE 38200,J:
+     IF PEEK(38200) > 10 AND PEEK(38201) = 1 THEN RETURN
+3207 IF L = 7 THEN RETURN
+3230 radar 38195, then 38198, 38197, 38196, 38186 at RND(1)*5, then 38193 at RND(1)*4
+3350 POKE 38193,J: DMG = 0: IF J = 0 THEN PRINT "RUNS/X"
+3360 IF PEEK(38393) = 0 THEN POKE 38393,1: PRINT "RUNDMG"
+3380 IF J < 0 THEN J = 0
+```
+
+### Four things the port had wrong
+
+- **The heavy branch needs two rolls.** `3001` and `3010` are separate
+  `IF RND(1) > .4 THEN 3030`, so 3019 wants **both** at or under .4 - a chance of **0.16**, not
+  0.4. With 3030's independent 0.3 that makes a damaging tick **41.2%** likely. Read as one
+  roll it comes out 58%, and the port was taking damage about 40% too often.
+- **There is no per-bolt hit on the player.** Nothing in the original tests whether an enemy's
+  shot reaches you; the port had invented `shields -= 0.5 + rnd*2` and `hull -= rnd*3` on a
+  50-pixel proximity test. Damage is the periodic tick and nothing else.
+- **Ground fire touches shields only.** `5098` is `L = 7: GOSUB 3205: L = 0`, and `3207` is
+  `IF L = 7 THEN RETURN` - so a shot from the surface enters at 3205, takes `RND(1)*1.1` off
+  the shields, and stops. It cannot reach the hull. Neat reuse: `L` is the shields-only flag.
+- **The shield gate tests the POKEd byte.** `POKE 38200,J: IF PEEK(38200) > 10` - shields of
+  10.9 store as **10**, the test fails, and the rest of the ship takes the hit. Testing the
+  unrounded number absorbs something the original lets through.
+
+Five systems are never touched by this routine: energy 38199, env. control 38194, hyperdrive
+38190, missiles 38187 and nav. comp. 38184.
+
+### 38194 is not env. control. It is a loop counter.
+
+`oracle/probe_damage.mjs` reads all thirteen systems together rather than only the six, which
+is what turned this up: 38194 moved 42 times in three short runs and **went up**, repeatedly to
+128.
+
+Nothing in any BASIC program on the disk writes it. Trapping every write to `$9532` during
+flight finds them all in **MEM TRANSFER A**, which BLOADs to `$9400`:
+
+```
+$9400  LDX #$00 / STX $9532
+$9406  LDX $9532 / CPX #$80 / BEQ $946D
+$940D  LDA $8BEC,X / STA $00 / LDA $8D7C,X / STA $04
+$9417  INC $9532 ...
+```
+
+`$9532` is its index, counted 0 to `$80` while it moves 128 bytes between `$8BEC` and `$8D7C`.
+And lines 150 and 153 are `CALL 37936` and `CALL 37888` - `$9430` and `$9400` - **every pass
+of the main loop**, alternating on the page flip. So the byte under the ENV. CONTROL readout is
+being counted from 0 to 128 continuously while you fly.
+
+SHORE LEAVE 2500's `DATA` names 38194 ENV. CONTROL and COM 15140 shows it as `ST(5)`, so the
+readout exists and is fed a counter. This is a collision in the original, not a reading error:
+env. control is not a system that can be damaged or repaired, because nothing can hold a value
+there for longer than a frame.
+
+38187's changes are the missile count - `1090 J = PEEK(38187) - 2: GOSUB 3380: POKE 38187,J`,
+which is firing one, not being hit.
+
+### Checked
+
+On the disk, over three runs - shields down, shields up and full, shields up but at 8:
+
+| | result |
+| --- | --- |
+| what moved under damage | shields, radar, both engines, computer, laser, hull - nothing else |
+| energy, hyperdrive, nav. comp. | never moved at all |
+| anything going **up** | none |
+| anything over its per-tick bound | none |
+| ticks taking shields alone / the rest as well | 18 / 5 |
+
+and `oracle/damage_parity.mjs` puts 40000 ticks of the port through the same predicates, plus
+the one number the listing gives outright: a tick damages something **41.3%** of the time
+against the 41.2% the two gates predict.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -3381,12 +3481,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Applesoft's line algorithm, properly.** `Hires.line()` is fitted to RADAR's reticle,
-  which it matches exactly, and SHIP # 3 and # 4 contradict it on 45 degree and 1-in-3
-  slopes - 109 and 19 corner pixels the port does not draw. Dropping the fitted rule makes
-  all three worse. The ROM routine needs disassembling. STATUS, GALAXY MAP, RADAR,
-  GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D. are done - every program on the disk
-  has now been looked at.
 - **Why one empty inverse PRINT whitens a whole page.** S/X line 5 does it, measured; the
   mechanism in the character generator is not derived.
 - **EX line 6's XDRAW.** The port draws the five flash shapes rather than XORing them, which
@@ -3400,9 +3494,9 @@ is what is genuinely not known, roughly in order of how much it matters.
   is not established.
 - **Why a full-width PRINT behaves differently at left margin 0 and 1.** SUPPLY loses its
   last character and GROUND FORCES does not; both are measured, neither is explained.
-- **Four of SHORE LEAVE's six sub-screens.** ENLIST TROOPS, SELL LOOT, REPAIR/RESTOCK and
-  ESTABLISH BASE are not captured. REPAIR needs the ship in atmosphere; the others need
-  credits, loot or an unbuilt base.
+- **Two of SHORE LEAVE's six sub-screens.** ENLIST TROOPS and REPAIR/RESTOCK are not
+  captured; REPAIR needs the ship in atmosphere. SELL LOOT and ESTABLISH BASE came out of
+  `probe_economy.mjs`.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
@@ -3410,23 +3504,25 @@ is what is genuinely not known, roughly in order of how much it matters.
   it no `RND`-driven routine can be reproduced exactly - which is why the combat is checked
   by predicate rather than by replay, and why EXPL's noise can only be matched given the same
   floating-bus reads. Transcribing it means transcribing Applesoft's floating point.
-- **Damage, and the rest of the game logic.** The economy and GROUND FORCES' combat are done.
-  STARSHIP SIMULATOR's damage model, the enemy AI and RECALL's branches are still only read.
+- **The enemy AI, and RECALL's branches.** The economy, GROUND FORCES' combat and the damage
+  model are done. STARSHIP SIMULATOR's enemy movement and firing, and four of RECALL's five
+  branches, are still only read.
+- **What feeds the ENV. CONTROL readout, if anything.** 38194 is MEM TRANSFER A's loop counter
+  and COM shows it as a system percentage. Whether the game was ever meant to have an env.
+  control system, or the address was simply reused, is not knowable from the disk.
 - **Five display-list opcodes.** `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` are in the
   table at `$6076` and no model on the disk reaches them.
 
-### Rendering, where the remaining error is
+### Rendering
 
-- **Exact pixel overlap.** Geometry is 98-100% within a pixel for ground and ships and the
-  extents match, but landing on the *same* pixel needs the renderer's own arithmetic. Two of
-  the three pieces are now transcribed and exact - the line at `$6DD5` and the projection at
-  `$68A1` - and the third is what fills `$60-$65`: the rotation and scaling that puts a world
-  point into the renderer's camera space. Until that is read, `projectCameraSpace()` stays in
-  floating point. Ships 71.9% exact, ground 67.5%, stars 38.9%.
-- **Opcode 3** in the model bytecode. The harness prefers "draw and continue" at 73.6%
-  against 72.6% and 72.2%, which is not much of a margin to conclude from.
-- **What state `$6000` needs before it will draw.** Snapshot and replay sidesteps the
-  question rather than answering it.
+Nothing left. Transform, object scale, frustum, clipping, projection, the line routine, its
+address arithmetic and the display list are all read from the disk rather than fitted, and the
+ship, the starfield and the ground each agree with the machine on every pixel in every state
+captured. What used to be here - fitted focal lengths, a float `projectCameraSpace()`, opcode 3
+chosen on a 1% margin, ships at 71.9% - is superseded.
+
+One thing remains unanswered rather than wrong: **what state `$6000` needs before it will
+draw.** Snapshot and replay sidesteps the question instead of answering it.
 
 ### Things in the port with no counterpart on the disk
 
