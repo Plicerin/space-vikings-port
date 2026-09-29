@@ -510,31 +510,69 @@ off the original's page: `$9539` = 1, `$953A` = 0, `$9515` = 3, `$9514` = 1, `$9
 
 | | before | after |
 | --- | --- | --- |
-| COM's panel region, rows 124-191 | 98.31% | **99.91%** - 18 of 19,040 |
-| COM, whole page | 99.40% | **99.97%** - 18 of 53,760, all disk-only |
+| COM's panel region, rows 124-191 | 98.31% | **99.91%** |
+| COM, whole page | 99.40% | **99.97%** |
 
 Frame parity is still 100%, and the frame it matches moved from 8 to 9 - a genuinely
 different captured frame, the one where line 210 has run. That is a check on the harness as
 much as on the port: it picks the best-agreeing frame, which could have flattered a port
 that drew nothing here, and instead it moved.
 
-#### The 18 pixels left are not this routine
+### The four panel needles
 
-They are two arrowheads, at x 138-142 / rows 132-134 and x 135-137 / rows 165-169, and they
-come from STARSHIP SIMULATOR line 180:
+The 18 pixels `CALL 38402` left over are not that routine at all. They are STARSHIP
+SIMULATOR's needles, redrawn every pass of the flight loop:
 
 ```
+159 HCOLOR= 0: DRAW 25 AT TT,133: DRAW 26 AT 136,VV: DRAW 25 AT EE,133: DRAW 25 AT SS,133
+    TX = 140 + ((HL - B) / 5.7): IF B < 127 THEN TX = 140 - (B / 5.7)
+170 VY = INT(167 - ((HL - P) / 4)): IF P < 127 THEN VY = INT(167 + (P / 4))
+173 SX = 13 + (S / 2):EX = 199 + E
+175 HCOLOR= 3
 180 DRAW 13 AT TX,133: DRAW 14 AT 136,VY: DRAW 13 AT SX,133: DRAW 13 AT EX,133
 ```
 
-with line 159 erasing the previous positions in `HCOLOR= 0`. `TX = 140 + ((HL - B) / 5.7)`,
-or `140 - (B / 5.7)` when the bank `B` is under 127 - which is x = 140 at zero bank, exactly
-where the capture has one. Only one of the three shape-13 needles is distinguishable, so
-`TX`, `SX` and `EX` coincide in this state.
+`HL` is 255. Line 159 erases the previous positions with the wider shapes 25 and 26 before
+line 180 draws the new ones with 13 and 14, so the track is never repainted whole. Line 159
+writes the `>= 127` form of `TX` first and overrides it below 127, which makes `B` and `P`
+the same signed bytes the rest of the flight model uses.
 
-These are the flight needles, drawn from BASIC out of the shape table the port already
-matches exactly. They are not part of `CALL 38402`, and the port does not draw them at all.
+`S = PEEK(38157)`, clamped to 0-120 by lines 207 and 208, and `E = PEEK(38199)`. Both scales
+check out against something independent: `SX` spans 13 to 73 and `EX` spans 199 to 261, and
+those are exactly the two ranges COM line 8 sweeps clear.
 
+#### Why only two of the four are on COM's page
+
+COM line 8, before it draws anything:
+
+```
+8 ... HCOLOR= 0: FOR X = 200 TO 260 STEP 5: DRAW 25 AT X,133: NEXT:
+      FOR X = 13 TO 73 STEP 5: DRAW 25 AT X,133: NEXT
+```
+
+It wipes the speed and energy tracks. `TX` at 140 and the vertical needle at x 136 fall
+between the two ranges and survive, which is why the capture has exactly those two. In the
+snapshot `B` and `P` are both 0, so `TX` = 140 and `VY` = 167 - exactly where the missing
+pixels were - and `S` = 0, `E` = 63 put `SX` at 13 and `EX` at 262. 262 is past the last
+erase at 260, and it still comes out clean, so shape 25 is at least five pixels wider than
+shape 13 either side.
+
+**COM's page is now exact: 0 of 53,760 pixels differ.** `com_parity.mjs` models the sequence
+rather than short-cutting it - INSTRUMENTS' panel, line 210's lamps, line 180's needles, then
+COM, which erases two of them on its own line 8.
+
+#### What this replaced in the port
+
+`drawHUD` had its own reading of this part of the panel, and all four were wrong in the same
+way: speed and energy as filled bars, and the bank and pitch needles as **rate-of-change**
+markers at `140 + dHeading * 8` and `155 + dPitch * 6`. The disk drives all four off bytes,
+not off how fast anything is changing. The energy bar also used `state.energy / 2000`.
+
+That is the third independent sighting of the energy-scale problem, and the two on the disk
+agree: STATUS line 1255 divides `$9537` by 62, line 173 spans it across a 199-260 track, and
+the machine reads 63 on a fresh ship. `gameState.ts`'s 2000 is the odd one out. Everything
+that needs the disk's byte now goes through `diskEnergyByte()`, which scales, so nothing
+depends on which is right - but the port's energy model still does not match the disk.
 ---
 
 ## Ships and shapes
@@ -1273,14 +1311,14 @@ It draws on **page 1**, and the original's page has **11,468** lit pixels.
 | region | agreement |
 | --- | --- |
 | COM's own area, rows 0-123 | **100.00%** - 0 of 34,720 pixels differ |
-| rows 124-191, the panel | **99.91%** - 18 of 19,040 |
-| whole page | **99.97%** |
+| rows 124-191, the panel | **100.00%** |
+| whole page | **100.00%** - 0 of 53,760 |
 
 The two regions have to be counted separately. COM fills rows 0 to 123 and never touches
 what is below, so the **instrument panel is still standing underneath it**. The port's
 `drawComMainScreen()` opened with `hgr()`, which clears the whole buffer, and that alone
 cost 3,011 pixels - the panel region was 84.2%. With the lamps `CALL 38402` draws ported
-too it is now 99.91%, and what remains there is 18 pixels of flight needles.
+too it is now 100%, and STARSHIP SIMULATOR line 180's needles close the rest.
 
 ### How the original clears its background - and it is not HOME
 
@@ -1397,8 +1435,8 @@ or more. `HCOLOR` is still 6 at that point - line 20 set it and nothing changes 
 line 90.
 
 With the readouts in, **COM's own area is exact: 0 of 34,720 pixels differ.** The only
-difference left on the page is 18 pixels of flight needles from STARSHIP SIMULATOR line
-180, which the port does not draw.
+difference left on the page was 18 pixels of flight needles from STARSHIP SIMULATOR line
+180, and with those drawn the page is exact.
 
 #### One thing this turned up
 
@@ -1420,9 +1458,12 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Seventeen of the 23 programs.** GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, STATUS,
   SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
   programs are extracted and readable but nothing has been compared against them.
-- **The port's energy scale.** `gameState.ts` starts it at 2000; the disk's `$9537` reads
-  63 on a fresh ship and STATUS divides it by 62. COM's readout is gated either way, but
-  nothing else that uses energy has been checked against the disk.
+- **The port's energy scale.** `gameState.ts` starts it at 2000. Three things on the disk
+  say 0-62: STATUS line 1255 divides `$9537` by 62, STARSHIP SIMULATOR line 173 spans it
+  across the 199-260 needle track, and the machine reads 63 on a fresh ship. Everything that
+  needs the byte goes through `diskEnergyByte()`, so nothing depends on which is right, but
+  the model itself has not been reconciled and nothing else that consumes energy - burn
+  rate, hyperdrive cost, restocking - has been checked at all.
 - **Sound.** SOUND GEN (`$9276`), LASER (`$92D1`) and EXPL (`$9270`) have never been
   disassembled or listened to. `audio.ts` says outright that it approximates them.
 - **Game logic.** Combat, damage, the economy, ground assaults - the BASIC for all of it is
@@ -1434,10 +1475,6 @@ is what is genuinely not known, roughly in order of how much it matters.
   extents match, but landing on the *same* pixel needs the renderer's fixed-point
   arithmetic rather than a float reimplementation of the same formula. Ships 72.2% exact,
   ground 67.5%, stars 38.9%.
-- **The flight needles.** STARSHIP SIMULATOR line 180 draws shapes 13 and 14 at `TX,133`,
-  `136,VY`, `SX,133` and `EX,133`, erased at the old positions by line 159. The port draws
-  none of them; they are the last 18 pixels of COM's page. `SX`, `EX` and `VY` have not been
-  derived - only `TX = 140 - (B / 5.7)`, read off line 159.
 - **Opcode 3** in the model bytecode. The harness prefers "draw and continue" at 73.6%
   against 72.6% and 72.2%, which is not much of a margin to conclude from.
 - **What state `$6000` needs before it will draw.** Snapshot and replay sidesteps the

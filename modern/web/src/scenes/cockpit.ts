@@ -5,7 +5,10 @@ import {
   pitchByteToRad,
   v3scale, v3len, v3dot, v3normalize, v3cross,
 } from '../engine/math3d';
-import { ShapeRenderer } from '../engine/shapeTable';
+import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
+import type { ShapeTable } from '../engine/shapeTable';
+import { drawPanelNeedles, erasePanelNeedles, diskEnergyByte } from './instruments';
+import type { PanelNeedles } from './instruments';
 import {
   computeShipPointScale,
   decodeShipPointJson,
@@ -156,6 +159,13 @@ let enemySourceBitmap: Bitmap | null = null;
 let enemySourceBounds: BitmapBounds | null = null;
 let enemyBytecodeOps: ShipBytecodeOp[] | null = null;
 const shapeR = new ShapeRenderer(hires);
+// The shape table the panel needles come out of - line 180 draws shapes 13 and 14 from it
+// every pass of the flight loop.
+let panelShapes: ShapeTable | null = null;
+void (async () => {
+  try { panelShapes = decodeShapeTableJson(await loader.json('data/shapes/shape-table.json')); }
+  catch { /* no table: the needles stay off rather than being guessed at */ }
+})();
 let assetsReady = false;
 
 const shipKind = state.shipKind;
@@ -670,7 +680,7 @@ const enemy = spawnEnemy(state);
       renderFighters();
       renderFlashes();
       renderSurrenderMessage();
-      drawHUD(hires, state, pitchRad, headingRad, prevHeading, prevPitch, dt, showControls);
+      drawHUD(hires, state, pitchRad, headingRad, prevHeading, prevPitch, dt, showControls, panelShapes);
       prevHeading = headingRad;
       prevPitch = pitchRad;
     }
@@ -1497,6 +1507,8 @@ function pseudoNoise(seed: number): number {
   return n - Math.floor(n);
 }
 
+let prevNeedles: PanelNeedles | null = null;
+
 function drawHUD(
   hires: import('../engine/hires').Hires,
   state: GameState,
@@ -1506,6 +1518,7 @@ function drawHUD(
   prevPitch: number,
   dt: number,
   showControls: boolean,
+  panelShapes: ShapeTable | null,
 ) {
   hires.hcolor(1);
   hires.line(123, 145, 1, 145);
@@ -1516,23 +1529,25 @@ function drawHUD(
   hires.line(123, 128, 123, 183);
   hires.line(157, 128, 157, 183);
 
-  const spdFrac = Math.max(0, Math.min(1, state.speed / 120));
-  const spdEnd = 5 + Math.round(spdFrac * 112);
-  hires.hcolor(5);
-  for (let yy = 132; yy <= 144; yy++) hires.line(5, yy, spdEnd, yy);
-
-  const eFrac = Math.max(0, Math.min(1, state.energy / 2000));
-  const eEnd = 163 + Math.round(eFrac * 112);
-  hires.hcolor(1);
-  for (let yy = 132; yy <= 144; yy++) hires.line(163, yy, eEnd, yy);
-
-  const dHeading = ((headingRad - prevHeading) / Math.max(dt, 0.001));
-  const dPitch = ((pitchRad - prevPitch) / Math.max(dt, 0.001));
-  const turnX = Math.round(140 + Math.max(-15, Math.min(15, dHeading * 8)));
-  const climbY = Math.round(155 + Math.max(-12, Math.min(12, dPitch * 6)));
-  hires.hcolor(5);
-  hires.line(turnX, 130, turnX, 138);
-  hires.line(135, climbY, 145, climbY);
+  // STARSHIP SIMULATOR lines 159, 170, 173 and 180 - the four needles.
+  //
+  // What stood here was the port's own reading of this part of the panel: speed and energy
+  // as filled bars, and the bank and pitch needles as rate-of-change markers at
+  // 140 + dHeading * 8 and 155 + dPitch * 6. The disk drives all four off bytes, not off how
+  // fast anything is changing - TX off the bank byte, VY off the pitch byte, SX off
+  // PEEK(38157) and EX off PEEK(38199) - and line 159 erases the previous positions with the
+  // wider shapes 25 and 26 rather than repainting the whole track.
+  if (panelShapes) {
+    const needles: PanelNeedles = {
+      bank: state.bank,
+      pitch: state.pitch,
+      speed: Math.max(0, Math.min(120, Math.round(state.speed))),
+      energy: diskEnergyByte(state.energy),
+    };
+    if (prevNeedles) erasePanelNeedles(hires, panelShapes, prevNeedles);
+    drawPanelNeedles(hires, panelShapes, needles);
+    prevNeedles = needles;
+  }
 
   const pill = (px: number, py: number, on: boolean, color: number): void => {
     if (on) {

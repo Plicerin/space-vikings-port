@@ -15,21 +15,30 @@ const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(PORT_URL, { waitUntil: 'load' });
-await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.drawComMainScreen), null, { timeout: 30000 })
-  .catch(() => { throw new Error('the port did not expose drawComMainScreen - is the dev server running at ' + PORT_URL + '?'); });
+await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.drawComMainScreen && window.__spaceVikings.drawPanelNeedles), null, { timeout: 30000 })
+  .catch(() => { throw new Error('the port did not expose drawComMainScreen/drawPanelNeedles - is the dev server running at ' + PORT_URL + '?'); });
 
-const snap = await page.evaluate(() => {
-  const { Hires, drawComMainScreen, drawInstruments } = window.__spaceVikings;
+const tableJson = JSON.parse(fs.readFileSync('../public/data/shapes/shape-table.json', 'utf8'));
+
+// The sequence the disk performs, not a shortcut for it. COM is reached from flight, so the
+// page already carries INSTRUMENTS' panel (lines 10-200), the lamps line 210's CALL 38402
+// draws, and the four needles STARSHIP SIMULATOR line 180 redraws every pass of the main
+// loop. COM then wipes two of those needles itself, on line 8, before it draws anything.
+//
+// The needle state is the flight snapshot's: bank 0, pitch 0, S = PEEK(38157) = 0 and
+// E = PEEK(38199) = 63, so TX = 140, VY = 167, SX = 13 and EX = 262.
+const snap = await page.evaluate((tj) => {
+  const { Hires, drawComMainScreen, drawInstruments, drawPanelNeedles, decodeShapeTableJson } = window.__spaceVikings;
+  const shapes = decodeShapeTableJson(tj);
   const c = document.createElement('canvas');
   c.width = 560; c.height = 384;
   const h = new Hires(c);
   h.hgr();
-  // COM is reached from flight, so the instrument panel is already on the page. COM does
-  // not clear it, and the original's capture still has it.
   drawInstruments(h);
-  drawComMainScreen(h);
+  drawPanelNeedles(h, shapes, { bank: 0, pitch: 0, speed: 0, energy: 63 });
+  drawComMainScreen(h, undefined, shapes);
   return Array.from(h.snapshot().on);
-});
+}, tableJson);
 await browser.close();
 for (const e of errors.slice(0, 3)) console.log('page error:', e);
 
@@ -64,7 +73,7 @@ console.log('');
 console.log(`below it, rows ${COM_AREA_BOTTOM + 1}-${HGR_H - 1} - the panel COM does not touch:`);
 console.log(`  disk ${panel.diskLit} lit, port ${panel.portLit} lit`);
 console.log(`  ${panel.onlyDisk + panel.onlyPort} of ${panel.px} differ  (${(100 * panel.agree).toFixed(2)}% agree)`);
-console.log(`  both leave the panel standing, lamps and all; what is left is the flight needles.`);
+console.log(`  both leave the panel standing - lamps, needles and all.`);
 console.log('');
 
 let both = 0, onlyDisk = 0, onlyPort = 0, diskLit = 0, portLit = 0;

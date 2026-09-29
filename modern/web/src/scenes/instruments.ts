@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { ShapeRenderer } from '../engine/shapeTable';
 import { setScene, log as glog } from '../engine/gameLog';
 
 /**
@@ -192,4 +193,95 @@ export async function instrumentsScene(ctx: SceneContext, scenes: SceneManager):
     return scenes.run('starshipSimulator');
   }
   return scenes.run('galaxyMap');
+}
+
+
+
+/**
+ * The four panel needles - STARSHIP SIMULATOR lines 159, 170, 173 and 180.
+ *
+ *     159 HCOLOR= 0: DRAW 25 AT TT,133: DRAW 26 AT 136,VV: DRAW 25 AT EE,133: DRAW 25 AT SS,133
+ *         TX = 140 + ((HL - B) / 5.7): IF B < 127 THEN TX = 140 - (B / 5.7)
+ *     170 VY = INT(167 - ((HL - P) / 4)): IF P < 127 THEN VY = INT(167 + (P / 4))
+ *     173 SX = 13 + (S / 2): EX = 199 + E
+ *     180 DRAW 13 AT TX,133: DRAW 14 AT 136,VY: DRAW 13 AT SX,133: DRAW 13 AT EX,133
+ *
+ * `HL` is 255 (line 1). Line 159 erases the previous positions with the wider shapes 25 and
+ * 26 before line 175 sets HCOLOR 3 and line 180 draws the new ones with 13 and 14. These are
+ * not INSTRUMENTS' - they are redrawn every pass of the flight loop, which is why they are
+ * on the page when COM takes over.
+ *
+ * Line 159 writes the `>= 127` form first and overrides it below 127, so B and P are the
+ * same signed bytes the rest of the flight model uses. `S` and `E` are plain:
+ * `S = PEEK(38157)`, clamped to 0-120 by lines 207 and 208, and `E = PEEK(38199)` - the
+ * energy byte COM's POWER LOW readout gates on. Their two scales line up exactly with the
+ * ranges COM line 8 erases, 13-73 and 200-260.
+ */
+export interface PanelNeedles {
+  /** B - $7322. */
+  bank: number;
+  /** P - $7321. */
+  pitch: number;
+  /** S - PEEK(38157), 0-120. */
+  speed: number;
+  /** E - PEEK(38199), 0-62. */
+  energy: number;
+}
+
+const HL = 255;
+
+/** STATUS line 1255 divides the energy byte by 62, so that is full scale on the disk. */
+export const DISK_ENERGY_FULL = 62;
+/**
+ * The port's own starting energy, from gameState.ts. Not from the disk: the machine reads
+ * 63 in $9537 on a fresh ship, and two separate uses of that byte agree on a 0-62 scale -
+ * STATUS dividing by 62, and line 173's EX = 199 + E spanning the 199-260 needle track.
+ * The port's 2000 came from the repo's own analysis and is an open question, so everything
+ * that needs the disk's byte scales rather than comparing raw.
+ */
+export const PORT_ENERGY_FULL = 2000;
+
+export function diskEnergyByte(portEnergy: number): number {
+  return Math.round((portEnergy / PORT_ENERGY_FULL) * DISK_ENERGY_FULL);
+}
+
+export function needlePositions(n: PanelNeedles): { tx: number; vy: number; sx: number; ex: number } {
+  return {
+    tx: n.bank < 127 ? 140 - n.bank / 5.7 : 140 + (HL - n.bank) / 5.7,
+    vy: n.pitch < 127 ? Math.floor(167 + n.pitch / 4) : Math.floor(167 - (HL - n.pitch) / 4),
+    sx: 13 + n.speed / 2,
+    ex: 199 + n.energy,
+  };
+}
+
+/** Line 180. Shape numbers are the BASIC ones, so 13 is index 12. */
+export function drawPanelNeedles(
+  hires: import('../engine/hires').Hires,
+  shapes: import('../engine/shapeTable').ShapeTable,
+  n: PanelNeedles,
+): void {
+  const { tx, vy, sx, ex } = needlePositions(n);
+  const r = new ShapeRenderer(hires);
+  r.rot = 0; r.scale = 1;
+  hires.hcolor(3);
+  r.draw(shapes, 12, tx, 133);
+  r.draw(shapes, 13, 136, vy);
+  r.draw(shapes, 12, sx, 133);
+  r.draw(shapes, 12, ex, 133);
+}
+
+/** Line 159 - the same four at their previous positions, in HCOLOR 0 and the wider shapes. */
+export function erasePanelNeedles(
+  hires: import('../engine/hires').Hires,
+  shapes: import('../engine/shapeTable').ShapeTable,
+  previous: PanelNeedles,
+): void {
+  const { tx, vy, sx, ex } = needlePositions(previous);
+  const r = new ShapeRenderer(hires);
+  r.rot = 0; r.scale = 1;
+  hires.hcolor(0);
+  r.draw(shapes, 24, tx, 133);
+  r.draw(shapes, 25, 136, vy);
+  r.draw(shapes, 24, ex, 133);
+  r.draw(shapes, 24, sx, 133);
 }

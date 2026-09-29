@@ -1,6 +1,8 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 import { drawOptions, drawPrompt, getChoice, writeLines, clearLines } from '../engine/menu';
+import { ShapeRenderer } from '../engine/shapeTable';
+import { diskEnergyByte } from './instruments';
 
 const PLANET_NAMES = [
   'SOL', 'ALPHA CENTAURI', "BARNARD'S STAR", 'WOLF 359', 'LUYTEN',
@@ -105,16 +107,6 @@ export const COM_FRESH_SHIP: Record<number, number> = {
  *
  * HCOLOR is still 6 here: line 20 set it and nothing changes it until line 90.
  */
-/** STATUS line 1255 divides the energy byte by 62, so that is full scale. */
-const COM_ENERGY_FULL = 62;
-/**
- * The port's own starting energy. This one is not from the disk: gameState.ts says
- * "starts at 2000, decremented by hyperdrive jumps", which came from the repo's analysis,
- * while the machine reads 63 in $9537 on a fresh ship. Until that is settled the threshold
- * is scaled rather than compared raw, so the readout gates correctly either way.
- */
-const COM_PORT_ENERGY_FULL = 2000;
-
 /** The port's state as the twelve bytes COM peeks. */
 export function comStatusBytes(
   state: import('../engine/gameState').GameState,
@@ -123,7 +115,7 @@ export function comStatusBytes(
   return {
     38198: d.engine1Pct, 38197: d.engine2Pct, 38196: d.computerPct,
     38195: d.radarPct, 38194: d.envPct, 38193: d.hullPct,
-    [COM_ENERGY]: Math.round((state.energy / COM_PORT_ENERGY_FULL) * COM_ENERGY_FULL),
+    [COM_ENERGY]: diskEnergyByte(state.energy),
     38200: d.shieldsPct, 38190: d.hyperdrivePct,
     38187: state.missilesRemaining, 38186: d.laserPct, 38185: d.comsPct,
   };
@@ -154,10 +146,23 @@ export function drawComReadouts(
 export function drawComMainScreen(
   hires: import('../engine/hires').Hires,
   status: Record<number, number> = COM_FRESH_SHIP,
+  shapes: import('../engine/shapeTable').ShapeTable | null = null,
 ): void {
   // No hgr(). COM.bas line 20 floods rows 0 to 123 and never touches what is below, so the
   // instrument panel is still standing underneath it - measured, the original's page has
   // 3,011 lit pixels there while clearing the buffer left the port with none.
+  // COM line 8, before anything else: HCOLOR= 0 and shape 25 swept along both needle
+  // scales - x 200 to 260 and x 13 to 73, step 5, all at y 133. That is what wipes the
+  // speed and energy needles the flight loop left on the panel. TX at 140 and the vertical
+  // needle at x 136 fall between the two ranges, which is why only those two survive.
+  if (shapes) {
+    const r = new ShapeRenderer(hires);
+    r.rot = 0; r.scale = 1;
+    hires.hcolor(0);
+    for (let x = 200; x <= 260; x += 5) r.draw(shapes, 24, x, 133);
+    for (let x = 13; x <= 73; x += 5) r.draw(shapes, 24, x, 133);
+  }
+
   fillBackground(hires, 6, 0, 123);
 
   // COM fills and then clears its text window over the fill, so the menu area is black and
