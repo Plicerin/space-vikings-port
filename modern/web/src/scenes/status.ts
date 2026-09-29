@@ -1,178 +1,188 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 
+/**
+ * STATUS, the ship status report - STATUS.bas, reached from COM by 1 then 4 (COM line 270's
+ * ON C GOTO 800,900,30,1200,20000 landing on 1200's RUN STATUS).
+ *
+ * Two screens. Line 1315's GET I$ holds the first; then R = 4 sends line 1230 through its
+ * blanking loop and straight back out at 1232, and the troop report is drawn over the same
+ * cleared rows.
+ *
+ * The screen is set up by lines 12-20: POKE 32,1 / POKE 33,39 puts the text window at
+ * column 1, 39 wide, and HCOLOR= 1 flooding rows 0 to 123 is the background. Nothing changes
+ * HCOLOR afterwards, so the whole report is green. Line 1230 clears with printed spaces -
+ * FOR C = 1 TO 15: VTAB C: HTAB 2: PRINT <38 spaces> - which is 0-based rows 0-14, columns
+ * 1-38.
+ *
+ * TAB( ) and HTAB are absolute screen columns here, the same as in COM, so TAB(22) is
+ * 0-based column 21 and TAB(18)/TAB(24) are columns 17 and 23.
+ */
+
+/** STATUS line 10000's own DATA. Note GROOMBRIDGE **1618** - COM line 15130 calls the same
+ *  planet GROOMBRIDGE 168. The two programs disagree; this list is STATUS's. */
 const PLANET_NAMES = [
   'SOL', 'ALPHA CENTAURI', "BARNARD'S STAR", 'WOLF 359', 'LUYTEN',
   'LALANDE 21185', 'SIRIUS', 'VARCAR', 'XANADON', 'EPSILON ERIDANA',
   'CYGNI', 'PROCYON', 'TAU CETI', 'LACAILLE 9352', 'LARSEN-C',
-  'GROOMBRIDGE 168', 'KRUGER 60', 'EPSILON INDI', 'ARGO', 'SHIVANDA',
+  'GROOMBRIDGE 1618', 'KRUGER 60', 'EPSILON INDI', 'ARGO', 'SHIVANDA',
 ];
+/** Lines 1350-1360, indexed by PEEK(38203). */
 const MORALE = ['', 'AWFUL!!!', 'POOR', 'SO-SO', 'FAIR', 'GOOD', 'EXCELLENT!'];
+/** Lines 1380-1384, indexed by PEEK(38166). Note 3 is CRYOGENIC SLEEP, tested first. */
 const LOCATION = ['ON BOARD', 'PLANETSIDE', 'SHORE LEAVE', 'CRYOGENIC SLEEP'];
+/** Lines 1290-1294, indexed by PEEK(38165). */
+const CONDITION = ['', 'GREEN', 'BLUE', 'RED'];
 
-function bar(hires: import('../engine/hires').Hires, x: number, y: number, w: number, pct: number, color: number): void {
-  const fill = Math.round(w * Math.min(100, Math.max(0, pct)) / 100);
-  if (fill <= 0) return;
-  hires.hcolor(color);
-  hires.hlin(x, x + fill - 1, y);
+/** Everything the report prints, so the draw is pure and can be compared against the disk. */
+export interface StatusData {
+  /** 0-based. The disk's PEEK(38209) is 1-based and line 1235 READs that many names. */
+  planetIndex: number;
+  /** SD, TR and CR are not bytes - line 50 INPUTs them from the MISC file. */
+  stardate: number;
+  troops: number;
+  credits: number;
+  energy: number;      // 38199
+  shields: number;     // 38200
+  condition: number;   // 38165
+  hull: number;        // 38193, printed as 100 - it
+  missiles: number;    // 38187
+  computer: number;    // 38196
+  hyperdrive: number;  // 38190
+  radar: number;       // 38195
+  laser: number;       // 38186
+  engine1: number;     // 38198
+  engine2: number;     // 38197
+  morale: number;      // 38203
+  troopLocation: number; // 38166
+  fighters: number;    // 38156
+  transports: number;  // 38155
+  tanks: number;       // 38154
+  groundMissiles: number; // 38153
+  /** Line 1386: (PEEK(38167) * 256) + PEEK(38159). A different quantity from TR. */
+  troopsAlive: number;
+}
+
+/** Applesoft PRINT of a number: nine significant digits, no trailing zeros, no sign space. */
+function num(n: number): string {
+  if (Number.isInteger(n)) return String(n);
+  return String(Number(n.toPrecision(9)));
+}
+
+type H = import('../engine/hires').Hires;
+
+/**
+ * Line 30's POKE 973,255, and it stays that way until line 1396 resets it just before
+ * RUN COM - so the whole report is inverse video.
+ *
+ * $3CD is the character generator's inverse flag. That is measurable: row 40 of the
+ * original's page reads `.#.#.#.` across text column 0 and then solid to column 38, and
+ * 38 columns x 7 pixels is the 266 per row the port was missing. A space printed in inverse
+ * is a solid block, which is what line 1230's 38 spaces put down.
+ */
+const INVERSE = { invert: true } as const;
+
+/** Lines 15-20 and 1230: the green flood, then the printed-space clear over rows 0-14. */
+function background(hires: H): void {
+  hires.hcolor(1);
+  for (let y = 0; y <= 123; y++) hires.hlin(0, 279, y);
+  // Line 1230's FOR C = 1 TO 15: VTAB C: HTAB 2: PRINT <38 spaces>. In inverse those are
+  // solid blocks over the flood, not blanked cells.
+  for (let r = 1; r <= 15; r++) hires.text(' '.repeat(38), 2, r, INVERSE);
+}
+
+/** Lines 1240-1310 and the GOSUB at 5100. */
+export function drawStatusReport(hires: H, d: StatusData): void {
+  background(hires);
+  hires.text('-SHIP STATUS REPORT-', 9, 1, INVERSE);
+  hires.text(`LOCATION :${PLANET_NAMES[d.planetIndex] ?? ''}`, 2, 3, INVERSE);
+  hires.text(`STARDATE :${num(d.stardate)}`, 2, 5, INVERSE);
+
+  // Line 1255 divides by 62 while a full tank is 63, so a full tank computes 101 - and line
+  // 1256 clamps it back to 100. Both halves matter: without the clamp the original would
+  // read 101%, and on the machine it reads 100%.
+  let energyPct = Math.floor((d.energy / 62) * 100);
+  if (energyPct > 100) energyPct = 100;
+
+  const left = (text: string, row: number) => hires.text(text, 2, row, INVERSE);
+  const right = (text: string, row: number) => hires.text(text, 22, row, INVERSE);
+
+  left(`ENERGY  :${energyPct}%`, 7);
+  right(`CREDITS  :${Math.floor(d.credits)}`, 7);
+  left(`SHIELDS :${num(d.shields)}%`, 8);
+  right(`CONDITION:${CONDITION[d.condition] ?? ''}`, 8);
+  left(`HULL DMG:${100 - d.hull}%`, 9);
+  right(`MISSILES :${num(d.missiles)}`, 9);
+  left(`COMPUTER:${num(d.computer)}%`, 10);
+  right(`H-DRIVE  :${num(d.hyperdrive)}%`, 10);
+  left(`RADAR   :${num(d.radar)}%`, 11);
+  right('ENV.     :100%', 11);          // 5110 prints this literally, ignoring 38194
+  left(`LASER   :${num(d.laser)}%`, 12);
+  right('NAV.COMP.:100%', 12);          // 5120 prints the constant 100, ignoring 38184
+  left(`ENGINE#1:${num(d.engine1)}%`, 13);
+  right(`ENGINE#2 :${num(d.engine2)}%`, 13);
+}
+
+/** Lines 1320-1386 and the GOSUB at 5200. */
+export function drawTroopReport(hires: H, d: StatusData): void {
+  background(hires);
+  hires.text('-TROOP STATUS-', 12, 2, INVERSE);
+  const row = (label: string, value: string, r: number) => {
+    hires.text(label, 2, r, INVERSE);
+    hires.text('-', 18, r, INVERSE);
+    hires.text(value, 24, r, INVERSE);
+  };
+  row('NO. OF TROOPS', num(d.troops), 4);
+  row('TROOP MORALE', MORALE[d.morale] ?? '', 5);
+  row('TROOP LOCATION', LOCATION[d.troopLocation] ?? '', 6);
+  row('FIGHTERS', num(d.fighters), 7);
+  row('TRANSPORTS', num(d.transports), 8);
+  row('TANKS', num(d.tanks), 9);
+  row('GROUND MISSILES', num(d.groundMissiles), 10);
+  if (d.troopsAlive === 0) hires.text('THE TROOPS ARE ALL DEAD!', 2, 11, INVERSE);
+}
+
+export function statusDataFrom(state: import('../engine/gameState').GameState): StatusData {
+  const d = state.damage;
+  const f = state.forces;
+  return {
+    planetIndex: state.planetIndex,
+    stardate: state.stardate,
+    troops: f.troops,
+    credits: state.credits,
+    energy: Math.round(state.energy),
+    shields: d.shieldsPct,
+    // The disk stores 1/2/3 in $954D-ish ($9515 region: 38165); the port keeps the word.
+    condition: CONDITION.indexOf(state.condition.toUpperCase()),
+    hull: d.hullPct,
+    missiles: state.missilesRemaining,
+    computer: d.computerPct,
+    hyperdrive: d.hyperdrivePct,
+    radar: d.radarPct,
+    laser: d.laserPct,
+    engine1: d.engine1Pct,
+    engine2: d.engine2Pct,
+    morale: f.morale,
+    troopLocation: f.troopLocation,
+    fighters: f.fighters,
+    transports: f.transports,
+    tanks: f.tanks,
+    groundMissiles: f.groundMissiles,
+    troopsAlive: f.troops,
+  };
 }
 
 export async function statusScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input } = ctx;
   setScene('status');
+  const d = statusDataFrom(state);
 
-  // Page 1 — ship systems
-  hires.hgr();
-  for (let y = 0; y <= 140; y++) hires.hlin(0, 279, y);
-
-  hires.hcolor(3);
-  hires.text('-SHIP STATUS REPORT-', 9, 1);
-
-  const conquered = state.planets.filter(p => p.surrendered).length;
-
-  hires.hcolor(1);
-  hires.text(`LOCATION :${PLANET_NAMES[state.planetIndex]}`, 1, 3);
-  hires.text(`STARDATE :${state.stardate.toFixed(1)}`, 22, 3);
-  hires.text(`CONDITION:${state.condition.toUpperCase()}`, 1, 4);
-  hires.text(`SYSTEMS  :${conquered}/20`, 22, 4);
-
-  hires.hcolor(5);
-  hires.line(1, 38, 279, 38);
-
-  // STATUS line 1255, verbatim: EN = PEEK(38199): EN = EN / 62: EN = INT(EN * 100).
-  // It divides by 62 while a full tank is 63, so the original reads 101% - not clamped.
-  const energyPct = Math.floor((state.energy / 62) * 100);
-  hires.hcolor(1);
-  hires.text('ENERGY', 1, 6);
-  hires.text(`${energyPct}%`, 10, 6);
-  bar(hires, 100, 46, 120, energyPct, energyPct > 30 ? 3 : 5);
-
-  hires.text('CREDITS', 1, 7);
-  hires.text(`${Math.floor(state.credits)}`, 10, 7);
-
-  hires.hcolor(1);
-  hires.text('SHIELDS', 1, 8);
-  hires.text(`${state.damage.shieldsPct}%`, 10, 8);
-  bar(hires, 100, 62, 120, state.damage.shieldsPct, state.damage.shieldsPct > 30 ? 3 : 5);
-
-  hires.text('HULL', 1, 9);
-  hires.text(`${100 - state.damage.hullPct}%`, 10, 9);
-  bar(hires, 100, 70, 120, 100 - state.damage.hullPct, state.damage.hullPct < 70 ? 5 : 3);
-
-  hires.text('MISSILES', 1, 10);
-  hires.text(`${state.missilesRemaining}`, 10, 10);
-
-  hires.hcolor(5);
-  hires.line(1, 85, 279, 85);
-
-  hires.hcolor(1);
-  hires.text('SYSTEM       STATUS', 1, 12);
-  hires.text('COMPUTER', 1, 13);
-  hires.text(`${state.damage.computerPct}%`, 20, 13);
-  bar(hires, 130, 102, 90, state.damage.computerPct, state.damage.computerPct > 30 ? 3 : 5);
-
-  hires.text('H-DRIVE', 1, 14);
-  hires.text(`${state.damage.hyperdrivePct}%`, 20, 14);
-  bar(hires, 130, 110, 90, state.damage.hyperdrivePct, state.damage.hyperdrivePct > 30 ? 3 : 5);
-
-  hires.text('RADAR', 1, 15);
-  hires.text(`${state.damage.radarPct}%`, 20, 15);
-  bar(hires, 130, 118, 90, state.damage.radarPct, state.damage.radarPct > 30 ? 3 : 5);
-
-  hires.text('ENVIRON', 1, 16);
-  hires.text(`${state.damage.envPct}%`, 20, 16);
-  bar(hires, 130, 126, 90, state.damage.envPct, state.damage.envPct > 30 ? 3 : 5);
-
-  hires.text('LASER', 1, 17);
-  hires.text(`${state.damage.laserPct}%`, 20, 17);
-  bar(hires, 130, 134, 90, state.damage.laserPct, state.damage.laserPct > 30 ? 3 : 5);
-
-  hires.text('NAV.COMP', 1, 18);
-  hires.text('100%', 20, 18);
-  bar(hires, 130, 142, 90, 100, 3);
-
-  hires.text('ENGINE#1', 1, 19);
-  hires.text(`${state.damage.engine1Pct}%`, 20, 19);
-  bar(hires, 130, 150, 90, state.damage.engine1Pct, state.damage.engine1Pct > 30 ? 3 : 5);
-
-  hires.text('ENGINE#2', 1, 20);
-  hires.text(`${state.damage.engine2Pct}%`, 20, 20);
-  bar(hires, 130, 158, 90, state.damage.engine2Pct, state.damage.engine2Pct > 30 ? 3 : 5);
-
-  hires.hcolor(5);
-  hires.text('PRESS ANY KEY FOR TROOP STATUS', 2, 22);
-  glog('status', `page=1 energy=${energyPct}% credits=${Math.floor(state.credits)} hull=${100 - state.damage.hullPct}%`);
+  drawStatusReport(hires, d);
+  glog('status', `page=1 energy=${d.energy} credits=${Math.floor(d.credits)}`);
   await input.waitForKey();
 
-  // Page 2 — troops + ground forces
-  hires.hgr();
-  for (let y = 0; y <= 140; y++) hires.hlin(0, 279, y);
-
-  hires.hcolor(3);
-  hires.text('-TROOP STATUS-', 12, 1);
-
-  hires.hcolor(1);
-  hires.text('TROOPS', 1, 3);
-  hires.text('-', 18, 3);
-  hires.text(`${state.forces.troops}`, 24, 3);
-  bar(hires, 78, 22, 140, (state.forces.troops / 20000) * 100, state.forces.troops > 0 ? 3 : 5);
-
-  hires.text('MORALE', 1, 4);
-  hires.text('-', 18, 4);
-  hires.text(MORALE[state.forces.morale], 24, 4);
-
-  const troopPlanet = state.forces.troopPlanetIndex;
-  const here = troopPlanet === state.planetIndex;
-  const locName = troopPlanet >= 0 && troopPlanet < PLANET_NAMES.length ? PLANET_NAMES[troopPlanet] : '';
-  hires.text('LOCATION', 1, 5);
-  hires.text('-', 18, 5);
-  hires.text(LOCATION[state.forces.troopLocation], 24, 5);
-  if (troopPlanet >= 0 && troopPlanet !== state.planetIndex) {
-    hires.text(`ON: ${locName}`, 1, 6);
-  }
-
-  if (state.forces.troops === 0) {
-    hires.hcolor(2);
-    hires.text('THE TROOPS ARE ALL DEAD!', 6, 7);
-  }
-
-  hires.hcolor(5);
-  hires.line(1, 60, 279, 60);
-
-  hires.hcolor(1);
-  hires.text('EQUIPMENT', 1, 9);
-  hires.text('FIGHTERS', 1, 10);
-  hires.text('-', 18, 10);
-  hires.text(`${state.forces.fighters}`, 24, 10);
-
-  hires.text('TRANSPORTS', 1, 11);
-  hires.text('-', 18, 11);
-  hires.text(`${state.forces.transports}`, 24, 11);
-
-  hires.text('TANKS', 1, 12);
-  hires.text('-', 18, 12);
-  hires.text(`${state.forces.tanks}`, 24, 12);
-
-  hires.text('GND.MISSILES', 1, 13);
-  hires.text('-', 18, 13);
-  hires.text(`${state.forces.groundMissiles}`, 24, 13);
-
-  hires.hcolor(5);
-  hires.line(1, 108, 279, 108);
-
-  hires.hcolor(1);
-  hires.text('PLANET STATUS', 1, 15);
-  let r = 16;
-  for (let p = 0; p < 20 && r <= 22; p++) {
-    const pl = state.planets[p];
-    if (pl.visited || pl.surrendered) {
-      const icon = pl.surrendered ? '+' : '*';
-      hires.text(`${icon} ${pl.name.toUpperCase().slice(0, 16)}`, 1, r);
-      r++;
-    }
-  }
-
-  glog('status', `page=2 troops=${state.forces.troops} morale=${state.forces.morale}`);
+  drawTroopReport(hires, d);
+  glog('status', `page=2 troops=${d.troops} morale=${d.morale}`);
   await input.waitForKey();
 
   return scenes.run('com');

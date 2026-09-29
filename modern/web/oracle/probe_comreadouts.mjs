@@ -96,8 +96,12 @@ async function capture(label) {
   const on = decodeHgr(await a2.readRange(0x2000, 0x4000));
   fs.mkdirSync('captured/com', { recursive: true });
   fs.writeFileSync(`captured/com/readouts-${label}.png`, toPng(on));
+  const pts = [];
+  for (let y = 0; y < 192; y++) for (let x = 0; x < HGR_W; x++) if (on[y * HGR_W + x]) pts.push([x, y]);
+  CAPTURES[label] = pts;
   return on;
 }
+const CAPTURES = {};
 
 console.log('waiting for STARSHIP SIMULATOR...');
 await waitFor(SIM, 'STARSHIP SIMULATOR');
@@ -132,10 +136,19 @@ const afterC = cells(afterOn);
 console.log('\n   J1  what            before  poked  in COM    lit before  lit after   drawn?');
 for (const r of READOUTS) {
   const b = litOf(baseC, r), a = litOf(afterC, r);
-  const drawn = a === b ? 'same' : (a > b ? 'GONE (now background)' : 'appeared');
+  // Five cells are 5 x 7 x 8 = 280, so before + after = 280 means the glyph was redrawn as
+  // its own complement - inverse video - rather than removed.
+  const drawn = a === b ? 'same' : (a + b === 280 ? 'INVERSE (a + b = 280)' : 'changed');
   console.log(`  ${String(r.j).padStart(3)}  ${r.what.padEnd(14)}  ${String(baseBytes[r.addr]).padStart(6)}  ` +
     `${String(poked[r.addr]).padStart(5)}  ${String(afterBytes[r.addr]).padStart(6)}    ` +
     `${String(b).padStart(10)}  ${String(a).padStart(9)}   ${drawn}`);
 }
+fs.writeFileSync('captured/com/readouts.json', JSON.stringify({
+  source: 'COM reached from flight, once with a fresh ship and once with four systems broken',
+  healthy: { bytes: baseBytes, points: CAPTURES.healthy },
+  broken: { bytes: afterBytes, poked: BREAK, points: CAPTURES.broken },
+}, null, 0) + String.fromCharCode(10));
+console.log('');
+console.log('wrote captured/com/readouts.json');
 if (a2.errors.length) console.log('page errors:', a2.errors.slice(0, 3));
 await a2.close();

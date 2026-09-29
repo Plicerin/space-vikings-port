@@ -630,7 +630,7 @@ the sum under the root is `3 * X1 ^ 2`, and `D1` comes out as `|dX| * sqrt(3)`, 
 planets at the same X cost nothing to travel between however far apart they are.
 
 It looks like copy-paste - the `- 21` and `- 42` that GALAXY MAP has are simply missing - but
-the port reproduces it, the way it reproduces the inverted warning lamps and STATUS's 101%.
+the port reproduces it, the way it reproduces the rest of the original's arithmetic.
 
 The same `D1` is the stardate cost: H/D line 6 is `SD = SD + D1 + .3`, not the true distance.
 
@@ -1433,7 +1433,7 @@ runs only as far as the longest line.
 
 Rows 0-13, columns 0-19 now agree pixel for pixel.
 
-### The twelve readouts, and an inverted warning light
+### The twelve readouts, and a warning light
 
 Lines 40 to 70 draw a 3 x 4 grid down the right-hand side. `ST(1..12)` comes from line
 15140, the label pairs are the `DATA` at 15000-15030 read in order, and line 70's
@@ -1472,10 +1472,10 @@ NAV. COMP. and has no readout.
 
 The "fresh ship" column is what COM actually found, read off the machine.
 
-#### POKE 973 means skip, and the light is inverted
+#### POKE 973 is inverse video - corrected
 
 Line 70 calls `GOSUB 10000` before every `PRINT`, and that subroutine does nothing but poke
-973 - `$3CD`, in the character generator's vector area:
+973 - `$3CD`:
 
 ```
 10000 IF J1 = 7 AND PEEK(ST(J1)) < 16 THEN POKE 973,255: RETURN
@@ -1483,30 +1483,40 @@ Line 70 calls `GOSUB 10000` before every `PRINT`, and that subroutine does nothi
 10010 POKE 973,0: RETURN
 ```
 
-The listing cannot say whether 255 is draw or skip, and the two readings give opposite
-screens: the grid either lists the systems that have failed, or the ones still working.
+**`$3CD` is the character generator's inverse flag.** A failed system's readout is drawn
+highlighted - black glyphs on a solid block - which is what labels like `NO/GO`, `POWER LOW`
+and `HULL DMG` are for.
 
-Measured, by `probe_comreadouts.mjs`. STARSHIP SIMULATOR does not touch these bytes on the
-way to COM, so poking a system to 0 in flight and then pressing C runs the loop over the
-poked value; COM option 5 goes back to flight, which allows a second pass in one session.
-Zeroing the computer, the shields and the laser and dropping the energy to 9:
+This file previously said 255 meant *skip*, and concluded that the grid lists the systems
+still working and that the warning lights were inverted - a bug in the original. That was
+wrong, and it is worth recording how, because the measurement that produced it was sound and
+the reading of it was not.
 
-| | before | after |
-| --- | --- | --- |
-| COMPUTER, SHIELD, LASER, ENERGY | glyphs | plain `HCOLOR= 6` fill |
-| the other eight | glyphs | unchanged, pixel for pixel |
+`probe_comreadouts.mjs` zeroes the computer, the shields and the laser and drops the energy
+to 9. Those four readouts stop looking like glyphs, and the other eight are untouched pixel
+for pixel. The conclusion drawn was "they are not drawn". The probe's own numbers say
+otherwise:
 
-So **255 is skip**. The grid lists the systems that are *working*, and each label disappears
-as its system fails - even though the labels read `NO/GO`, `POWER LOW` and `HULL DMG`, which
-reads like the opposite was intended. It is what the disk does, so the port does it.
+| readout | lit before | lit after | sum |
+| --- | --- | --- | --- |
+| COMPUTER | 70 | 210 | 280 |
+| ENERGY | 95 | 185 | 280 |
+| SHIELD | 68 | 212 | 280 |
+| LASER | 88 | 192 | 280 |
 
-The rule, then: draw when the byte is non-zero, except ENERGY, which is drawn when it is 16
-or more. `HCOLOR` is still 6 at that point - line 20 set it and nothing changes it until
-line 90.
+A readout is five cells, and 5 x 7 x 8 is **280**. Every pair sums to it exactly. That is
+the glyph's complement, not its absence. The error was comparing "after" against the
+background figure without noticing that 210 is not 140.
 
-With the readouts in, **COM's own area is exact: 0 of 34,720 pixels differ.** The only
-difference left on the page was 18 pixels of flight needles from STARSHIP SIMULATOR line
-180, and with those drawn the page is exact.
+STATUS settles it independently and without any inference: line 30 pokes 973,255 and leaves
+it there until line 1396, and the whole report is drawn, inverse from edge to edge.
+
+And the port is now checked against the machine in the state where the two readings differ.
+`com_parity.mjs` renders COM with those four systems broken and compares it against
+`captured/com/readouts.json`: **0 of 34,720 pixels differ**. Under the old reading it could
+not have matched at all.
+
+The rule: draw always, and draw inverse when the byte is zero - or, for ENERGY, below 16.
 
 #### One thing this turned up
 
@@ -1518,6 +1528,74 @@ not match the disk and that is not settled here.
 
 ---
 
+## STATUS, the ship status report
+
+`STATUS.bas`, reached from flight by C, then 1 for CENTRAL COMPUTER, then 4 for SHIP STATUS -
+COM line 270's `ON C GOTO 800,900,30,1200,20000` landing on 1200's `RUN STATUS`.
+`probe_status.mjs` captures it; `status_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| screen 1, the ship report | **0 of 53,760 pixels differ** |
+| screen 2, the troop report | **0 of 53,760** |
+
+Both exact, panel included.
+
+### The whole report is inverse video
+
+Line 30 pokes 973,255 and nothing resets it until line 1396, just before `RUN COM`. So every
+character of both screens is inverse, and line 1230's clear -
+`FOR C = 1 TO 15: VTAB C: HTAB 2: PRINT <38 spaces>` - lays down solid blocks rather than
+blanking cells.
+
+The capture says so plainly. Row 40 of the original's page reads `.#.#.#.` across text
+column 0 and then solid to column 38: columns 1-38 are 38 x 7 = **266 pixels**, which was
+exactly the per-row shortfall while the port was drawing normal text. Columns 0 and 39 fall
+outside the window `POKE 32,1: POKE 33,39` sets and keep the `HCOLOR= 1` flood.
+
+This is also what corrected COM's readouts - see above.
+
+### ENERGY reads 100%, not 101%
+
+```
+1255 EN = PEEK(38199):EN = EN / 62:EN = INT(EN * 100)
+1256 IF EN > 100 THEN EN = 100
+```
+
+Line 1255 divides by 62 while a full tank is 63, so a full tank computes 101 - and **line
+1256 clamps it**. On the machine it reads `ENERGY  :100%`.
+
+An earlier note in this file said the original shows 101% and that the port should reproduce
+that. It was written from line 1255 without reading line 1256, and the port was built to
+match it. Both are fixed.
+
+### Two systems are printed as constants
+
+```
+5110 PRINT "RADAR   :"; PEEK(38195);"%";: HTAB 22: PRINT "ENV.     :100%"
+5120 PRINT "LASER   :"; PEEK(38186);"%";: HTAB 22: PRINT "NAV.COMP.:";100;"%"
+```
+
+`ENV.` and `NAV.COMP.` are hard-coded at 100%, even though 38194 and 38184 both exist and
+SHORE LEAVE line 2500 names them. They never report damage.
+
+### Other things the listing settles
+
+- **`TR` and the troop count are different quantities.** Line 1330 prints `TR`, read from
+  the MISC file (2000 in the capture), while line 1386's all-dead test is
+  `(PEEK(38167) * 256) + PEEK(38159)`, which is 788. The port had one number doing both jobs.
+- **STATUS and COM disagree about a planet's name.** STATUS line 10000's DATA has
+  `GROOMBRIDGE 1618`; COM line 15130 has `GROOMBRIDGE 168`. The port had COM's everywhere.
+- **`SD`, `TR` and `CR` are not bytes.** Line 50's `GOSUB 5000` INPUTs them from the MISC
+  file, so they only exist as Applesoft variables - read through `VAR_READER` for the
+  capture.
+- **The needles carry through from flight.** STATUS never touches rows 124-191, so the panel
+  underneath still has the lamps and the two needles COM's line 8 did not erase. Comparing
+  it means replaying that whole sequence - panel, lamps, needles, COM's erase - which
+  `status_parity.mjs` does.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -1525,9 +1603,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Seventeen of the 23 programs.** GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, STATUS,
-  SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
-  programs are extracted and readable but nothing has been compared against them.
+- **Sixteen of the 23 programs.** GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY,
+  ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D. programs are
+  extracted and readable but nothing has been compared against them. STATUS is now done.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.

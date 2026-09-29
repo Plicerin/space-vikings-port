@@ -107,3 +107,43 @@ const diff = new Uint8Array(diskOn.length);
 for (let k = 0; k < diff.length; k++) diff[k] = diskOn[k] === portOn[k] ? 0 : 1;
 fs.writeFileSync('captured/com/diff.png', toPng(diff, { colour: [255, 0, 0] }));
 console.log('\nwrote captured/com/port.png and diff.png');
+
+// The broken-ship state, which is what tells inverse video apart from a skipped draw.
+// captured/com/readouts.json holds COM as the machine drew it with the computer, shields
+// and laser zeroed and the energy at 9.
+if (fs.existsSync('captured/com/readouts.json')) {
+  const ro = JSON.parse(fs.readFileSync('captured/com/readouts.json', 'utf8'));
+  const browser2 = await chromium.launch({ headless: true });
+  const page2 = await browser2.newPage();
+  await page2.goto(PORT_URL, { waitUntil: 'load' });
+  await page2.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.drawComMainScreen), null, { timeout: 30000 });
+  const brokenShot = await page2.evaluate(({ bytes, tj }) => {
+    const sv = window.__spaceVikings;
+    const shapes = sv.decodeShapeTableJson(tj);
+    const c = document.createElement('canvas');
+    c.width = 560; c.height = 384;
+    const h = new sv.Hires(c);
+    h.hgr();
+    sv.drawInstruments(h);
+    sv.drawPanelNeedles(h, shapes, { bank: 0, pitch: 0, speed: 0, energy: bytes['38199'] });
+    sv.drawComMainScreen(h, bytes, shapes);
+    return Array.from(h.snapshot().on);
+  }, { bytes: ro.broken.bytes, tj: tableJson });
+  await browser2.close();
+
+  const bDisk = new Uint8Array(HGR_W * HGR_H);
+  for (const [x, y] of ro.broken.points) bDisk[y * HGR_W + x] = 1;
+  const bPort = Uint8Array.from(brokenShot);
+  let bd = 0, bp = 0, diff2 = 0;
+  for (let y = 0; y <= COM_AREA_BOTTOM; y++) for (let x = 0; x < HGR_W; x++) {
+    const k = y * HGR_W + x;
+    if (bDisk[k]) bd++;
+    if (bPort[k]) bp++;
+    if (bDisk[k] !== bPort[k]) diff2++;
+  }
+  const px2 = (COM_AREA_BOTTOM + 1) * HGR_W;
+  console.log('');
+  console.log('with four systems broken - computer, shields and laser at 0, energy at 9:');
+  console.log(`  disk ${bd} lit, port ${bp} lit`);
+  console.log(`  ${diff2} of ${px2} differ  (${(100 * (1 - diff2 / px2)).toFixed(2)}% agree)`);
+}

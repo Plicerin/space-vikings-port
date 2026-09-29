@@ -89,23 +89,40 @@ export const COM_FRESH_SHIP: Record<number, number> = {
 };
 
 /**
- * Line 70 calls `GOSUB 10000` before every PRINT, and that subroutine only pokes 973 ($3CD,
- * in the character generator's vector area):
+ * Line 70 calls `GOSUB 10000` before every PRINT, and that subroutine only pokes 973 ($3CD):
  *
  *     10000 IF J1 = 7 AND PEEK(ST(J1)) < 16 THEN POKE 973,255: RETURN
  *     10005 IF T = 0 THEN POKE 973,255: RETURN
  *     10010 POKE 973,0: RETURN
  *
- * 255 turns out to mean **skip**, measured: zeroing the computer, shields and laser and
- * dropping the energy to 9 made those four labels vanish into the HCOLOR 6 fill while the
- * other eight were untouched, pixel for pixel.
+ * **$3CD is the character generator's inverse flag**, so a failed system's readout is
+ * highlighted - black glyphs on a solid block - which is what labels like NO/GO, POWER LOW
+ * and HULL DMG are for.
  *
- * So the grid lists the systems that are *working*, and a label disappears as its system
- * fails - even though the labels read NO/GO, POWER LOW and HULL DMG, which reads like the
- * opposite was intended. It is what the disk does, so it is what the port does.
+ * This was read as "255 means skip" at first, on the strength of a probe that zeroed the
+ * computer, shields and laser and dropped the energy to 9 and saw those four readouts stop
+ * looking like glyphs. The probe's own numbers say otherwise, and they are exact: the four
+ * went 70 -> 210, 95 -> 185, 68 -> 212 and 88 -> 192 lit pixels, and a readout is five
+ * cells, 5 x 7 x 8 = 280. Every pair sums to 280. That is the complement of the glyph, not
+ * its absence. STATUS settles it independently - line 30 pokes 973,255 and leaves it there
+ * for the whole report, which is drawn and is inverse from edge to edge.
  *
  * HCOLOR is still 6 here: line 20 set it and nothing changes it until line 90.
  */
+export function drawComReadouts(
+  hires: import('../engine/hires').Hires,
+  status: Record<number, number> = COM_FRESH_SHIP,
+): void {
+  hires.hcolor(6);
+  for (const r of COM_READOUTS) {
+    const v = status[r.addr] ?? 0;
+    const failed = r.addr === COM_ENERGY ? v < 16 : v === 0;
+    const opts = failed ? { invert: true } : undefined;
+    hires.text(r.lines[0], r.col, r.row, opts);
+    hires.text(r.lines[1], r.col, r.row + 1, opts);
+  }
+}
+
 /** The port's state as the twelve bytes COM peeks. */
 export function comStatusBytes(
   state: import('../engine/gameState').GameState,
@@ -121,17 +138,29 @@ export function comStatusBytes(
 }
 
 
-export function drawComReadouts(
+/**
+ * COM line 8, before it draws anything of its own:
+ *
+ *     HCOLOR= 0: FOR X = 200 TO 260 STEP 5: DRAW 25 AT X,133: NEXT:
+ *                FOR X = 13 TO 73 STEP 5: DRAW 25 AT X,133: NEXT
+ *
+ * Shape 25 is the eraser - the wider shape line 159 uses - swept along both needle tracks,
+ * so it wipes the speed and energy needles the flight loop left on the panel. TX at 140 and
+ * the vertical needle at x 136 fall between the two ranges and survive, which is why COM's
+ * page has exactly those two.
+ *
+ * Exported because it outlives COM: anything COM chains to - STATUS, for one - inherits a
+ * panel with those two tracks already cleared.
+ */
+export function eraseComNeedleTracks(
   hires: import('../engine/hires').Hires,
-  status: Record<number, number> = COM_FRESH_SHIP,
+  shapes: import('../engine/shapeTable').ShapeTable,
 ): void {
-  hires.hcolor(6);
-  for (const r of COM_READOUTS) {
-    const v = status[r.addr] ?? 0;
-    if (r.addr === COM_ENERGY ? v < 16 : v === 0) continue;
-    hires.text(r.lines[0], r.col, r.row);
-    hires.text(r.lines[1], r.col, r.row + 1);
-  }
+  const r = new ShapeRenderer(hires);
+  r.rot = 0; r.scale = 1;
+  hires.hcolor(0);
+  for (let x = 200; x <= 260; x += 5) r.draw(shapes, 24, x, 133);
+  for (let x = 13; x <= 73; x += 5) r.draw(shapes, 24, x, 133);
 }
 
 /**
@@ -150,17 +179,7 @@ export function drawComMainScreen(
   // No hgr(). COM.bas line 20 floods rows 0 to 123 and never touches what is below, so the
   // instrument panel is still standing underneath it - measured, the original's page has
   // 3,011 lit pixels there while clearing the buffer left the port with none.
-  // COM line 8, before anything else: HCOLOR= 0 and shape 25 swept along both needle
-  // scales - x 200 to 260 and x 13 to 73, step 5, all at y 133. That is what wipes the
-  // speed and energy needles the flight loop left on the panel. TX at 140 and the vertical
-  // needle at x 136 fall between the two ranges, which is why only those two survive.
-  if (shapes) {
-    const r = new ShapeRenderer(hires);
-    r.rot = 0; r.scale = 1;
-    hires.hcolor(0);
-    for (let x = 200; x <= 260; x += 5) r.draw(shapes, 24, x, 133);
-    for (let x = 13; x <= 73; x += 5) r.draw(shapes, 24, x, 133);
-  }
+  if (shapes) eraseComNeedleTracks(hires, shapes);
 
   fillBackground(hires, 6, 0, 123);
 

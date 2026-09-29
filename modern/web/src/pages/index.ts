@@ -17,8 +17,8 @@ import { startScene } from '../scenes/start';
 import { cockpitScene } from '../scenes/cockpit';
 import { instrumentsScene, drawInstruments, drawPanelNeedles } from '../scenes/instruments';
 import { galaxyMapScene } from '../scenes/galaxyMap';
-import { comScene, drawComMainScreen } from '../scenes/com';
-import { statusScene } from '../scenes/status';
+import { comScene, drawComMainScreen, eraseComNeedleTracks } from '../scenes/com';
+import { statusScene, drawStatusReport, drawTroopReport } from '../scenes/status';
 import { supplyScene } from '../scenes/supply';
 import { radarScene } from '../scenes/radar';
 import { recallScene } from '../scenes/recall';
@@ -102,7 +102,7 @@ function boot(): void {
   (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments,
     ShapeRenderer, decodeShapeTableJson,
     parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW,
-    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles };
+    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();
