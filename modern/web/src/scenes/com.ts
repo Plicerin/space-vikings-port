@@ -34,6 +34,35 @@ function drawMenuBox(hires: import('../engine/hires').Hires): void {
   hires.line(1, 110, 1, 1);
 }
 
+/**
+ * COM's command screen, as the original draws it.
+ *
+ * Pure, so it can be compared against the disk: oracle/com_parity.mjs calls it on a
+ * throwaway Hires and diffs the result. The original is COM.bas lines 20, 90 and 100-120 -
+ * HCOLOR 6 flooded across rows 0 to 123, a green box from (1,1) to (139,110), then the
+ * menu text through the hi-res character generator.
+ */
+export function drawComMainScreen(hires: import('../engine/hires').Hires): void {
+  // No hgr(). COM.bas line 20 floods rows 0 to 123 and never touches what is below, so the
+  // instrument panel is still standing underneath it - measured, the original's page has
+  // 3,011 lit pixels there while clearing the buffer left the port with none.
+  fillBackground(hires, 6, 0, 123);
+  drawMenuBox(hires);
+
+  hires.hcolor(3);
+  hires.text('COMMAND MODE', 4, 2);
+
+  drawOptions(hires, [
+    { key: '1', label: 'COMPUTER' },
+    { key: '2', label: 'GROUND FORCES' },
+    { key: '3', label: 'RADAR' },
+    { key: '4', label: 'END' },
+    { key: '5', label: 'RETURN' },
+  ], 4, 2);
+
+  drawPrompt(hires, 14, 2);
+}
+
 async function showError(hires: import('../engine/hires').Hires, lines: string[], durationMs = 2500): Promise<void> {
   writeLines(hires, 1, 21, lines, 5);
   await wait(durationMs);
@@ -63,22 +92,7 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
   }
 
   mainMenu: for (;;) {
-    hires.hgr();
-    fillBackground(hires, 6, 0, 123);
-    drawMenuBox(hires);
-
-    hires.hcolor(3);
-    hires.text('COMMAND MODE', 4, 2);
-
-    drawOptions(hires, [
-      { key: '1', label: 'COMPUTER' },
-      { key: '2', label: 'GROUND FORCES' },
-      { key: '3', label: 'RADAR' },
-      { key: '4', label: 'END' },
-      { key: '5', label: 'RETURN' },
-    ], 4, 2);
-
-    drawPrompt(hires, 14, 2);
+    drawComMainScreen(hires);
 
     const mainChoice = await getChoice(input, hires, 1, 5);
 

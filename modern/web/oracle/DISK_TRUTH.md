@@ -1175,6 +1175,52 @@ comes from the data.
 
 ---
 
+## COM, the command screen
+
+Reached by pressing **C** in flight: STARSHIP SIMULATOR line 319 runs it, via
+`ON K - 16 GOTO 317,318,319` with K = 19, and 19 is 195 - 176 where 195 is `C` with the high
+bit set.
+
+It is a good parity target for the same reasons the cockpit panel was. Line 20 floods rows
+0 to 123 with `HCOLOR= 6`, line 90 draws a box from (1,1) to (139,110) in `HCOLOR= 1`, and
+the rest is text through the hi-res character generator. No RNG, no ship state, and it
+settles waiting at `GET COM$`. `probe_com.mjs` captures it; `com_parity.mjs` compares.
+
+It draws on **page 1**, and the original's page has **11,468** lit pixels.
+
+### Measured
+
+| region | agreement |
+| --- | --- |
+| COM's own area, rows 0-123 | **70.3%** |
+| rows 124-191, the panel | **98.3%** |
+| whole page | 80.2% |
+
+The two regions have to be counted separately. COM fills rows 0 to 123 and never touches
+what is below, so the **instrument panel is still standing underneath it**. The port's
+`drawComMainScreen()` opened with `hgr()`, which clears the whole buffer, and that alone
+cost 3,011 pixels - the panel region was 84.2% and is now 98.3%. What remains there is the
+gauge fill `CALL 38402` draws, which is a known gap.
+
+### What is still wrong in COM's own area
+
+The port draws **12,614** lit pixels against the original's 8,457, and the excess is nearly
+all background: 7,229 pixels are in the port only, 3,072 in the disk only.
+
+The row strips say what is happening. At rows 112 to 119 the port is solid
+`0101010101...` - `HCOLOR= 6` filled straight across - where the original has sparse text
+or nothing at all.
+
+The original fills, and then **clears its text windows over the fill**. COM sets the text
+window with `POKE 32/33/34/35` and calls `HOME` and prints blanks several times (lines 21,
+25, 29, 80), and through the hi-res character generator each of those writes black cells
+over the background. The port fills and does not clear.
+
+That is the next thing to fix in COM, and it needs the character generator's window
+handling, not just its glyphs.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -1182,10 +1228,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Eighteen of the 23 programs.** COM, GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE,
-  STATUS, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
-  programs are extracted and readable but nothing has been compared against them. Every
-  parity harness so far covers flight and the cockpit panel.
+- **Seventeen of the 23 programs.** GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, STATUS,
+  SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
+  programs are extracted and readable but nothing has been compared against them.
+- **COM's text windows.** Its own area is at 70.3%; the port fills the background and does
+  not clear text windows over it the way the original does.
 - **Sound.** SOUND GEN (`$9276`), LASER (`$92D1`) and EXPL (`$9270`) have never been
   disassembled or listened to. `audio.ts` says outright that it approximates them.
 - **Game logic.** Combat, damage, the economy, ground assaults - the BASIC for all of it is
