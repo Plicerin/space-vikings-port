@@ -2311,6 +2311,62 @@ page, cuts the burst out of it, prints one line, waits for two keys and reboots 
 
 ---
 
+## DMG
+
+`DMG.bas`, three lines:
+
+```
+10 HCOLOR= 5: FOR J = 153 TO 157: HPLOT 262,J TO 271,J: NEXT:
+   PRINT " ": PRINT "RUN STARSHIP SIMULATOR"
+```
+
+It lights one panel lamp orange and chains straight back. No clear, no text, no pause.
+`probe_dmg.mjs` captures it; `dmg_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| the lamp | **25 of 25 pixels, none missing, none extra** |
+| everything else on the page | **0 pixels changed** |
+
+Measured: the lamp is ten wide by five tall at x 262-271, y 153-157, and HCOLOR 5 lights the
+odd columns - 263, 265, 267, 269 and 271.
+
+### 38393 is the ship-damaged flag
+
+Four programs use it and between them they fix its meaning:
+
+| | |
+| --- | --- |
+| START 2030 | clears it on a new game |
+| STARSHIP SIMULATOR 3360 | `IF PEEK(38393) = 0 THEN POKE 38393,1: PRINT "RUNDMG"` - once, on the first hit |
+| SHORE LEAVE 2555 | clears it again when the repairs are paid for |
+| GALAXY MAP 5140-5150 | paints the same lamp HCOLOR 1 when it is 0 and HCOLOR 5 when it is 1 |
+
+So the light comes on the first time anything lands and stays on until the ship is fixed,
+and SHORE LEAVE line 2545 paints the same ten-by-five block in HCOLOR 1 to put it out.
+Both colours light the same pixels - green and orange are both odd-column - so the lamp's
+state is a colour difference and nothing else.
+
+### Reaching it
+
+Line 192 only calls the damage routine when 38208 is 0 and the ship is inside a box around
+the enemy, and the routine at 3000-3032 is gated on `RND` three times over. So the probe
+clears the surrender flag, puts an enemy at 38205, and moves `Z` inside the box - `Z` being
+a BASIC variable, the same `VAR_READER` trick ORBIT needed, with -3000 as the Applesoft
+float `8C BB 80 00 00`.
+
+### What the port had
+
+`hgr()`, which wipes the whole screen; `line(262, 153, 271, 157)`, a single diagonal rather
+than five horizontal runs; a `DAMAGE REPORT` title; a twelve-row table of every system's
+percentage with NOGO markers; and a three-second pause. DMG draws ten pixels by five and
+leaves.
+
+`scenes/stubs.ts` and `scenes/transitions.ts` held nothing but that stub and a re-export of
+it, so both are gone.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -2318,9 +2374,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Five of the 23 programs.** DMG, END and the four SHIP # n I.D. programs are extracted
-  and readable but nothing has been compared against them. STATUS, GALAXY MAP, RADAR,
-  GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX and S/X are done.
+- **Four of the 23 programs.** END and the four SHIP # n I.D. programs are extracted and
+  readable but nothing has been compared against them. STATUS, GALAXY MAP, RADAR,
+  GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X and DMG are done.
 - **Why one empty inverse PRINT whitens a whole page.** S/X line 5 does it, measured; the
   mechanism in the character generator is not derived.
 - **EX line 6's XDRAW.** The port draws the five flash shapes rather than XORing them, which

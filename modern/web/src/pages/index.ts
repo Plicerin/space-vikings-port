@@ -32,7 +32,7 @@ import { orbitScene } from '../scenes/orbit';
 import { reentryScene } from '../scenes/reentry';
 import { exScene, drawExBurst, drawExFlash } from '../scenes/ex';
 import { playerDeathScene, drawPlayerDeathBackground, drawPlayerDeathMessage } from '../scenes/playerDeath';
-import { dmgScene } from '../scenes/stubs';
+import { dmgScene, drawDamageLamp } from '../scenes/dmg';
 import { shipIdScene } from '../scenes/shipId';
 import { shapeDemoScene } from '../scenes/shapeDemo';
 import { shipDebugScene } from '../scenes/shipDebug';
@@ -103,7 +103,7 @@ function boot(): void {
   (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments,
     ShapeRenderer, decodeShapeTableJson,
     parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW,
-    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage };
+    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();

@@ -318,6 +318,13 @@ export class GameState {
    */
   collectedThisTrip = false;
 
+  /**
+   * Byte 38393, the ship-damaged lamp. START line 2030 clears it, STARSHIP SIMULATOR line
+   * 3360 sets it the first time damage lands and runs DMG, and SHORE LEAVE line 2555 clears
+   * it again on repair. GALAXY MAP lines 5140-5150 read it to colour the same lamp.
+   */
+  shipDamaged = false;
+
   /** Immediate re-assault recovery flag after ground-forces defeat.
    *  Set when assault fails, reset on conquest success. */
   pendingGroundForcesNeedsRecovery = false;
