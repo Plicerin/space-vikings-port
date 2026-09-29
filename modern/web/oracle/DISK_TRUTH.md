@@ -1192,9 +1192,9 @@ It draws on **page 1**, and the original's page has **11,468** lit pixels.
 
 | region | agreement |
 | --- | --- |
-| COM's own area, rows 0-123 | **90.2%** |
+| COM's own area, rows 0-123 | **100.00%** - 0 of 34,720 pixels differ |
 | rows 124-191, the panel | **98.3%** |
-| whole page | 93.0% |
+| whole page | 99.40% |
 
 The two regions have to be counted separately. COM fills rows 0 to 123 and never touches
 what is below, so the **instrument panel is still standing underneath it**. The port's
@@ -1245,23 +1245,88 @@ runs only as far as the longest line.
 
 Rows 0-13, columns 0-19 now agree pixel for pixel.
 
-### What is still wrong in COM's own area
+### The twelve readouts, and an inverted warning light
 
-The twelve right-hand readouts, and nothing else. Lines 40-70 lay them out in a 3 x 4 grid:
+Lines 40 to 70 draw a 3 x 4 grid down the right-hand side. `ST(1..12)` comes from line
+15140, the label pairs are the `DATA` at 15000-15030 read in order, and line 70's
+`FOR J = 1 TO 2` prints two lines per readout - its row and the one below. `V()` and `H()`
+from lines 40 and 50 put them on rows 2, 5, 8, 11 and columns 23, 29, 35.
 
-- `H(1..12) = 23, 29, 35` repeating - 0-based columns 22, 28, 34
-- `V(1..12) = 2, 5, 8, 11` in blocks of three - 0-based rows 1, 4, 7, 10
-- line 70 loops `FOR J = 1 TO 2`, so each readout prints **two** lines, on that row and the
-  one below: rows 1-2, 4-5, 7-8 and 10-11
+What the addresses hold is fixed by two other programs, not by guesswork. SHORE LEAVE line
+2500 names them:
 
-Each line is `T = PEEK(X): GOSUB 10000: VTAB V(I): HTAB H(I): READ T$: PRINT T$`, where `X`
-comes from `ST(1..12)` (set by the `GOSUB 15100` at line 12) and the strings come from the
-program's `DATA`. They are ship state, so they need the state model, not more text-window
-work.
+```
+2500 DATA SHIELD,38200,ENERGY,38199,# 1 ENGINE,38198,# 2 ENGINE,38197,COMPUTER,38196,
+     RADAR,38195,ENV. CONTROL,38194,HULL DMG.,38193,HYPERDRIVE,38190,MISSILES,38187,
+     LASER,38186,NAV. COMP.,38184
+```
 
-That accounts for all 787 disk-only and 2,634 port-only pixels that remain: the disk's
-readouts are `HCOLOR= 0` over the fill, so where the disk has dark glyph cells the port
-still has `HCOLOR= 6` background.
+and STATUS prints them as percentages (`PRINT "ENGINE#1:"; PEEK(38198);"%"`). So they are
+0-100 health bytes, with three exceptions: 38187 is a bare missile count, 38199 is divided
+by 62 (STATUS line 1255), and **38193 is hull health** - STATUS prints `100 - PEEK(38193)`
+as HULL DMG. 38185 carries COM itself and is not in that DATA list; 38184, which is, is
+NAV. COMP. and has no readout.
+
+| J1 | addr | what | line 1 | line 2 | fresh ship |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 38198 | # 1 ENGINE | `  1  ` | ` ENG ` | 100 |
+| 2 | 38197 | # 2 ENGINE | `  2  ` | ` ENG ` | 100 |
+| 3 | 38196 | COMPUTER | ` COMP` | `NO/GO` | 100 |
+| 4 | 38195 | RADAR | `RADAR` | `NO/GO` | 100 |
+| 5 | 38194 | ENV. CONTROL | ` ENV ` | `NO/GO` | 128 |
+| 6 | 38193 | HULL DMG. | ` HULL` | ` DMG ` | 100 |
+| 7 | 38199 | ENERGY | `POWER` | ` LOW ` | 63 |
+| 8 | 38200 | SHIELD | ` SHLD` | `NO/GO` | 100 |
+| 9 | 38190 | HYPERDRIVE | `HYPER` | `DRIVE` | 100 |
+| 10 | 38187 | MISSILES | ` MSL ` | `NO/GO` | 60 |
+| 11 | 38186 | LASER | `LASER` | `NO/GO` | 100 |
+| 12 | 38185 | COMS | ` COM ` | `NO/GO` | 1 |
+
+The "fresh ship" column is what COM actually found, read off the machine.
+
+#### POKE 973 means skip, and the light is inverted
+
+Line 70 calls `GOSUB 10000` before every `PRINT`, and that subroutine does nothing but poke
+973 - `$3CD`, in the character generator's vector area:
+
+```
+10000 IF J1 = 7 AND PEEK(ST(J1)) < 16 THEN POKE 973,255: RETURN
+10005 IF T = 0 THEN POKE 973,255: RETURN
+10010 POKE 973,0: RETURN
+```
+
+The listing cannot say whether 255 is draw or skip, and the two readings give opposite
+screens: the grid either lists the systems that have failed, or the ones still working.
+
+Measured, by `probe_comreadouts.mjs`. STARSHIP SIMULATOR does not touch these bytes on the
+way to COM, so poking a system to 0 in flight and then pressing C runs the loop over the
+poked value; COM option 5 goes back to flight, which allows a second pass in one session.
+Zeroing the computer, the shields and the laser and dropping the energy to 9:
+
+| | before | after |
+| --- | --- | --- |
+| COMPUTER, SHIELD, LASER, ENERGY | glyphs | plain `HCOLOR= 6` fill |
+| the other eight | glyphs | unchanged, pixel for pixel |
+
+So **255 is skip**. The grid lists the systems that are *working*, and each label disappears
+as its system fails - even though the labels read `NO/GO`, `POWER LOW` and `HULL DMG`, which
+reads like the opposite was intended. It is what the disk does, so the port does it.
+
+The rule, then: draw when the byte is non-zero, except ENERGY, which is drawn when it is 16
+or more. `HCOLOR` is still 6 at that point - line 20 set it and nothing changes it until
+line 90.
+
+With the readouts in, **COM's own area is exact: 0 of 34,720 pixels differ.** The only
+difference left on the page is the instrument panel's gauge fill, which `CALL 38402` draws
+and which is a separate known gap.
+
+#### One thing this turned up
+
+`gameState.ts` has `energy = 2000`, "decremented by hyperdrive jumps". That came from the
+repo's own analysis. The machine reads **63** in `$9537` on a fresh ship, and STATUS divides
+that byte by 62, so the disk's scale is 0-62. `comStatusBytes()` scales rather than
+comparing raw, so the readout gates correctly either way, but the port's energy model does
+not match the disk and that is not settled here.
 
 ---
 
@@ -1275,8 +1340,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Seventeen of the 23 programs.** GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, STATUS,
   SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
   programs are extracted and readable but nothing has been compared against them.
-- **COM's twelve readouts.** Its own area is at 90.2% and the text windows are exact; what
-  is left is the 3 x 4 grid of ship-state values from lines 40-70.
+- **The port's energy scale.** `gameState.ts` starts it at 2000; the disk's `$9537` reads
+  63 on a fresh ship and STATUS divides it by 62. COM's readout is gated either way, but
+  nothing else that uses energy has been checked against the disk.
 - **Sound.** SOUND GEN (`$9276`), LASER (`$92D1`) and EXPL (`$9270`) have never been
   disassembled or listened to. `audio.ts` says outright that it approximates them.
 - **Game logic.** Combat, damage, the economy, ground assaults - the BASIC for all of it is

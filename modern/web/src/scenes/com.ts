@@ -34,6 +34,115 @@ function drawMenuBox(hires: import('../engine/hires').Hires): void {
   hires.line(1, 110, 1, 1);
 }
 
+
+/**
+ * COM's twelve right-hand readouts - lines 40 to 70.
+ *
+ * `ST(1..12)` is set by line 15140 and the label pairs are the DATA at 15000-15030, read in
+ * order; line 70 loops `FOR J = 1 TO 2`, so each readout prints two lines, on its row and
+ * the one below. Lines 40 and 50 give `V()` and `H()`: rows 2, 5, 8, 11 and columns 23, 29,
+ * 35. HTAB and TAB( ) are absolute screen columns here, so those are the columns outright.
+ *
+ * What the addresses hold is fixed by two other programs. SHORE LEAVE line 2500 names them
+ * - `DATA SHIELD,38200,ENERGY,38199,# 1 ENGINE,38198, ...` - and STATUS prints them as
+ * percentages (`PRINT "ENGINE#1:"; PEEK(38198);"%"`), so they are 0-100 health, except
+ * 38187, which STATUS prints as a bare missile count, and 38199, which it divides by 62.
+ * 38193 is hull *health*: STATUS prints `100 - PEEK(38193)` as HULL DMG.
+ */
+const COM_READOUT_ROWS = [2, 5, 8, 11];
+const COM_READOUT_COLS = [23, 29, 35];
+export const COM_ENERGY = 38199;
+
+export interface ComReadout {
+  /** The address ST(J1) holds, so the table can be checked against the disk. */
+  addr: number;
+  what: string;
+  lines: [string, string];
+  /** 1-based, as hires.text() takes them. */
+  col: number;
+  row: number;
+}
+
+export const COM_READOUTS: ComReadout[] = ([
+  [38198, '# 1 ENGINE', '  1  ', ' ENG '],
+  [38197, '# 2 ENGINE', '  2  ', ' ENG '],
+  [38196, 'COMPUTER', ' COMP', 'NO/GO'],
+  [38195, 'RADAR', 'RADAR', 'NO/GO'],
+  [38194, 'ENV. CONTROL', ' ENV ', 'NO/GO'],
+  [38193, 'HULL DMG.', ' HULL', ' DMG '],
+  [COM_ENERGY, 'ENERGY', 'POWER', ' LOW '],
+  [38200, 'SHIELD', ' SHLD', 'NO/GO'],
+  [38190, 'HYPERDRIVE', 'HYPER', 'DRIVE'],
+  [38187, 'MISSILES', ' MSL ', 'NO/GO'],
+  [38186, 'LASER', 'LASER', 'NO/GO'],
+  [38185, 'COMS', ' COM ', 'NO/GO'],
+] as [number, string, string, string][]).map(([addr, what, a, b], i) => ({
+  addr, what, lines: [a, b] as [string, string],
+  col: COM_READOUT_COLS[i % 3], row: COM_READOUT_ROWS[(i / 3) | 0],
+}));
+
+/** The bytes COM found on a fresh ship, read off the machine by probe_comreadouts.mjs. */
+export const COM_FRESH_SHIP: Record<number, number> = {
+  38198: 100, 38197: 100, 38196: 100, 38195: 100, 38194: 128, 38193: 100,
+  38199: 63, 38200: 100, 38190: 100, 38187: 60, 38186: 100, 38185: 1,
+};
+
+/**
+ * Line 70 calls `GOSUB 10000` before every PRINT, and that subroutine only pokes 973 ($3CD,
+ * in the character generator's vector area):
+ *
+ *     10000 IF J1 = 7 AND PEEK(ST(J1)) < 16 THEN POKE 973,255: RETURN
+ *     10005 IF T = 0 THEN POKE 973,255: RETURN
+ *     10010 POKE 973,0: RETURN
+ *
+ * 255 turns out to mean **skip**, measured: zeroing the computer, shields and laser and
+ * dropping the energy to 9 made those four labels vanish into the HCOLOR 6 fill while the
+ * other eight were untouched, pixel for pixel.
+ *
+ * So the grid lists the systems that are *working*, and a label disappears as its system
+ * fails - even though the labels read NO/GO, POWER LOW and HULL DMG, which reads like the
+ * opposite was intended. It is what the disk does, so it is what the port does.
+ *
+ * HCOLOR is still 6 here: line 20 set it and nothing changes it until line 90.
+ */
+/** STATUS line 1255 divides the energy byte by 62, so that is full scale. */
+const COM_ENERGY_FULL = 62;
+/**
+ * The port's own starting energy. This one is not from the disk: gameState.ts says
+ * "starts at 2000, decremented by hyperdrive jumps", which came from the repo's analysis,
+ * while the machine reads 63 in $9537 on a fresh ship. Until that is settled the threshold
+ * is scaled rather than compared raw, so the readout gates correctly either way.
+ */
+const COM_PORT_ENERGY_FULL = 2000;
+
+/** The port's state as the twelve bytes COM peeks. */
+export function comStatusBytes(
+  state: import('../engine/gameState').GameState,
+): Record<number, number> {
+  const d = state.damage;
+  return {
+    38198: d.engine1Pct, 38197: d.engine2Pct, 38196: d.computerPct,
+    38195: d.radarPct, 38194: d.envPct, 38193: d.hullPct,
+    [COM_ENERGY]: Math.round((state.energy / COM_PORT_ENERGY_FULL) * COM_ENERGY_FULL),
+    38200: d.shieldsPct, 38190: d.hyperdrivePct,
+    38187: state.missilesRemaining, 38186: d.laserPct, 38185: d.comsPct,
+  };
+}
+
+
+export function drawComReadouts(
+  hires: import('../engine/hires').Hires,
+  status: Record<number, number> = COM_FRESH_SHIP,
+): void {
+  hires.hcolor(6);
+  for (const r of COM_READOUTS) {
+    const v = status[r.addr] ?? 0;
+    if (r.addr === COM_ENERGY ? v < 16 : v === 0) continue;
+    hires.text(r.lines[0], r.col, r.row);
+    hires.text(r.lines[1], r.col, r.row + 1);
+  }
+}
+
 /**
  * COM's command screen, as the original draws it.
  *
@@ -42,7 +151,10 @@ function drawMenuBox(hires: import('../engine/hires').Hires): void {
  * HCOLOR 6 flooded across rows 0 to 123, a green box from (1,1) to (139,110), then the
  * menu text through the hi-res character generator.
  */
-export function drawComMainScreen(hires: import('../engine/hires').Hires): void {
+export function drawComMainScreen(
+  hires: import('../engine/hires').Hires,
+  status: Record<number, number> = COM_FRESH_SHIP,
+): void {
   // No hgr(). COM.bas line 20 floods rows 0 to 123 and never touches what is below, so the
   // instrument panel is still standing underneath it - measured, the original's page has
   // 3,011 lit pixels there while clearing the buffer left the port with none.
@@ -63,6 +175,9 @@ export function drawComMainScreen(hires: import('../engine/hires').Hires): void 
   // 33,40: fourteen printed lines of twenty spaces - one at row 0, twelve from VTAB 2,
   // and one at row 13.
   hires.clearTextCells(1, 1, 20, 14);
+
+  // Lines 60-70, before the box and the menu: the twelve readouts on the right.
+  drawComReadouts(hires, status);
 
   // COM.bas line 80 prints a 40-character line at row 15. Text is opaque, so it clears that
   // row across the full width, and the labels sit on black rather than on the fill.
@@ -120,7 +235,7 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
   }
 
   mainMenu: for (;;) {
-    drawComMainScreen(hires);
+    drawComMainScreen(hires, comStatusBytes(state));
 
     const mainChoice = await getChoice(input, hires, 1, 5);
 
