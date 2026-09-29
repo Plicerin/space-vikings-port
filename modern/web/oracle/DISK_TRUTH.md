@@ -2564,6 +2564,75 @@ about the line.
 
 ---
 
+## The projection arithmetic at $68A1
+
+`$6274` is `LDY #$60: LDX #$9F: JSR $68A1` - project the camera-space point at zero page
+`$60` into two screen bytes at `$9F`. The point is six bytes: x, y, z, 16-bit little-endian.
+
+```
+$68A1  STX $A7 / STY $A8
+$68A5  LDA $0004,Y / STA $7A / LDA $0005,Y / STA $7B   ; z
+$68AF  LDX $00,Y / LDA $0001,Y / JSR $6468             ; x / z
+$68B7  LDA $79 / LDX #$45 / JSR $691E                  ; scale the quotient by 69
+$68BE  CLC / ADC #$00 / STA $0000,Y                    ; plus the x offset
+$68C8  ... the same for y, with #$3E and #$22
+```
+
+- **`$6468`** sorts out the signs and calls **`$64B6`**, a sixteen-step non-restoring divide.
+  The quotient lands in `$78`/`$79` and the caller takes the **high** byte.
+- **`$691E`** multiplies that byte by the clamp limit in eight shift-and-add rounds. It
+  complements its input first, so a clear carry out of each `ROR $78` means the original bit
+  was set; the first round loads instead of adding, and the last subtracts once for the sign.
+- The carry the divide leaves matters: `$691E`'s opening `ROR $78` shifts it in.
+
+### The four operands are per-object
+
+`$68BA`, `$68C0`, `$68DD` and `$68E3` - the two clamp limits and the two offsets - are
+**patched from the model stream** by `$68EA`, which reads four bytes and writes them into the
+instruction operands. They are not constants. In the flight snapshot they read 69/0 and
+62/34, and the limits arrive as `(byte >> 1) - 1`.
+
+`$6DD5` then maps the results to the screen as `x + 70`, doubled when plotted, and `95 - y`.
+That derives two numbers this file had only as fits: `95 - 34 = 61` is `SCREEN_CENTRE_Y`
+(fitted 61.74), and the clip rectangle's 0 to 123 is `95 - 34 - 62` to `95 - 34 + 62`.
+
+### Transcribed and checked
+
+`diskProjectionFixed.ts` is the divide, the scale and the sign handling, transcribed rather
+than fitted. `probe_project6000.mjs` calls `$68A1` on the machine and
+`project6000_parity.mjs` runs the port over the same inputs:
+
+| | |
+| --- | --- |
+| a sweep of 261 points, including z behind the camera | **261 of 261** |
+| every call a live render made to `$68A1` - 293 of them | **293 of 293** |
+
+Curve-fitting would have gone wrong here the way the line rule did: the transfer function is
+asymmetric. A ratio of -0.1 gives -8 and +0.1 gives +6, because the sign is resolved before
+the divide and the truncations do not mirror.
+
+### Not wired in yet, and why
+
+`projectCameraSpace()` still projects in floating point. Swapping it for the transcription
+needs the inputs in the renderer's units, and they are not:
+
+| | |
+| --- | --- |
+| the port's fitted `FOCAL_X` | 230.90 |
+| the machine's, from the clamp limit | 69, doubled to 138 |
+
+A live render's own camera-space values run to `|x|` 764, `|y|` 1114, `|z|` 2176 with the
+camera at X 700, Y 200, Z -6401 and stars out at +/-10000 - so the renderer scales into its
+own space before projecting, and z comes out **positive forward**, the same sense the port
+uses. Feeding the renderer's own values through the port's formula disagrees, so the two
+spaces differ by more than a constant factor.
+
+What closes this is the rotation and scaling chain that fills `$60-$65` in the first place.
+That is the next thing to read, and until it is read the fixed-point projection stays beside
+the float one rather than replacing it.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -2607,10 +2676,12 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Rendering, where the remaining error is
 
-- **Exact pixel overlap.** Geometry is 98-100% within a pixel for ground and ships, and the
-  extents match, but landing on the *same* pixel needs the renderer's fixed-point
-  arithmetic rather than a float reimplementation of the same formula. Ships 72.2% exact,
-  ground 67.5%, stars 38.9%.
+- **Exact pixel overlap.** Geometry is 98-100% within a pixel for ground and ships and the
+  extents match, but landing on the *same* pixel needs the renderer's own arithmetic. Two of
+  the three pieces are now transcribed and exact - the line at `$6DD5` and the projection at
+  `$68A1` - and the third is what fills `$60-$65`: the rotation and scaling that puts a world
+  point into the renderer's camera space. Until that is read, `projectCameraSpace()` stays in
+  floating point. Ships 71.9% exact, ground 67.5%, stars 38.9%.
 - **Opcode 3** in the model bytecode. The harness prefers "draw and continue" at 73.6%
   against 72.6% and 72.2%, which is not much of a margin to conclude from.
 - **What state `$6000` needs before it will draw.** Snapshot and replay sidesteps the

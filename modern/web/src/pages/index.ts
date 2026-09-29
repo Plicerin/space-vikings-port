@@ -2,6 +2,7 @@
 // SceneManager, and every registered scene.  Entry point for the Vite app.
 
 import { Hires } from '../engine/hires';
+import { project68A1, project68A1ToScreen } from '../engine/diskProjectionFixed';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import { parseShipBytecode, projectShipBytecode, drawShipWireframe,
   projectShipWorld, drawShipWorld, COCKPIT_SHIP_WIREFRAME_VIEW } from '../engine/shipBytecode';
@@ -103,7 +104,7 @@ function boot(): void {
   (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments,
     ShapeRenderer, decodeShapeTableJson,
     parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW,
-    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu, drawShipId };
+    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu, drawShipId, project68A1, project68A1ToScreen };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();
