@@ -202,57 +202,82 @@ export class Hires {
   }
 
   /**
-   * HPLOT TO.
+   * HPLOT TO, transcribed from the ROM.
    *
-   * Not textbook Bresenham. Applesoft advances the major axis one step at a time and, in the
-   * column (or row) where the minor axis changes, lights **both** sides of the change, so the
-   * line is 4-connected rather than 8-connected. Measured off RADAR's reticle, which is the
-   * first diagonal line work on this disk: along `HPLOT 1,0 TO 131,59` the original lights 7
-   * and 8 at x 18, 14 and 15 at x 34, 18 and 19 at x 42, and a single pixel everywhere else.
-   * The doubles fall exactly where `floor(y(x + 1)) > floor(y(x))`, and it is floor, not
-   * round - at x 66 the true y is 29.50 and the original lights 29.
+   * Applesoft's line is HLIN at $F53A, and it is one loop that plots a pixel and then
+   * advances **one axis only**: `dx + dy + 1` pixels, 4-connected, every corner doubled,
+   * no exceptions. The error term starts at `dx`, loses `dy` on each x step and regains
+   * `dx` on each y step - and the y step skips the subtraction, which is why the two
+   * branches are not symmetric.
    *
-   * Nothing before RADAR caught this, because every line COM, STATUS and GALAXY MAP draw is
-   * axis-aligned, where the two algorithms agree.
+   *     F581  LDA $D4 / ADC $D2 / STA $D4 / LDA $D5 / SBC #$00   ; err -= dy
+   *     F58D  LDA ($26),Y / EOR $1C / AND $30 / EOR ($26),Y / STA ($26),Y   ; plot
+   *     F597  INX / BNE / INC $1D / BEQ                          ; dx + dy + 1 times
+   *     F59E  LDA $D3 / BCS $F57C                                ; carry -> step x
+   *     F5A2  JSR $F4D3 / CLC / LDA $D4 / ADC $D0 ...            ; else step y, err += dx
    *
-   * The extra pixel is not emitted on the last step, which is what the original's endpoint
-   * does: `HPLOT 1,0 TO 131,59` lights 58 at x 130 and not 59.
+   * `$D2` holds `-(dy + 1)`, so adding it with the carry set is `err -= dy`.
+   *
+   * This replaced a rule fitted to RADAR's reticle - that a crossing landing exactly on a
+   * column boundary does not double. That was fitting noise: RADAR's diagonals are drawn in
+   * HCOLOR 2, which lights only the even columns, so half of the corner pixels were masked
+   * away and never appeared in the capture at all. The ship I.D. wireframes are HCOLOR 3,
+   * all columns, and they show the corners the ROM really draws.
    */
   line(x1: number, y1: number, x2: number, y2: number): void {
     const ax = Math.round(x1);
     const ay = Math.round(y1);
     const bx = Math.round(x2);
     const by = Math.round(y2);
-    const dx = bx - ax;
-    const dy = by - ay;
-    const adx = Math.abs(dx);
-    const ady = Math.abs(dy);
-    const steps = Math.max(adx, ady);
+    const dx = Math.abs(bx - ax);
+    const dy = Math.abs(by - ay);
+    const sx = bx >= ax ? 1 : -1;
+    const sy = by >= ay ? 1 : -1;
     const buf = this.buf;
     const put = (x: number, y: number): void => {
       if (x >= 0 && x < W && y >= 0 && y < H) buf[y * W + x] = this.argbAt(x);
     };
-    if (steps === 0) { put(ax, ay); this.dirty = true; return; }
-    const sx = Math.sign(dx);
-    const sy = Math.sign(dy);
-    const majorIsX = adx >= ady;
-    const minorLen = majorIsX ? ady : adx;
-    for (let i = 0; i <= steps; i++) {
-      const cur = Math.floor((i * minorLen) / steps);
-      if (majorIsX) put(ax + i * sx, ay + cur * sy);
-      else put(ax + cur * sx, ay + i * sy);
-      if (i + 1 < steps) {
-        // Only when the row actually changes *inside* this column. If the ideal line crosses
-        // exactly on the boundary - `(i + 1) * minorLen` divisible by `steps` - the new row
-        // belongs to the next column and the original does not double. That is every 16th
-        // step of RADAR's `HPLOT 151,67 TO 279,123`, where 56/128 is exactly 7/16.
-        const nn = (i + 1) * minorLen;
-        const next = Math.floor(nn / steps);
-        if (next !== cur && nn % steps !== 0) {
-          if (majorIsX) put(ax + i * sx, ay + next * sy);
-          else put(ax + next * sx, ay + i * sy);
-        }
+
+    // $D2 = -(dy + 1) as a byte; $D4/$D5 = the error, starting at dx.
+    const d2 = (0x100 - ((dy + 1) & 0xff)) & 0xff;
+    const dyHi = (dy + 1) > 0xff ? 1 : 0;
+    let errLo = dx & 0xff;
+    let errHi = (dx >> 8) & 0xff;
+    let x = ax;
+    let y = ay;
+    let n = dx + dy + 1;
+    let carry = 1;
+    let skipErr = false;   // the y branch re-enters at the plot, past the subtraction
+
+    for (;;) {
+      if (!skipErr) {
+        // err -= dy, as ADC $D2 then SBC #$00 on the high byte.
+        const lo = errLo + d2 + carry;
+        const c1 = lo > 0xff ? 1 : 0;
+        errLo = lo & 0xff;
+        const hi = errHi - dyHi - (1 - c1);
+        carry = hi >= 0 ? 1 : 0;
+        errHi = hi & 0xff;
       }
+      skipErr = false;
+
+      put(x, y);
+      if (--n <= 0) break;
+
+      if (carry) {
+        x += sx;
+        carry = 1;            // the SEC at $F580
+        continue;
+      }
+      y += sy;
+      // err += dx
+      const lo = errLo + (dx & 0xff);
+      const c1 = lo > 0xff ? 1 : 0;
+      errLo = lo & 0xff;
+      const hi = errHi + ((dx >> 8) & 0xff) + c1;
+      carry = hi > 0xff ? 1 : 0;
+      errHi = hi & 0xff;
+      skipErr = true;
     }
     this.dirty = true;
   }

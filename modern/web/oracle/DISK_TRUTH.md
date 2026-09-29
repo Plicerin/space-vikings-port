@@ -1716,20 +1716,15 @@ MAP draw is axis-aligned, where every line algorithm agrees, so nothing before t
 what the port was doing wrong.
 
 Along `HPLOT 1,0 TO 131,59` the original lights **two** pixels in some columns and one in
-others: 7 and 8 at x 18, 14 and 15 at x 34, 18 and 19 at x 42, but only 11 at x 26 and only
-29 at x 66. Textbook Bresenham takes a diagonal step when both error tests fire and never
-lights the corner; Applesoft steps one axis at a time and lights both sides of every row
-change, in the column where it happens.
+others: 7 and 8 at x 18, 14 and 15 at x 34, 18 and 19 at x 42. Textbook Bresenham takes a
+diagonal step when both error tests fire and never lights the corner; Applesoft steps one
+axis at a time and lights both sides of every row change.
 
-Two details fall out of the measurements and neither is guessable:
-
-- **It is floor, not round.** At x 66 the true y is 29.50 and the original lights 29.
-- **An exact crossing does not double.** Along `HPLOT 151,67 TO 279,123` the slope is
-  56/128, which is exactly 7/16, so every sixteenth step lands on a whole number - and at
-  those columns the original lights one pixel, not two. The new row belongs to the next
-  column. That was the last seven pixels of disagreement.
-
-The endpoint behaves the same way: `HPLOT 1,0 TO 131,59` lights 58 at x 130, not 58 and 59.
+**A rule fitted here was wrong, and the ROM says why - see "The ROM's line routine" below.**
+RADAR's diagonals are `HCOLOR= 2`, which lights only the even columns, so half of the
+corner pixels were masked out of the capture. Reading that as "an exact crossing does not
+double" fitted the mask, not the algorithm, and the SHIP # n I.D. wireframes - `HCOLOR= 3`,
+all columns - contradicted it. The transcribed ROM loop satisfies both.
 
 ### Two line routines, not one
 
@@ -2459,29 +2454,78 @@ prints THERE IS NO / STARSHIP IN / THIS SYSTEM.
 The tables are pulled out of the listings by the probe and generated into
 `scenes/shipIdData.ts` rather than transcribed: 233 values for # 1, 236 for # 3, 428 for # 4.
 
-### The residual is the line algorithm, and RADAR and the ships disagree
+### All four exact, once the ROM was read
 
-SHIP # 3 and # 4 are short by 109 and 19 pixels, all disk-only - the port draws a strict
-subset, never an extra pixel. They are corner pixels on two particular slopes: a 45 degree
-segment and a 1-in-3 one, where `HPLOT TO` doubles and the port does not.
+SHIP # 3 and # 4 were short by 109 and 19 corner pixels under a line rule fitted to RADAR.
+Disassembling `HLIN` settled it and all four are now exact - see below.
 
-The rule this file recorded from RADAR is that an exact crossing - where the ideal line meets
-a column boundary on a whole pixel - does **not** double. That was measured, and it is what
-takes RADAR's reticle to 1,143 of 1,143. On a 1-in-3 slope every crossing is exact, so the
-rule suppresses all of them, and the ships want them back.
+---
 
-Tried and measured: dropping the exclusion costs more than it gains -
+## The ROM's line routine
 
-| | with the rule | without |
+`Hires.line()` had been fitted to RADAR's reticle and the SHIP # n I.D. wireframes
+contradicted the fit. Guessing had run out, so `probe_hlin.mjs` reads $F400-$F700 out of the
+emulator and disassembles it. Applesoft's hi-res line is **HLIN at $F53A**, which is where
+`HPLOT TO` ends up.
+
+### What it does
+
+One loop. It plots a pixel and then advances **one axis only** - never both - and runs
+`dx + dy + 1` times:
+
+```
+F53A  ...                                    ; |dx| into $D0/$D1 and $D4/$D5
+F55E  TYA / CLC / SBC $E2 / ... / STA $D2    ; $D2 = -(|dy| + 1)
+F56E  SEC / SBC $D0 / TAX / LDA #$FF / SBC $D1 / STA $1D   ; counter = -(dx + dy + 1)
+F57C  ASL A / JSR $F465 / SEC                ; step x
+F581  LDA $D4 / ADC $D2 / STA $D4
+      LDA $D5 / SBC #$00 / STA $D5           ; err -= |dy|
+F58D  LDA ($26),Y / EOR $1C / AND $30 / EOR ($26),Y / STA ($26),Y   ; plot
+F597  INX / BNE / INC $1D / BEQ $F600        ; until the counter runs out
+F59E  LDA $D3 / BCS $F57C                    ; carry set -> step x again
+F5A2  JSR $F4D3                              ; else step y
+F5A5  CLC / LDA $D4 / ADC $D0 / ... ADC $D1  ; err += |dx|
+F5B0  BVC $F58B                              ; and straight back to the plot
+```
+
+Three things fall out of that and none of them is guessable from pixels alone:
+
+- **It is 4-connected, with no exceptions.** Every corner is two pixels, because the loop
+  can only move one axis per plot.
+- **`$D2` holds `-(|dy| + 1)`**, so adding it with the carry set is `err -= |dy|`. The error
+  starts at `|dx|`.
+- **The two branches are not symmetric.** The x branch subtracts `|dy|` and then plots; the
+  y branch adds `|dx|` and jumps back to the *plot*, skipping the subtraction entirely.
+
+### What it corrected
+
+The rule this file previously recorded - that a crossing landing exactly on a column
+boundary does not double - was **fitted to a colour mask**. RADAR's diagonals are
+`HCOLOR= 2`, which lights only even columns, so half the corners never appeared in the
+capture. It happened to reproduce RADAR exactly and it was wrong.
+
+Transcribing the loop instead:
+
+| | before | after |
 | --- | --- | --- |
-| RADAR's reticle | 1,143 of 1,143 | 1,143 of 1,150 - 7 extra |
-| SHIP # 3 | 109 differ | 214 differ |
-| SHIP # 4 | 19 differ | 24 differ |
+| RADAR's reticle | 1,143 of 1,143 | **1,144 of 1,144** |
+| SHIP # 0 and # 1 | exact | exact |
+| SHIP # 3 | 109 differ | **0** |
+| SHIP # 4 | 19 differ | **0** |
 
-So the rule stays, and the disagreement is real rather than resolved: two screens on the same
-disk cannot both be satisfied by either version. The ROM's actual line routine has not been
-disassembled, and until it is this is a fit to RADAR that the ship wireframes partly
-contradict.
+RADAR gained a pixel rather than losing one: the extra corner lands on an even column there,
+and the original has it too.
+
+Nothing else moved. COM, STATUS, SUPPLY, GALAXY MAP, GROUND FORCES, COLLECT, RECALL, END,
+frame and shape parity are all still exact, and the three renderer harnesses are unchanged at
+98.8%, 91.7% and 99.5%.
+
+### `Hires.segment()` is still a placeholder
+
+The 3D renderer at `$6000` plots its own segments in machine code that has not been
+disassembled, so `segment()` keeps the textbook Bresenham the ship, star and ground numbers
+were measured against. Whether `$6000` uses this same routine is untested - it is a
+different piece of code, and the way to find out is to read it, not to try it and see.
 
 ---
 
@@ -2519,8 +2563,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **GROUND FORCES' combat resolution.** Lines 500-690 are readable and are now quoted in
   this file, but the port's version was not derived from them and has not been checked.
 - **The renderer's own line drawing.** `$6000` plots segments in machine code that has not
-  been disassembled, and RADAR proves it is not the same routine as Applesoft's HPLOT TO.
-  `Hires.segment()` is a placeholder for it.
+  been disassembled. Applesoft's HLIN now is - see "The ROM's line routine" - but whether
+  $6000 calls it or rolls its own is untested. `Hires.segment()` is a placeholder either
+  way.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
