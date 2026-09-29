@@ -64,7 +64,7 @@ console.log('');
 console.log(`below it, rows ${COM_AREA_BOTTOM + 1}-${HGR_H - 1} - the panel COM does not touch:`);
 console.log(`  disk ${panel.diskLit} lit, port ${panel.portLit} lit`);
 console.log(`  ${panel.onlyDisk + panel.onlyPort} of ${panel.px} differ  (${(100 * panel.agree).toFixed(2)}% agree)`);
-console.log(`  both leave the panel standing; what is left is the gauge fill CALL 38402 draws.`);
+console.log(`  both leave the panel standing, lamps and all; what is left is the flight needles.`);
 console.log('');
 
 let both = 0, onlyDisk = 0, onlyPort = 0, diskLit = 0, portLit = 0;

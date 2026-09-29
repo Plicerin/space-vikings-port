@@ -383,10 +383,10 @@ It started at 95.086%. Five defects were found and fixed, each one visible only 
 previous had been cleared.
 
 The comparison is against **every distinct hi-res page the oracle sees while INSTRUMENTS is
-the loaded program**, picking the frame that agrees best. INSTRUMENTS' BASIC drawing (lines
-10-200) finishes before line 210's `CALL 38402` fills the gauges, so the port's
-`drawInstruments` has an exact counterpart part-way through - and which frame that is gets
-found by comparing rather than by timing.
+The comparison is against **every distinct hi-res page the oracle sees while INSTRUMENTS is
+the loaded program**, picking the frame that agrees best - found by comparing rather than by
+timing. The port now draws line 210's lamps too, and the frame it matches moved from 8 to 9
+accordingly.
 
 ### 1. Coloured lines were drawn at double density
 
@@ -448,12 +448,92 @@ orange rule line 70 drew at y177, and on the disk the rule is **gone** beneath t
 port drew only the lit pixels, so the rule showed through - 31 pixels, at exactly the
 character cells of HTAB 3, 9, 15, 25 and 34.
 
-### What `CALL 38402` draws is still unread
+### What `CALL 38402` draws: eight blinking lamps
 
-INSTRUMENTS line 210 calls into TRANLIT.OBJ0 before chaining, and it fills the four gauge
-boxes and marks the rules: measured, the disk's final panel has 2,993 lit pixels against
-2,856 once that routine has run. The port draws its gauges later, in the cockpit scene, so
-nothing is missing on screen - but that routine has not been disassembled.
+`$9602`, reached from INSTRUMENTS line 210 (`POKE 38189,10: CALL 38402`) and from STARSHIP
+SIMULATOR line 500, every pass of the main loop. It reads `$952D` (38189): 10 draws all six
+routines, anything else updates only the one `$9517` selects.
+
+The drawing is `$9754`, and it is self-modifying - `$9773` and `$9774` are the low and high
+operand bytes of the `STA` at `$9772`:
+
+```
+$9754  LDA #$00 / STA $9600      ; column counter
+$9759  LDY #$00
+$975B  LDA $9601 / BNE $9769
+       LDA $9789,Y / STA $9774   ; 25 29 2d 31 35
+       JMP $976F
+$9769  LDA $978E,Y / STA $9774   ; 26 2a 2e 32 36
+$976F  LDA $9793,X
+$9772  STA $35F7                 ; <- $9773/$9774 are this operand
+       INY / CPY #$05 / BNE $975B
+$977A  INX / INC $9773 / INC $9600
+       LDA $9600 / CMP #$02 / BNE $9759
+```
+
+Five rows from the high-byte table, two columns from the bumped low byte, the same byte
+repeated down each column. The two tables work out as **rows 153-157** (`$9601` = 0) and
+**rows 161-165** (`$9601` = 1), and the low bytes land on byte columns 1, 10, 28 and 37 in
+both bands - eight lamps of 2 x 5 bytes, at x 7, 70, 196 and 259.
+
+Each lamp has two appearances chosen by its own flag byte, and four of the six routines
+write the flag back as they draw, so those blink as the main loop turns over:
+
+| routine | flag | band | columns | flag = 0 | otherwise | flips? |
+| --- | --- | --- | --- | --- | --- | --- |
+| `$9643` | `$9539` | B | 37 | `50 2a` | `78 3f` | yes |
+| `$966A` | `$953A` | B | 1, 10 | `55 02` / `7c 1f` | `7f 07` / `28 15` | yes |
+| `$96A5` | `$9515` | B | 28 | `d0 aa` | 2: `a0 d5`, 3: `20 55` | 2 -> 3 -> 1 -> 2 |
+| `$96DF` | `$9514` | A | 1, 10 | `7f 07` / `28 15` | `55 02` / `7c 1f` | yes |
+| `$971A` | `$9542` | A | 28 | `20 55` | `70 7f` | no - atmosphere |
+| `$9737` | `$95F9` | A | 37 | `50 2a` | `d0 aa` | no |
+
+`$971A` reads the atmosphere flag RE sets, so that lamp is the one with a known meaning.
+
+Measured, not inferred: `probe_gauges.mjs` blanks page 1, calls `$9602` with the flags set
+both ways, and reads back which bytes land where.
+
+**Two lamp states cannot be told apart from a capture.** `$95F9`'s two appearances are
+`50 2a` and `d0 aa`, and two of `$9515`'s are `20 55` and `a0 d5`; each pair differs only in
+bit 7, which is the palette and not a pixel. A lit-pixel comparison sees them as identical.
+
+#### Wired, and what it settles
+
+`Hires.hbyte()` writes a raw screen byte - seven pixels, LSB leftmost, clearing the bits it
+does not set, with bit 7 picking green/violet or orange/blue by the odd/even split
+`HCOLOR_PHASE` already records. The lamps are stored, not plotted, so they hold patterns no
+HCOLOR produces and a plot-based primitive cannot express them.
+
+The blinking four have no canonical state, so the phase the COM capture caught was read back
+off the original's page: `$9539` = 1, `$953A` = 0, `$9515` = 3, `$9514` = 1, `$9542` = 0,
+`$95F9` = 0. That is what makes the panel comparable at all.
+
+| | before | after |
+| --- | --- | --- |
+| COM's panel region, rows 124-191 | 98.31% | **99.91%** - 18 of 19,040 |
+| COM, whole page | 99.40% | **99.97%** - 18 of 53,760, all disk-only |
+
+Frame parity is still 100%, and the frame it matches moved from 8 to 9 - a genuinely
+different captured frame, the one where line 210 has run. That is a check on the harness as
+much as on the port: it picks the best-agreeing frame, which could have flattered a port
+that drew nothing here, and instead it moved.
+
+#### The 18 pixels left are not this routine
+
+They are two arrowheads, at x 138-142 / rows 132-134 and x 135-137 / rows 165-169, and they
+come from STARSHIP SIMULATOR line 180:
+
+```
+180 DRAW 13 AT TX,133: DRAW 14 AT 136,VY: DRAW 13 AT SX,133: DRAW 13 AT EX,133
+```
+
+with line 159 erasing the previous positions in `HCOLOR= 0`. `TX = 140 + ((HL - B) / 5.7)`,
+or `140 - (B / 5.7)` when the bank `B` is under 127 - which is x = 140 at zero bank, exactly
+where the capture has one. Only one of the three shape-13 needles is distinguishable, so
+`TX`, `SX` and `EX` coincide in this state.
+
+These are the flight needles, drawn from BASIC out of the shape table the port already
+matches exactly. They are not part of `CALL 38402`, and the port does not draw them at all.
 
 ---
 
@@ -1193,14 +1273,14 @@ It draws on **page 1**, and the original's page has **11,468** lit pixels.
 | region | agreement |
 | --- | --- |
 | COM's own area, rows 0-123 | **100.00%** - 0 of 34,720 pixels differ |
-| rows 124-191, the panel | **98.3%** |
-| whole page | 99.40% |
+| rows 124-191, the panel | **99.91%** - 18 of 19,040 |
+| whole page | **99.97%** |
 
 The two regions have to be counted separately. COM fills rows 0 to 123 and never touches
 what is below, so the **instrument panel is still standing underneath it**. The port's
 `drawComMainScreen()` opened with `hgr()`, which clears the whole buffer, and that alone
-cost 3,011 pixels - the panel region was 84.2% and is now 98.3%. What remains there is the
-gauge fill `CALL 38402` draws, which is a known gap.
+cost 3,011 pixels - the panel region was 84.2%. With the lamps `CALL 38402` draws ported
+too it is now 99.91%, and what remains there is 18 pixels of flight needles.
 
 ### How the original clears its background - and it is not HOME
 
@@ -1317,8 +1397,8 @@ or more. `HCOLOR` is still 6 at that point - line 20 set it and nothing changes 
 line 90.
 
 With the readouts in, **COM's own area is exact: 0 of 34,720 pixels differ.** The only
-difference left on the page is the instrument panel's gauge fill, which `CALL 38402` draws
-and which is a separate known gap.
+difference left on the page is 18 pixels of flight needles from STARSHIP SIMULATOR line
+180, which the port does not draw.
 
 #### One thing this turned up
 
@@ -1354,7 +1434,10 @@ is what is genuinely not known, roughly in order of how much it matters.
   extents match, but landing on the *same* pixel needs the renderer's fixed-point
   arithmetic rather than a float reimplementation of the same formula. Ships 72.2% exact,
   ground 67.5%, stars 38.9%.
-- **`CALL 38402`** (TRANLIT.OBJ0) fills the four gauge boxes on the panel. Not disassembled.
+- **The flight needles.** STARSHIP SIMULATOR line 180 draws shapes 13 and 14 at `TX,133`,
+  `136,VY`, `SX,133` and `EX,133`, erased at the old positions by line 159. The port draws
+  none of them; they are the last 18 pixels of COM's page. `SX`, `EX` and `VY` have not been
+  derived - only `TX = 140 - (B / 5.7)`, read off line 159.
 - **Opcode 3** in the model bytecode. The harness prefers "draw and continue" at 73.6%
   against 72.6% and 72.2%, which is not much of a margin to conclude from.
 - **What state `$6000` needs before it will draw.** Snapshot and replay sidesteps the

@@ -129,6 +129,33 @@ export class Hires {
     }
   }
 
+  /**
+   * Write one hi-res screen byte: seven pixels at x = col * 7 + bit, LSB leftmost.
+   *
+   * This is below HCOLOR rather than beside it. The panel lamps that CALL 38402 ($9602)
+   * draws are stored as raw bytes by a self-modifying STA, not plotted, so they can hold
+   * patterns no HCOLOR produces - and they clear the bits they do not set, which is why
+   * this writes all seven pixels instead of only the lit ones.
+   *
+   * Bit 7 is not a pixel. It picks the palette pair, so a lit pixel is green or violet with
+   * it clear and orange or blue with it set, by the same odd/even split HCOLOR_PHASE
+   * records: green and orange on odd columns, violet and blue on even.
+   */
+  hbyte(col: number, row: number, value: number): void {
+    if (row < 0 || row >= H) return;
+    const shifted = (value & 0x80) !== 0;
+    const off = row * W;
+    for (let bit = 0; bit < 7; bit++) {
+      const x = col * 7 + bit;
+      if (x < 0 || x >= W) continue;
+      if (!((value >> bit) & 1)) { this.buf[off + x] = 0; continue; }
+      const idx = (x & 1) ? (shifted ? 5 : 1) : (shifted ? 6 : 2);
+      this.buf[off + x] = PALETTE_ARGB.get(idx)!;
+    }
+    this.dirty = true;
+  }
+
+
   hplot(x: number, y: number): void {
     const ix = Math.round(x);
     const iy = Math.round(y);
@@ -182,6 +209,29 @@ export class Hires {
       for (let col = x0; col < x1; col++) {
         buf[offset + col] = 0;
       }
+    }
+    this.dirty = true;
+  }
+
+  /**
+   * Blank a rectangle of character cells, the way the original's HOME does.
+   *
+   * The hi-res character generator at $9300 writes whole cells - text is opaque, see
+   * text() - so clearing a text window paints black over whatever was under it. COM floods
+   * the view with HCOLOR 6 and then clears its window over the fill, which is why its menu
+   * area is black where the port's was solid blue.
+   *
+   * Columns and rows are the 1-based ones text() takes.
+   */
+  clearTextCells(col: number, row: number, cols: number, rows: number): void {
+    const cellW = 7, cellH = 8;
+    const x0 = Math.max(0, (col - 1) * cellW);
+    const y0 = Math.max(0, (row - 1) * cellH);
+    const x1 = Math.min(W, x0 + cols * cellW);
+    const y1 = Math.min(H, y0 + rows * cellH);
+    for (let y = y0; y < y1; y++) {
+      const off = y * W;
+      for (let x = x0; x < x1; x++) this.buf[off + x] = 0;
     }
     this.dirty = true;
   }

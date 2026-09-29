@@ -10,6 +10,92 @@ import { setScene, log as glog } from '../engine/gameLog';
  */
 const INVERSE = { invert: true } as const;
 
+
+/**
+ * The panel lamps - CALL 38402 ($9602), which INSTRUMENTS line 210 runs right after the
+ * panel is drawn (`POKE 38189,10: CALL 38402`) and STARSHIP SIMULATOR line 500 runs every
+ * pass of the main loop.
+ *
+ * $9602 reads $952D (38189): 10 draws all six, anything else updates only the one $9517
+ * selects. Each lamp has two appearances picked by its own flag byte, and four of the six
+ * flip that flag as they draw, so those blink as the main loop turns over.
+ *
+ * The drawing is $9754, which is self-modifying - $9773 and $9774 are the low and high
+ * operand bytes of the STA at $9772. The high byte comes from $9789 (25 29 2d 31 35) or
+ * $978E (26 2a 2e 32 36) depending on $9601, which works out as rows 153-157 and 161-165;
+ * the low byte is the caller's, bumped once, so each lamp is two byte columns wide and the
+ * same byte repeats down all five rows. Verified by running $9602 on a blank page 1 with
+ * every flag both ways - oracle/probe_gauges.mjs.
+ */
+const LAMP_BYTES = [
+  0x7f, 0x07, 0x55, 0x02, 0x28, 0x15, 0x7c, 0x1f, 0x20, 0x55,
+  0x70, 0x7f, 0xa0, 0xd5, 0x50, 0x2a, 0xd0, 0xaa, 0x78, 0x3f,
+];
+const BAND_A = [153, 154, 155, 156, 157];   // $9601 = 0, the $9789 table
+const BAND_B = [161, 162, 163, 164, 165];   // $9601 = 1, the $978E table
+
+/** The six flag bytes, by the address each lamp reads. */
+export interface PanelLamps {
+  /** $9539 - band B, column 37. Flips on every draw. */
+  a: number;
+  /** $953A - band B, columns 1 and 10. Flips on every draw. */
+  b: number;
+  /** $9515 - band B, column 28. Three-way: 2 -> 3 -> 1 -> 2. */
+  c: number;
+  /** $9514 - band A, columns 1 and 10. Flips on every draw. */
+  d: number;
+  /** $9542 - band A, column 28. The atmosphere flag RE sets; read, never written. */
+  atmosphere: number;
+  /** $95F9 - band A, column 37. Read, never written. */
+  f: number;
+}
+
+/**
+ * The phase the COM capture caught.
+ *
+ * The blinking four have no canonical state - a capture shows whichever phase the main loop
+ * happened to leave - so this is read back off the original's page rather than assumed, and
+ * it is what lets the panel be compared at all. Two of the six cannot be pinned down this
+ * way: $95F9's two appearances are $50/$2a and $d0/$aa, and two of $9515's are $20/$55 and
+ * $a0/$d5, and each pair differs only in bit 7. That bit is the palette, not a pixel, so
+ * both look identical to a lit-pixel comparison.
+ */
+export const LAMPS_AT_CAPTURE: PanelLamps = { a: 1, b: 0, c: 3, d: 1, atmosphere: 0, f: 0 };
+
+function lamp(
+  hires: import('../engine/hires').Hires,
+  band: readonly number[], col: number, x: number,
+): void {
+  for (const row of band) {
+    hires.hbyte(col, row, LAMP_BYTES[x]);
+    hires.hbyte(col + 1, row, LAMP_BYTES[x + 1]);
+  }
+}
+
+/** Mutates `st`, because four of the six routines write their flag back as they draw. */
+export function drawPanelLamps(
+  hires: import('../engine/hires').Hires,
+  st: PanelLamps = LAMPS_AT_CAPTURE,
+): void {
+  // $9643
+  if (st.a === 0) { lamp(hires, BAND_B, 37, 0x0e); st.a = 1; }
+  else { lamp(hires, BAND_B, 37, 0x12); st.a = 0; }
+  // $966A
+  if (st.b === 0) { lamp(hires, BAND_B, 1, 0x02); lamp(hires, BAND_B, 10, 0x06); st.b = 1; }
+  else { lamp(hires, BAND_B, 1, 0x00); lamp(hires, BAND_B, 10, 0x04); st.b = 0; }
+  // $96A5, the three-way one
+  if (st.c === 2) { lamp(hires, BAND_B, 28, 0x0c); st.c = 3; }
+  else if (st.c === 3) { lamp(hires, BAND_B, 28, 0x08); st.c = 1; }
+  else { lamp(hires, BAND_B, 28, 0x10); st.c = 2; }
+  // $96DF
+  if (st.d === 0) { lamp(hires, BAND_A, 1, 0x00); lamp(hires, BAND_A, 10, 0x04); st.d = 1; }
+  else { lamp(hires, BAND_A, 1, 0x02); lamp(hires, BAND_A, 10, 0x06); st.d = 0; }
+  // $971A - the atmosphere flag, read only
+  lamp(hires, BAND_A, 28, st.atmosphere === 0 ? 0x08 : 0x0a);
+  // $9737 - read only
+  lamp(hires, BAND_A, 37, st.f === 0 ? 0x0e : 0x10);
+}
+
 export function drawInstruments(hires: import('../engine/hires').Hires): void {
   // All instruments drawn instantly — no artificial delays.
   hires.hcolor(1);
@@ -87,6 +173,9 @@ export function drawInstruments(hires: import('../engine/hires').Hires): void {
   hires.text('Z', 15, 23);
   hires.text('XHDNG', 25, 23);
   hires.text('YHDNG', 34, 23);
+
+  // INSTRUMENTS line 210: POKE 38189,10: CALL 38402.
+  drawPanelLamps(hires, { ...LAMPS_AT_CAPTURE });
 }
 
 export async function instrumentsScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
