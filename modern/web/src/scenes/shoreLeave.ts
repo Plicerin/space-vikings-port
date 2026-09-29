@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { lootValue2400, rollArtRate } from '../engine/diskEconomy';
 import { setScene, log as glog } from '../engine/gameLog';
 import { clearPendingConquestCollection } from '../engine/commander';
 import { writeLines } from '../engine/menu';
@@ -191,22 +192,15 @@ async function sellLoot(ctx: SceneContext, scenes: SceneManager): Promise<void> 
   const { hires, state, input } = ctx;
 
   const l = state.loot;
-  let lootValue = 0;
-  const artPrice = 150 + Math.floor(Math.random() * 150);
-  lootValue += l.artUnits * 10 * artPrice;
-  lootValue += l.wineCases * 100 * 150;
-  lootValue += l.luxuryFoodCases * 100;
-  lootValue += l.fighterPartCrates * 200;
-  lootValue += l.weaponCrates * 200;
-  lootValue += l.electronicCrates * 200;
-  lootValue += l.fissionablesLb * 300;
-  lootValue += l.steelTons * 15;
-  lootValue += l.collapsiumTons * 5;
-  lootValue += l.titaniumKlb * 25;
-  lootValue += l.platinum * 10 * 75;
-  lootValue += l.silver * 20 * 100;
-  lootValue += l.gold * 10 * 200;
-  lootValue = Math.floor(lootValue * 2);
+  // 2400-2408, in diskEconomy.ts, checked against the disk to the credit. Four of the rates
+  // here were wrong: art carried a stray * 10 and a 150..300 price where the BASIC rolls
+  // 0..300, wine carried a stray * 100, and platinum and silver had their 20 and 10 the wrong
+  // way round - 750 and 2000 where the machine pays 1500 and 1000.
+  const lootValue = lootValue2400([
+    l.artUnits, l.wineCases, l.luxuryFoodCases, l.fighterPartCrates, l.weaponCrates,
+    l.electronicCrates, l.fissionablesLb, l.steelTons, l.collapsiumTons, l.titaniumKlb,
+    l.platinum, l.silver, l.gold,
+  ], rollArtRate());
 
   hires.hgr();
   hires.hcolor(1);

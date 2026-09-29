@@ -3287,6 +3287,93 @@ every capture here was taken with that; `diskSound.ts` takes it as a parameter a
 
 ---
 
+## The economy and the combat, run rather than quoted
+
+Both were in this file as line numbers copied off a listing, with a note saying so. They have
+now been run.
+
+### The economy, exact
+
+Twelve of SHORE LEAVE's thirteen cargo rates are constants; the first, art at 38171, is
+`300 * RND(1)` a unit. Empty that one and the whole sale is a number that can be predicted, so
+`oracle/probe_economy.mjs` drives the disk to GROUND FORCES, sets the counters, sells, and
+reads `L` and `CR` out of Applesoft's own variable table - the screen is no use, because SHORE
+LEAVE prints through the hi-res character generator and the numbers are pixels by then.
+
+With counts `0,3,7,2,1,4,5,9,11,6,2,3,1` the formula says **24780** and the machine pays
+**24780**. The counters come back all zero, as 2460 says. With art set to 4 the extra was 2186,
+inside the `0..2400` its `300 * RND * 4 * 2` allows.
+
+| address | what | rate |
+| --- | --- | --- |
+| 38171 | art | `300 * RND(1)` |
+| 38172 | wine | 150 |
+| 38173 | luxury food | 100 |
+| 38174, 38175, 38176 | fighter parts, weapons, electronics | 200 |
+| 38177 | fissionables | 300 |
+| 38178 | steel | 15 |
+| 38179 | collapsium | 5 |
+| 38180 | titanium | 25 |
+| 38181 | platinum | `20 * 75` = **1500** |
+| 38182 | silver | `10 * 100` = **1000** |
+| 38183 | gold | `10 * 200` = 2000 |
+
+then `2406 L = L * 2` and `2408 L = INT(L)`.
+
+**The port was paying 116880 for that cargo.** Four rates were wrong: art carried a stray
+`* 10` and a 150-to-300 price where the BASIC rolls 0 to 300, wine carried a stray `* 100`, and
+platinum and silver had their 20 and 10 the wrong way round - 750 and 2000 against the
+machine's 1500 and 1000. The wine alone accounted for 90000 of the difference.
+
+A base is `2170 C = 20000 + ((RND(1) * 5000) * (RND(1) * 10))`, so 20000 to 70000; the disk
+gave 32982. Weapons are `3060 C = INT((RND(1) + .2) * 4 * MU)` against `MU = 50, 75, 40, 30`
+for fighters, transports, tanks and missiles at 38156 counting **down** to 38153 - the same
+order GROUND FORCES line 600 pokes them back in, which is what ties the two screens together.
+
+### The combat, by predicate
+
+Lines 550-680 are all `RND`, and Applesoft's `RND` is a five-byte float LCG - `$EFAE` multiplies
+and adds through `$E97F` and `$E7BE` and then forces the exponent - so reproducing a battle
+would mean transcribing the ROM's floating point. That was not done. What was done instead is
+to watch a real assault (`oracle/probe_combat.mjs`) and check the claims the formulas make,
+each of which a wrong formula fails.
+
+Setting one up takes care: the opening save has the first planet already taken, and line 660
+zeroes 38150 on a surrender, so `SP` of 0 against `VP` of 1 means the battle is over before the
+first round. Give it a surrender point to climb to and it runs.
+
+Three things the port had wrong:
+
+- **`T2` in the losing branch is `200 * (RND * 5)`, not `200 + (RND * 5)`.** A multiply: 0 to
+  1000, not 200 to 205. `T2` scales the troop losses, so the branch where the roll goes against
+  you can cost five times more than the other one.
+- **`TP = TP - (RND * 1) + .5`, so transports can go UP.** One uniform with half added back:
+  the change is `(-0.5, +0.5]`. The port had `rnd * rnd * 0.5`, which only ever subtracts. The
+  assault settles it - over 27 values transports rose 9 times and fell 4, the largest rise
+  +0.4297 and the largest fall -0.4674, both inside half a unit.
+- **Line 650's `GOSUB 4000` truncates every round.** `P = INT(P): TP = INT(TP): TR = INT(TR):
+  T = INT(T): M = INT(M)` - the fractions go in the variables themselves, not just in the byte
+  line 600 pokes, so each round starts from whole numbers. Thirteen truncations in those same
+  27 values.
+
+Two more things the assault settled. `TR` is not a PEEK at all: it comes off the disk at line
+11, `OPEN MISC FILE: READ MISC FILE: INPUT SD: INPUT TR: INPUT CR`, which is why a lost battle
+writes the file back at line 670. And `ET` is **dead** - line 500 sets it from
+`PEEK(38206) * 500`, line 570 takes some off every round, and nothing ever reads it.
+
+Tanks, fighters and missiles behaved as `RND * (RND * 5)` says: no gains, and the worst single
+round cost 4.3 of 5. An earlier reading of the capture said they gained too; that was the clamp
+at 590-598 pulling a negative back to zero on a ship that had none of either to begin with.
+
+The battle ended in defeat and poked what line 670 says: 38151 to 7, 38166 to 0, 38208 left
+alone.
+
+`diskEconomy.ts` and `diskCombat.ts` hold the transcriptions, `oracle/logic_parity.mjs` checks
+the port against both - the sale to the credit, the combat against the same predicates - and
+the harness reports the disk's own figures beside the port's so the two can be read together.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -3316,17 +3403,17 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Four of SHORE LEAVE's six sub-screens.** ENLIST TROOPS, SELL LOOT, REPAIR/RESTOCK and
   ESTABLISH BASE are not captured. REPAIR needs the ship in atmosphere; the others need
   credits, loot or an unbuilt base.
-- **The economy.** Loot values, base cost and weapon prices are quoted in this file from
-  SHORE LEAVE lines 2170, 2400-2406 and 3060, and none of it is checked against the port.
-- **GROUND FORCES' combat resolution.** Lines 500-690 are readable and are now quoted in
-  this file, but the port's version was not derived from them and has not been checked.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
-- **Sound.** SOUND GEN (`$9276`), LASER (`$92D1`) and EXPL (`$9270`) have never been
-  disassembled or listened to. `audio.ts` says outright that it approximates them.
-- **Game logic.** Combat, damage, the economy, ground assaults - the BASIC for all of it is
-  in `captured/disk/` and none of it has been checked against the port.
+- **Applesoft's RND.** `$EFAE` is a five-byte float LCG through `$E97F` and `$E7BE`. Without
+  it no `RND`-driven routine can be reproduced exactly - which is why the combat is checked
+  by predicate rather than by replay, and why EXPL's noise can only be matched given the same
+  floating-bus reads. Transcribing it means transcribing Applesoft's floating point.
+- **Damage, and the rest of the game logic.** The economy and GROUND FORCES' combat are done.
+  STARSHIP SIMULATOR's damage model, the enemy AI and RECALL's branches are still only read.
+- **Five display-list opcodes.** `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` are in the
+  table at `$6076` and no model on the disk reaches them.
 
 ### Rendering, where the remaining error is
 

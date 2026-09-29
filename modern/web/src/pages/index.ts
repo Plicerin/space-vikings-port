@@ -8,6 +8,8 @@ import { viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, projectCameraS
   projectWorldPointFixed, outcode67EF, clipFrustum61B7, clipEnd6979 } from '../engine/diskPipeline';
 import { projectWorldPoint as projectWorldPointFloat } from '../engine/diskProjection';
 import { soundGen9276, laser92D1, expl9276 } from '../engine/diskSound';
+import { lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS } from '../engine/diskEconomy';
+import { combatRound550, truncate4000 } from '../engine/diskCombat';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import { parseShipBytecode, projectShipBytecode, drawShipWireframe,
   projectShipWorld, drawShipWorld, COCKPIT_SHIP_WIREFRAME_VIEW } from '../engine/shipBytecode';
@@ -113,7 +115,9 @@ function boot(): void {
     cos64FB, sin64F8, mul635C, buildMatrix654E, toCameraSpace6730, applyObjectScale,
     viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, projectCameraSpaceBytes,
     projectWorldPointFixed, projectWorldPointFloat, outcode67EF, clipFrustum61B7, clipEnd6979,
-    soundGen9276, laser92D1, expl9276 };
+    soundGen9276, laser92D1, expl9276,
+    lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS,
+    combatRound550, truncate4000 };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();

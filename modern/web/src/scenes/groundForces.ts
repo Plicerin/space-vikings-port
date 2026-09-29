@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { combatRound550, truncate4000, type CombatState } from '../engine/diskCombat';
 import { drawOptions, drawPrompt, getChoice, writeLines, clearLines } from '../engine/menu';
 import { drawComMainScreen, comStatusBytes } from './com';
 import type { ShapeTable } from '../engine/shapeTable';
@@ -333,41 +334,29 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
 
   let sp = state.planetVitalityLimit;
   let vp = state.planetVitality;
+  // ET, line 500: `ET = PEEK(38206) * 500`. Line 570 takes some off every round and nothing
+  // ever reads it again, so it decides nothing - combatRound550() carries it because the
+  // transcription should be the whole of 550-598, but there is no state here to give it and
+  // none is invented.
+  let enemyTroops = 0;
 
   for (let round = 0; round < 200; round++) {
     drawBattleFX(vp, sp, round);
-    let x: number;
-    const vic = Math.random() * (10 * tech);
+    // Lines 550-598 and 4000, in diskCombat.ts, transcribed from the listing and checked
+    // against a real assault on the disk. Three things here were wrong: T2 in the losing
+    // branch is a multiply, transports can go UP, and line 4000 truncates every round.
+    const before: CombatState = {
+      fighters, transports, tanks, missiles, troops, enemyTroops, vitality: vp,
+    };
+    const r = combatRound550(before, {
+      tech, surrenderAt: sp, morale: state.forces.morale, penalty: state.shipKind > 0,
+    });
+    ({ fighters, transports, tanks, missiles, troops, enemyTroops } = truncate4000(r));
+    vp = r.vitality;
+    const ps = Math.min(100, Math.round(r.surrenderPct));
+    const x = r.x;
+    void x;
 
-    let t2: number, t3: number;
-    if (vic < 20) {
-      t2 = 500 + Math.random() * 20;
-      t3 = 200 + Math.random() * 5;
-      x = Math.random() * (12 / (tech + 0.5));
-    } else {
-      t2 = 200 + Math.random() * 5;
-      t3 = 500 + Math.random() * 5;
-      x = -(Math.random() * (10 / (tech + 0.5)));
-    }
-
-    tanks -= Math.random() * Math.random() * 5;
-    fighters -= Math.random() * Math.random() * 5;
-    missiles -= Math.random() * Math.random() * 5;
-    transports -= Math.random() * Math.random() * 0.5;
-    troops -= Math.random() * Math.random() * tech * Math.random() * t2;
-
-    if (state.shipKind > 0) x -= Math.random();
-
-    const ps = Math.min(100, Math.round((100 / (sp + 0.01)) * vp));
-    x += (state.forces.morale - 3);
-    vp += x;
-
-    vp = Math.max(0, Math.min(255, vp));
-    tanks = Math.max(0, tanks);
-    fighters = Math.max(0, fighters);
-    missiles = Math.max(0, missiles);
-    transports = Math.max(0, transports);
-    troops = Math.max(0, troops);
 
     state.forces.fighters = Math.round(fighters);
     state.forces.transports = Math.round(transports);
