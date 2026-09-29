@@ -1995,11 +1995,12 @@ erase only `IF OO = 1`, so the flight loop is double-buffering and which hi-res 
 the needles depends on the flip phase when ORBIT takes over. Nothing here pins that phase
 down, so the harness draws no needles and says why.
 
-### Not wired into the port
+### In the port
 
-The draw lives in `scenes/orbitScreen.ts`. `scenes/orbit.ts` still renders its own version -
-`hgr()`, HCOLOR 3 instead of inverse, and no needle-track erase - because that file is
-carrying another agent's uncommitted work and was left alone. It needs a one-line switch.
+The draw lives in `scenes/orbitScreen.ts` and `scenes/orbit.ts` calls it. What it replaced
+was `hgr()`, HCOLOR 3 instead of inverse, and no needle-track erase. Lines 25-37's exit
+state - X 700, Y 200, Z 2000, heading 190, atmosphere cleared - is `ORBIT_EXIT_STATE` beside
+the draw, so the scene and the documentation share one copy of it.
 
 ---
 
@@ -2013,9 +2014,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Ten of the 23 programs.** H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four
   SHIP # n I.D. programs are extracted and readable but nothing has been compared against
   them. STATUS, GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY and ORBIT are done.
-- **`scenes/orbit.ts` still draws its own ORBIT screen.** The verified draw is in
-  `scenes/orbitScreen.ts`; switching orbit.ts over is a one-line change, not made because
-  that file holds another agent's uncommitted work.
 - **Why a full-width PRINT behaves differently at left margin 0 and 1.** SUPPLY loses its
   last character and GROUND FORCES does not; both are measured, neither is explained.
 - **Four of SHORE LEAVE's six sub-screens.** ENLIST TROOPS, SELL LOOT, REPAIR/RESTOCK and
