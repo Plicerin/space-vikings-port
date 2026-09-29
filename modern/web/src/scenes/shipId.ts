@@ -1,188 +1,99 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
-import { getShipModelInfo } from '../engine/shipModels';
+import { SHIP_ID_PROGRAMS } from './shipIdData';
 
-const SHIP_INFO: Record<number, { name: string; threat: string; lines: string[] }> = {
-  0: {
-    name: 'NONE',
-    threat: 'NONE',
-    lines: ['THERE IS NO', 'STARSHIP IN', 'THIS SYSTEM.'],
-  },
-  1: {
-    name: getShipModelInfo(1)?.name ?? 'SPACE LAB',
-    threat: 'LOW',
-    lines: ['OBSERVATORY/LAB', 'MINIMAL WEAPONS', 'WEAK ARMOR'],
-  },
-  3: {
-    name: getShipModelInfo(3)?.name ?? 'LIGHT CRUISER',
-    threat: 'MODERATE',
-    lines: ['LASER ARMED', 'MISSILE BATTERIES', 'FIGHTER COVER'],
-  },
-  4: {
-    name: getShipModelInfo(4)?.name ?? 'HEAVY CRUISER',
-    threat: 'HIGH',
-    lines: ['PHOTON MISSILES', 'HEAVY LASERS', '20-40 FIGHTERS'],
-  },
-};
+/**
+ * SHIP # 0, 1, 3 and 4 I.D. - four near-identical programs.
+ *
+ * RADAR line 2056 sends any key but X to line 5000, and 5005 is
+ * `J = PEEK(38205): POKE 38151,5: PRINT "RUN SHIP # ";J;" I.D."`, so the ship-kind byte picks
+ * the program. Line 5002 maps kind 2 to SHIP # 3.
+ *
+ * Each draws a dotted grid, then one or two wireframe views from its own DATA, then a
+ * description down the right. The window is set by the program itself -
+ * `POKE 32,0: POKE 33,40: POKE 34,0: POKE 35,16` - so the sixteen rows of forty spaces blank
+ * columns 0-39 outright, the left-margin-0 case. `$3CD` is 0 and `$E4` reads 127 for
+ * HCOLOR 3 by the time the drawing is done.
+ */
 
-const SHIP_WIREFRAMES: Record<number, number[][]> = {
-  1: [
-    [1,-13,0, 2,-11,0, 1,-10,.5, 2,-11,.5, 2,-11,-.5, 2,-10,-.5, 1,-10,1.5, 2,-10,-1.5, 2,-5,-1.5, 2,-5,1.5, 2,-10,1.5, 1,-10,0, 2,-5,0, 1,-5,2.5, 2,-5,-2.5, 2,5,-2.5, 2,5,2.5, 2,-5,2.5, 1,5,1.5, 2,6,1.5, 2,6,-1.5, 2,5,-1.5, 1,6,0, 2,6,-7.5, 2,16,-7.5],
-    [2,16,-4.5, 2,6,-4.5, 1,-2,2.5, 2,-2,3.5, 2,2,3.5, 2,2,2.5, 1,-2,.5, 2,2,.5, 2,2,-.5, 2,-2,-.5, 2,-2,.5, 1,-2,-2.5, 2,-2,-3.5, 2,2,-3.5, 2,2,-2.5],
-    [77],
-    [1,-13,0, 2,-11,0, 1,-10,.5, 2,-11,.5, 2,-11,-.5, 2,-10,-.5, 1,-10,1.5, 2,-10,-1.5, 2,-5,-1.5, 2,-5,1.5, 2,-10,1.5, 1,-10,0, 2,-5,0, 1,-5,2.5, 2,-5,-2.5, 2,5,-2.5, 2,5,2.5, 2,-5,2.5, 1,5,1.5, 2,6,1.5, 2,6,-1.5, 2,5,-1.5],
-    [1,-2,2.5, 2,-2,3.5, 2,2,3.5, 2,2,2.5, 1,-2,.5, 2,2,.5, 2,2,-.5, 2,-2,-.5, 2,-2,.5, 1,-2,-2.5, 2,-2,-3.5, 2,2,-3.5, 2,2,-2.5, 1,6,0, 2,16,0],
-    [127],
-  ],
-  3: [
-    [1,-25,0, 2,20,15, 2,20,-15, 2,-25,0, 2,5,0, 2,20,15, 1,5,0, 2,20,-15, 1,5,0, 2,15,4, 1,5,0, 2,15,-4, 1,20,-5, 2,15,-5, 2,15,5, 2,20,5, 1,15,1, 2,18,1, 1,15,-1, 2,18,-1, 2,18,-4, 2,20,-4, 1,20,4, 2,18,4, 2,18,-4, 2,20,-4],
-    [1,19,-3, 2,19,-1, 1,16,4, 2,17,4, 2,17,3, 2,16,3, 2,16,4, 1,16,-2, 2,16,-4, 2,18,-4, 2,18,-3, 2,17,-3, 2,17,-2, 2,16,-2, 1,-5,3, 2,-5,-3, 2,1,-3, 2,1,3, 2,-5,3],
-    [77],
-    [1,-25,0, 2,5,1, 2,15,4, 2,20,4, 2,20,2, 2,5,1, 1,15,4, 2,15,2, 1,15,4, 2,18,7, 2,20,7, 2,20,4, 1,18,7, 2,18,9, 2,20,9, 2,20,7, 1,19,9, 2,19,10],
-    [1,19,8, 1,17,4, 2,17,5, 2,19,5, 2,19,4, 1,-25,0, 2,20,0, 1,20,2, 2,20,-2, 2,-25,-.5],
-    [1,-5,-.5, 2,2,-.5, 2,2,-1, 1,-5,-.5, 2,-5,-1],
-    [127],
-  ],
-  4: [
-    [1,-23,1, 2,-23,-1, 2,-15,-4, 2,-11,-4, 2,-10,-3, 2,-10,3, 2,-11,4, 2,-15,4, 2,-23,1],
-    [1,-23,0, 2,-10,0, 1,-15,4, 2,-15,-4],
-    [1,-10,2, 2,-6,2, 2,-6,-2, 2,-10,-2],
-    [1,-6,2, 2,-5,4, 2,-5,1, 2,-6,0, 2,-5,-1, 2,-5,-4, 2,-6,-2],
-    [1,-5,4, 2,23,4, 2,23,-4, 2,-5,-4, 1,-5,-1, 2,20,-1, 1,-5,1, 2,20,1, 1,0,3, 2,5,3, 1,10,3, 2,15,3, 1,0,-3, 2,5,-3, 1,10,-3, 2,15,-3, 1,20,-4, 2,20,4],
-    [1,2,4, 2,2,6, 1,4,4, 2,4,6, 1,13,4, 2,13,6, 1,15,4, 2,15,6, 1,-2,6, 2,20,6, 2,20,10, 2,-2,10, 2,-2,6, 1,-2,7, 2,-3,7, 2,-3,9, 2,-2,9],
-    [1,19,10, 2,19,6],
-    [1,2,-4, 2,2,-6, 1,4,-4, 2,4,-6, 1,13,-4, 2,13,-6, 1,-2,-6, 2,-2,-10, 2,20,-10, 2,20,-6, 2,-2,-6, 1,-2,-7, 2,-3,-7, 2,-3,-9, 2,-2,-9, 1,19,-6, 2,19,-10],
-    [1,15,-6, 2,15,-4],
-    [77],
-    [1,-23,0, 2,-23,1, 2,-15,1, 2,-15,0, 2,-23,0, 2,-15,-1, 2,-15,4, 2,-23,1],
-    [1,-15,4, 2,-10,4, 2,-10,-1, 2,-15,-1, 1,-11,4, 2,-11,-1, 1,-10,3, 2,-6,3, 2,-6,0, 2,-10,0, 1,-6,3, 2,-5,4, 2,-5,0, 2,-6,0, 1,-6,2, 2,20,2, 1,-5,4, 2,20,4, 2,20,0, 2,-5,0, 1,2,2, 2,2,-1, 1,4,2, 2,4,-1, 1,13,2, 2,13,-1, 1,15,2, 2,15,-1],
-    [1,20,3, 2,23,3, 2,23,0, 2,20,0, 1,-2,-1, 2,20,-1, 2,20,-3, 2,-2,-3, 2,-2,-1, 1,-1,-1, 2,-1,-3, 1,1,-2, 2,6,-2, 1,13,-2, 2,19,-2, 1,-2,4, 2,-2,5, 2,0,5, 2,0,4, 1,-1,5, 2,-1,8, 2,0,7, 2,1,6, 2,-.5,5, 1,-1,7, 2,-2,7],
-    [127],
-  ],
-};
+/** Line 12's frame and lines 13-14's grid, all in HCOLOR 1. */
+export function drawShipIdGrid(hires: import('../engine/hires').Hires): void {
+  hires.hcolor(1);
+  hires.line(1, 1, 161, 1);
+  hires.line(161, 1, 161, 123);
+  hires.line(161, 123, 1, 123);
+  hires.line(1, 123, 1, 1);
+  for (let j = 7; j <= 161; j += 5) hires.line(j, 1, j, 123);
+  for (let j = 5; j <= 123; j += 5) hires.line(1, j, 161, j);
+}
 
-function drawWireframe(hires: import('../engine/hires').Hires, wireframes: number[][], angle: number): void {
-  const cosA = Math.cos(angle);
-  const sinA = Math.sin(angle);
-
-  for (const row of wireframes) {
-    let ox = 78;
-    let oy = 38;
-    let px = 0;
-    let py = 0;
-    let i = 0;
-    let first = true;
-
-    while (i < row.length) {
-      const c = row[i];
-      if (c === 77) { ox = 78; oy += 56; first = true; i++; continue; }
-      if (c === 127) { i++; continue; }
-      const x = row[i + 1];
-      const y = row[i + 2];
-      const z = row[i + 3];
-      const rx = x * cosA + z * sinA;
-      const rz = -x * sinA + z * cosA;
-      const sx = ox - rx * 2;
-      const sy = oy - y * 2 + rz * 0.5;
-
-      if (c === 1) {
-        hires.hplot(sx, sy);
-        px = sx; py = sy;
-        first = false;
-      } else if (c === 2) {
-        if (first) { hires.hplot(sx, sy); first = false; }
-        else hires.hplotTo(sx, sy);
-        px = sx; py = sy;
-      }
-      i += 3;
-    }
+/**
+ * The drawing loop at 1000-1050, shared by all four:
+ *
+ *     1020 X = X1 - (X * 2): Y = Y1 - (Y * 2)
+ *     1030 IF C = 1 THEN HPLOT X,Y
+ *     1040 IF C = 2 THEN HPLOT TO X,Y
+ *
+ * `X1` is 80 throughout; `Y1` starts at 40 and line 1003 moves it down for the second view.
+ * HPLOT truncates, and every coordinate these tables produce is a whole number because the
+ * fractions are all halves and they are doubled.
+ */
+export function drawShipIdWireframe(
+  hires: import('../engine/hires').Hires,
+  program: { data: number[]; secondY: number | null },
+): void {
+  hires.hcolor(3);
+  const x1 = 80;
+  let y1 = 40;
+  let penX = 0;
+  let penY = 0;
+  let i = 0;
+  while (i < program.data.length) {
+    const c = program.data[i++];
+    if (c === 77) { y1 = program.secondY ?? y1; continue; }
+    if (c === 127) break;
+    const dx = program.data[i++];
+    const dy = program.data[i++];
+    const x = Math.trunc(x1 - dx * 2);
+    const y = Math.trunc(y1 - dy * 2);
+    if (c === 1) { hires.hplot(x, y); }
+    else if (c === 2) { hires.line(penX, penY, x, y); }
+    penX = x;
+    penY = y;
   }
 }
 
-const PLANET_NAMES = [
-  'MERCURY', 'VENUS', 'EARTH', 'MARS', 'JUPITER',
-  'SATURN', 'URANUS', 'NEPTUNE', 'PLUTO', 'ALPHA',
-  'BETA', 'GAMMA', 'DELTA', 'EPSILON', 'ZETA',
-  'ETA', 'THETA', 'IOTA', 'KAPPA', 'LAMBDA',
-];
+/** Line 1060's description, down the right-hand side at HTAB 25. */
+export function drawShipIdText(
+  hires: import('../engine/hires').Hires,
+  text: Array<[number, number, string]>,
+): void {
+  hires.hcolor(3);
+  for (const [row, col, s] of text) hires.text(s, col + 1, row + 1);
+}
 
-export async function shipIdScene(
-  ctx: SceneContext,
-  scenes: SceneManager,
-): Promise<void> {
+/** Lines 10-14 and 1000-1060 together. */
+export function drawShipId(hires: import('../engine/hires').Hires, kind: number): void {
+  const program = SHIP_ID_PROGRAMS[kind] ?? SHIP_ID_PROGRAMS[0];
+  // 10/11: sixteen rows of forty spaces from column 0.
+  hires.hcolor(1);
+  for (let r = 1; r <= 16; r++) hires.text(' '.repeat(40), 1, r);
+  drawShipIdGrid(hires);
+  if (program.data.length) drawShipIdWireframe(hires, program);
+  drawShipIdText(hires, program.text);
+}
+
+export async function shipIdScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input } = ctx;
   setScene('shipId');
 
-  const requestedKind = parseShipKindParam(new URLSearchParams(window.location.search).get('ship'));
-  const kind = requestedKind ?? (state.planets[state.planetIndex]?.defender || 0);
-  const info = SHIP_INFO[kind] || SHIP_INFO[0];
-  const wireframes = SHIP_WIREFRAMES[kind];
-  const planetName = PLANET_NAMES[state.planetIndex] ?? `SYSTEM ${state.planetIndex + 1}`;
+  // RADAR line 5002 sends kind 2 to SHIP # 3.
+  const raw = state.shipKind as number;
+  const kind = raw === 2 ? 3 : raw;
+  drawShipId(hires, kind);
+  glog('shipId', `ship # ${kind}`);
 
-  glog('shipId', `identified ship kind=${kind} name=${info.name} at ${planetName}`);
-
-  await new Promise<void>(resolve => {
-    let lastTime = performance.now();
-    let angle = 0;
-
-    const frame = (now: number) => {
-      const dt = Math.min(now - lastTime, 50);
-      lastTime = now;
-      angle += dt * 0.0008;
-
-      hires.hgr();
-      hires.hcolor(1);
-      hires.line(1, 1, 161, 1);
-      hires.line(161, 1, 161, 123);
-      hires.line(161, 123, 1, 123);
-      hires.line(1, 123, 1, 1);
-
-      for (let j = 7; j <= 161; j += 5) hires.line(j, 1, j, 123);
-      for (let j = 5; j <= 123; j += 5) hires.line(1, j, 161, j);
-
-      if (wireframes) {
-        hires.hcolor(3);
-        drawWireframe(hires, wireframes, angle);
-      }
-
-      hires.hcolor(3);
-      hires.text('-SHIP I.D.-', 25, 1);
-
-      hires.hcolor(1);
-      hires.text(planetName, 25, 4);
-      hires.text(info.name, 25, 6);
-
-      hires.hcolor(5);
-      hires.text(`THREAT: ${info.threat}`, 25, 8);
-
-      hires.hcolor(1);
-      let row = 10;
-      for (const line of info.lines) {
-        hires.text(line, 25, row);
-        row += 2;
-      }
-
-      hires.hcolor(3);
-      hires.text('ANY KEY TO EXIT', 24, 21);
-
-      if (input.peekKey() !== 0) {
-        input.clearKey();
-        resolve();
-        return;
-      }
-      requestAnimationFrame(frame);
-    };
-
-    requestAnimationFrame(frame);
-  });
-
+  // 1070's GET, then RUN RADAR.
+  await input.waitForKey();
   return scenes.run('radar');
-}
-
-function parseShipKindParam(value: string | null): 0 | 1 | 3 | 4 | null {
-  if (value === '0') return 0;
-  if (value === '1') return 1;
-  if (value === '2' || value === '3') return 3;
-  if (value === '4') return 4;
-  return null;
 }

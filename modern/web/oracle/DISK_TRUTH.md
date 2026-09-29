@@ -2419,6 +2419,72 @@ board, hull integrity, stardate and condition - none of which END prints.
 
 ---
 
+## SHIP # 0, 1, 3 and 4 I.D.
+
+Four near-identical programs. RADAR line 2056 sends any key but X to line 5000, and 5005 is
+`J = PEEK(38205): POKE 38151,5: PRINT "RUN SHIP # ";J;" I.D."`, so the ship-kind byte picks
+the program; line 5002 maps kind 2 to SHIP # 3. `probe_shipid.mjs` captures all four in one
+session by poking 38205 between visits; `shipid_parity.mjs` compares.
+
+| | rows 0-15 |
+| --- | --- |
+| SHIP # 0 | **0 of 35,840 pixels differ** |
+| SHIP # 1 | **0 of 35,840** |
+| SHIP # 3 | 109 of 35,840 - 99.70% |
+| SHIP # 4 | 19 of 35,840 - 99.95% |
+
+### How they draw
+
+`POKE 32,0: POKE 33,40: POKE 34,0: POKE 35,16` then sixteen rows of forty spaces, so
+columns 0-39 are blanked outright - the left-margin-0 case again. Line 12 draws a frame from
+(1,1) to (161,123) and lines 13-14 fill it with a grid: verticals every five from x 7, and
+horizontals every five from y 5, all HCOLOR 1. Then HCOLOR 3 and the wireframe.
+
+The drawing loop is the same in all four:
+
+```
+1000 READ C
+1003 IF C = 77 THEN Y1 = <second view>: GOTO 1000
+1005 IF C = 127 THEN 1060
+1010 READ X,Y
+1020 X = X1 - (X * 2):Y = Y1 - (Y * 2)
+1030 IF C = 1 THEN HPLOT X,Y
+1040 IF C = 2 THEN HPLOT TO X,Y
+```
+
+`X1` is 80 throughout and `Y1` starts at 40; 77 drops to the lower view - 80 for SHIP # 1,
+100 for # 3, 90 for # 4 - and 127 ends. SHIP # 0 has no DATA at all: it draws the grid and
+prints THERE IS NO / STARSHIP IN / THIS SYSTEM.
+
+The tables are pulled out of the listings by the probe and generated into
+`scenes/shipIdData.ts` rather than transcribed: 233 values for # 1, 236 for # 3, 428 for # 4.
+
+### The residual is the line algorithm, and RADAR and the ships disagree
+
+SHIP # 3 and # 4 are short by 109 and 19 pixels, all disk-only - the port draws a strict
+subset, never an extra pixel. They are corner pixels on two particular slopes: a 45 degree
+segment and a 1-in-3 one, where `HPLOT TO` doubles and the port does not.
+
+The rule this file recorded from RADAR is that an exact crossing - where the ideal line meets
+a column boundary on a whole pixel - does **not** double. That was measured, and it is what
+takes RADAR's reticle to 1,143 of 1,143. On a 1-in-3 slope every crossing is exact, so the
+rule suppresses all of them, and the ships want them back.
+
+Tried and measured: dropping the exclusion costs more than it gains -
+
+| | with the rule | without |
+| --- | --- | --- |
+| RADAR's reticle | 1,143 of 1,143 | 1,143 of 1,150 - 7 extra |
+| SHIP # 3 | 109 differ | 214 differ |
+| SHIP # 4 | 19 differ | 24 differ |
+
+So the rule stays, and the disagreement is real rather than resolved: two screens on the same
+disk cannot both be satisfied by either version. The ROM's actual line routine has not been
+disassembled, and until it is this is a fit to RADAR that the ship wireframes partly
+contradict.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -2426,9 +2492,12 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Three of the 23 programs.** The four SHIP # n I.D. programs are extracted and readable
-  but nothing has been compared against them. STATUS, GALAXY MAP, RADAR,
-  GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG and END are done.
+- **Applesoft's line algorithm, properly.** `Hires.line()` is fitted to RADAR's reticle,
+  which it matches exactly, and SHIP # 3 and # 4 contradict it on 45 degree and 1-in-3
+  slopes - 109 and 19 corner pixels the port does not draw. Dropping the fitted rule makes
+  all three worse. The ROM routine needs disassembling. STATUS, GALAXY MAP, RADAR,
+  GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D. are done - every program on the disk
+  has now been looked at.
 - **Why one empty inverse PRINT whitens a whole page.** S/X line 5 does it, measured; the
   mechanism in the character generator is not derived.
 - **EX line 6's XDRAW.** The port draws the five flash shapes rather than XORing them, which
