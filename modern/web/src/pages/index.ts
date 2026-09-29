@@ -7,6 +7,7 @@ import { cos64FB, sin64F8, mul635C, buildMatrix654E, toCameraSpace6730, applyObj
 import { viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, projectCameraSpaceBytes,
   projectWorldPointFixed, outcode67EF, clipFrustum61B7, clipEnd6979 } from '../engine/diskPipeline';
 import { projectWorldPoint as projectWorldPointFloat } from '../engine/diskProjection';
+import { soundGen9276, laser92D1, expl9276 } from '../engine/diskSound';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import { parseShipBytecode, projectShipBytecode, drawShipWireframe,
   projectShipWorld, drawShipWorld, COCKPIT_SHIP_WIREFRAME_VIEW } from '../engine/shipBytecode';
@@ -111,7 +112,8 @@ function boot(): void {
     projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu, drawShipId, project68A1, project68A1ToScreen,
     cos64FB, sin64F8, mul635C, buildMatrix654E, toCameraSpace6730, applyObjectScale,
     viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, projectCameraSpaceBytes,
-    projectWorldPointFixed, projectWorldPointFloat, outcode67EF, clipFrustum61B7, clipEnd6979 };
+    projectWorldPointFixed, projectWorldPointFloat, outcode67EF, clipFrustum61B7, clipEnd6979,
+    soundGen9276, laser92D1, expl9276 };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();

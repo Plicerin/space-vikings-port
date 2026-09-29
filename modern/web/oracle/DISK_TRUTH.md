@@ -3186,9 +3186,104 @@ which is right for the flight view and unverified for the others.
 Five display-list opcodes - `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` - have not been
 read. None of the four models on the disk uses them.
 
-Away from the renderer: the sound routines (`$9276`, `$92D1`, `$9270`) have never been
-disassembled, and the game logic this file quotes for combat and the economy is quoted from
-the BASIC rather than checked against a running machine.
+Away from the renderer: the game logic this file quotes for combat and the economy is quoted
+from the BASIC rather than checked against a running machine.
+
+---
+
+## The three sounds
+
+A sound has no picture to diff. The only thing to compare is **when** the speaker is toggled:
+each routine ends in an access to `$C030`, and the gap between two of them in CPU cycles is
+the half-period of what comes out. So `oracle/probe_sound.mjs` runs each one on the machine
+and records the cycle at every access, and `oracle/sound_parity.mjs` checks the port's
+transcription against that timeline, toggle for toggle.
+
+| routine | catalog | loads at | BLOADed to | bytes | entry | toggles at |
+| --- | --- | --- | --- | --- | --- | --- |
+| SOUND GEN | `$2000` | `$2000` | `$9276` | 74 | `$9276` | `$928B` |
+| LASER | `$6000` | `$6000` | `$92D1` | 26 | `$92D1` | `$92DB` |
+| EXPL | `$9270` | `$9270` | `$9270` | 34 | `$9276` | `$927E` |
+
+STARSHIP SIMULATOR line 2 names them: `SG = 37494`, `LA = 37585`. Lines 4100, 4110 and 4120
+set SOUND GEN's parameters, and `POKE 37490-37493` is `$9272-$9275`.
+
+### SOUND GEN, $9276
+
+```
+$9276  SEC / INC $9273 / LDX $9274
+$927D  ROL $9270 / ROL $9271              ; the register, and the carry out of bit 15
+$9283  TXA / BEQ / DEX                    ; count the period down
+$9287  BNE / BCC / LDA $C030 / LDX $9274  ; toggle when the period ran out AND that bit is set
+$9291  ROR A x3 / EOR $9271 / ASL A x3    ; feedback: bit 5 of that becomes the next carry
+$929A  PHP ... PLP                        ; so the sweep cannot disturb it
+$92B5  DEC $9272 / BNE / DEC $9273 / BNE
+```
+
+`$9270`/`$9271` is a 16-bit shift register whose top bit gates the speaker, divided down by
+`$9274`. A period of 0 never decrements - `TXA` leaves Z set so `DEX` is skipped - which makes
+every iteration a candidate and is the harshest setting. `$9275` sweeps the period: zero
+leaves it alone, bit 7 set raises it, anything else lowers it. The register is **not** reset
+between calls, so consecutive `CALL SG` carry on from where the last one stopped.
+
+### LASER, $92D1
+
+```
+$92D1  LDY #$0E / LDX #$00
+$92D5  TXA / CLC / SBC #$01 / BNE $92D7   ; a delay that grows with X
+$92DB  STA $C030 / INX / CPX #$8C / BNE
+$92E3  DEY / BNE $92D3
+```
+
+A period rising from 0 to 139, fourteen times over: a falling whine, repeated. The delay is
+not quite `X`, because `CLC` then `SBC #$01` takes **two** off the first time and the loop
+re-enters the `SBC` without touching the carry, so every later pass takes one - and an odd X
+borrows down through zero to 255 and comes back the long way.
+
+### EXPL, $9270 - which lands on SOUND GEN
+
+EXPL BLOADs to `$9270`, which is SOUND GEN's parameter block, and its 34 bytes run to `$9291`.
+So it overwrites the front of SOUND GEN and shares nothing with it, carrying its own `RTS` at
+`$928E` and `JMP $9276` at `$928F`. The BASIC calls both at 37494 because after `BLOAD EXPL`
+that address is EXPL. It is the same shift register and the same feedback, with no divider.
+
+**Its setup is unreachable.** `LDA #$00 / TAY / SEC` sits at `$9272-$9275`, **below** the entry
+point, so `CALL 37494` skips it: the burst's length is whatever Y holds and the first `ROL`
+shifts in whatever carry Applesoft left. Neither is chosen by the routine.
+
+The ROM settles Y. Applesoft's `CALL` is `$F1D5 JSR $DD67 / JSR $E752 / JMP ($0050)`, and
+`$E75B` ends `LDA $A0 / LDY $A1 / STY $50 / STA $51 / RTS` - so **Y is the low byte of the
+address called**, and nothing between that and the indirect jump touches it. For `CALL 37494`
+that is `$76`. `oracle/probe_soundcall.mjs` boots the disk, empties the tank to reach H/D, and
+traps the real call: **Y = 118, the carry clear, the register still `$0414` from the file**.
+So the burst is 118 iterations, not 256, and 41 toggles in 4963 cycles.
+
+(`$9276` is both the entry and the top of EXPL's loop, so a trap there sees the call and then
+every pass - which is how Y counting down and the register doubling show up in that capture.)
+
+### Checked
+
+| run | toggles | cycles | |
+| --- | --- | --- | --- |
+| SOUND GEN line 4100 | 37 | 190650 | exact |
+| SOUND GEN line 4110 | 642 | 82944 | exact |
+| SOUND GEN line 4120 | 31 | 133509 | exact |
+| SOUND GEN, period 4 | 148 | 48124 | exact |
+| SOUND GEN, sweeping down | 510 | 76939 | exact |
+| LASER | 1960 | 734531 | exact |
+| EXPL as the game calls it | 41 | 4963 | exact |
+| EXPL, Y = 0 | 115 | 10843 | exact |
+| EXPL, Y = 0, carry set | 102 | 10804 | exact |
+| EXPL, Y = 1 | 0 | 43 | exact |
+| EXPL, Y = 200 | 82 | 8448 | exact |
+
+3668 toggles, every one at the same cycle, and every total.
+
+**One thing a port cannot reproduce faithfully.** `LDA $C030` returns the floating bus - what
+the video scanner last fetched - and that value feeds straight back into the feedback chain at
+`$9291`, so on real hardware the noise depends on what is on screen. apple2js returns 0 and
+every capture here was taken with that; `diskSound.ts` takes it as a parameter and defaults to
+0 rather than pretending the question does not exist.
 
 ---
 
