@@ -185,3 +185,31 @@ export function project68A1ToScreen(
     y: SCREEN_Y_FLIP - signed(sy),
   };
 }
+
+/**
+ * $6468 - the signed divide, whole sixteen bits of it.
+ *
+ * `$68A1` only ever takes `$79`, the high byte, so `signedDivide()` above returns that and the
+ * carry $691E needs. The clipper at $6979 takes the full `$78/$79` as its interpolation
+ * parameter, so it needs the pair.
+ *
+ *     $6468  ORA #$00 / BMI       ; the numerator arrives as A (high) and X (low)
+ *     $6487  negate the numerator when it is negative
+ *     $6495  negate the divisor when it is
+ *     $64A5  divide, then negate the quotient when exactly one of them was
+ *
+ * The result is a Q15 fraction, which is what `mul635C` then expects.
+ */
+export function divide6468(num: number, den: number): number {
+  const n = num & 0xffff;
+  const d = den & 0xffff;
+  let negate = false;
+  let nn = n;
+  let dd = d;
+  if (n & 0x8000) { nn = -n & 0xffff; negate = !negate; }   // $6478 JSR $6487
+  if (d & 0x8000) { dd = -d & 0xffff; negate = !negate; }   // $6472/$6481 JSR $6495
+  const q = divide64B6((nn >> 8) & 0xff, nn & 0xff, dd & 0xff, (dd >> 8) & 0xff);
+  const v = ((q.q79 << 8) | q.q78) & 0xffff;
+  const out = negate ? -v & 0xffff : v;                     // $64A5
+  return out > 32767 ? out - 65536 : out;
+}

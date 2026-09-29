@@ -29,7 +29,8 @@ import {
   SNAPSHOT_SCALE, type RotationMatrix,
 } from './diskRotation';
 import {
-  project68A1, project68A1ToScreen, SNAPSHOT_OPERANDS, type ProjectionOperands,
+  project68A1, project68A1ToScreen, divide6468, SNAPSHOT_OPERANDS,
+  type ProjectionOperands,
 } from './diskProjectionFixed';
 import { NEAR_Z, type Vec3 } from './diskProjection';
 
@@ -154,55 +155,129 @@ export function outcode67EF(d: Vec3): number {
   return o;
 }
 
-/** $615E - `LDA #$0A / STA $B1`, the clipper's iteration budget. */
+/** $615E - `LDA #$0A / STA $B1`, the budget the clipper spends across both ends. */
 export const CLIP_ROUNDS = 10;
+
+const w16 = (v: number): number => {
+  const u = v & 0xffff;
+  return u > 32767 ? u - 65536 : u;
+};
+
+/**
+ * $6992, $6A0D, $6A92, $6B0D - pull the far end of a segment onto one plane.
+ *
+ * All four are the same nine steps with the axes and signs swapped. For the plane `y = z`
+ * at $6992, with A at $60-$65 and B at $68-$6D:
+ *
+ *     $6992  $7A = az - bz
+ *     $699F  $7A = (ay - by) - (az - bz)          the denominator
+ *     $69B5  A:X = bz - by                        the numerator
+ *     $69BF  JSR $6468                            t, as a Q15 fraction in $78/$79
+ *     $69C2  bx += t * (ax - bx)                  through $635C
+ *     $69E4  bz += t * (az - bz)
+ *     $6A01  by = bz                              the plane, set rather than computed
+ *     $6A0A  JMP $6848                            and B's outcode is recomputed
+ *
+ * Solving `by + t(ay - by) = bz + t(az - bz)` gives exactly that t. The axis the plane names
+ * is assigned from the new z instead of interpolated, so it lands on the plane exactly: at
+ * $6A0D and $6B0D, where the plane is negative, it is `EOR #$FF` and `INC`, a two's
+ * complement of the new z.
+ */
+const PLANES = [
+  {
+    bit: OUT_TOP,                                         // $6992 - y = z
+    num: (a: Vec3, b: Vec3): number => b.z - b.y,
+    den: (a: Vec3, b: Vec3): number => (a.y - b.y) - (a.z - b.z),
+    free: 'x' as const, sign: 1,
+  },
+  {
+    bit: OUT_BOTTOM,                                      // $6A0D - y = -z
+    num: (a: Vec3, b: Vec3): number => b.z + b.y,
+    den: (a: Vec3, b: Vec3): number => (b.y - a.y) - (a.z - b.z),
+    free: 'x' as const, sign: -1,
+  },
+  {
+    bit: OUT_RIGHT,                                       // $6A92 - x = z
+    num: (a: Vec3, b: Vec3): number => b.z - b.x,
+    den: (a: Vec3, b: Vec3): number => (a.x - b.x) - (a.z - b.z),
+    free: 'y' as const, sign: 1,
+  },
+  {
+    bit: OUT_LEFT,                                        // $6B0D - x = -z
+    num: (a: Vec3, b: Vec3): number => b.z + b.x,
+    den: (a: Vec3, b: Vec3): number => (b.x - a.x) - (a.z - b.z),
+    free: 'y' as const, sign: -1,
+  },
+];
+
+/**
+ * $6979 - clip B against whichever plane its outcode names.
+ *
+ * The dispatch asks, in turn, whether $40 is the only bit left, then whether $40 and $20 are,
+ * then $10 as well - so the test that matches is the **last** bit still set, and the priority
+ * runs $08, $10, $20, $40. A corner outside both x = z and y = z is taken against y = z
+ * first, which is the opposite of the order the masks are written in.
+ */
+export function clipEnd6979(a: Vec3, b: Vec3, outcodeB: number): Vec3 {
+  const plane = PLANES.find((p) => outcodeB & p.bit);
+  if (!plane) return b;
+  const den = plane.den(a, b);
+  if (den === 0) return b;
+  const t = divide6468(plane.num(a, b), den);
+  const other = plane.free;
+  const axis = plane.free === 'x' ? 'y' : 'x';
+  const z = w16(b.z + mul635C(t, w16(a.z - b.z)));
+  const out: Vec3 = { x: b.x, y: b.y, z };
+  out[other] = w16(b[other] + mul635C(t, w16(a[other] - b[other])));
+  out[axis] = plane.sign === 1 ? z : w16(-z);
+  return out;
+}
 
 /**
  * $61B7 - clip a camera-space segment to the frustum, or drop it.
  *
  * `JSR $61A9 / JSR $618E / BNE $620F` transforms both ends, takes both outcodes and rejects
- * the segment outright when `$66 AND $6E` is nonzero - both ends outside the same plane. Then
- * it alternates: while an end is outside, pull it onto the plane that is failing ($6979 for
- * the far end, $695F for the near one, which is $6979 between two swaps), at most ten times.
+ * outright when `$66 AND $6E` is nonzero - both outside the same plane. Then A is pulled in
+ * first and B after, one plane per round:
  *
- * The disk's four intersection routines - $6B0D, $6A92, $6A0D and the inline case at $6992 -
- * are exact parametric intersections with the same four planes. This solves for the same
- * point rather than transcribing their arithmetic, so a clipped endpoint can sit a unit away
- * from where the disk puts it; an endpoint that was already inside is untouched.
+ *     $61BF  LDA $66 / BNE $61D7      A outside -> $61DB JSR $695F, clip A
+ *     $61DE  LDA $66 / BEQ $61C3      A is in now, go and look at B
+ *     $61E2  AND $6E / BNE $620F      still out, and sharing a plane with B -> reject
+ *     $61C3  LDA $6E / BNE $61CA      B outside -> $61CE JSR $6979, clip B
+ *     $61C7  JMP $627A                both in, draw it
+ *
+ * `$695F` is `$6979` between two calls to `$6969`, which swaps the eight bytes of each slot -
+ * outcodes included - so clipping A is clipping B with the ends exchanged.
+ *
+ * `$B1` is one budget of ten spent across both ends, and running out is a rejection, not a
+ * draw. `$7C` is a per-object flag from the display list ($62BE): when it is set, a segment
+ * that needs clipping is dropped rather than clipped.
  */
-export function clipFrustum61B7(a: Vec3, b: Vec3): { a: Vec3; b: Vec3 } | null {
+export function clipFrustum61B7(
+  a: Vec3,
+  b: Vec3,
+  noClip = 0,
+): { a: Vec3; b: Vec3 } | null {
   let p = { ...a };
   let q = { ...b };
   let op = outcode67EF(p);
   let oq = outcode67EF(q);
+  if (op & oq) return null;                       // $61BD
+  let budget = CLIP_ROUNDS;
 
-  for (let round = 0; round < CLIP_ROUNDS; round++) {
-    if (!(op | oq)) return { a: p, b: q };   // both in
-    if (op & oq) return null;                // $61BD BNE $620F - outside the same plane
-
-    // $61BF looks at $66 first, so the far end is pulled in before the near one.
-    const clipQ = oq !== 0;
-    const out = clipQ ? oq : op;
-    const from = clipQ ? p : q;
-    const to = clipQ ? q : p;
-
-    // The plane, and the value that has to become zero along the segment.
-    const f = (v: Vec3): number =>
-      out & OUT_LEFT ? v.x + v.z
-        : out & OUT_RIGHT ? v.z - v.x
-          : out & OUT_BOTTOM ? v.y + v.z
-            : v.z - v.y;
-    const fa = f(from), fb = f(to);
-    const denom = fa - fb;
-    if (denom === 0) return null;
-    const t = fa / denom;
-    const hit: Vec3 = {
-      x: Math.round(from.x + (to.x - from.x) * t),
-      y: Math.round(from.y + (to.y - from.y) * t),
-      z: Math.round(from.z + (to.z - from.z) * t),
-    };
-    if (clipQ) { q = hit; oq = outcode67EF(q); } else { p = hit; op = outcode67EF(p); }
+  while (op) {                                    // $61D7 - A first
+    if (noClip) return null;                      // $61D9
+    p = clipEnd6979(q, p, op);                    // $61DB JSR $695F
+    op = outcode67EF(p);
+    if (!op) break;                               // $61E0 BEQ $61C3
+    if (op & oq) return null;                     // $61E4
+    if (--budget === 0) return null;              // $61E6 DEC $B1 / $61EA BEQ $620F
   }
-  // $61D3 BEQ $620F - out of rounds is a rejection, not a draw.
-  return null;
+  while (oq) {                                    // $61C3 - then B
+    if (noClip) return null;                      // $61CC
+    q = clipEnd6979(p, q, oq);                    // $61CE JSR $6979
+    oq = outcode67EF(q);
+    if (--budget === 0) return null;              // $61D1 DEC $B1 / $61D3 BEQ $620F
+  }
+  return { a: p, b: q };                          // $61C7 JMP $627A
 }
