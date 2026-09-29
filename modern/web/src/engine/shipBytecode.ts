@@ -1,8 +1,5 @@
 import type { Hires } from './hires';
-import {
-  clipSegment, insideClip,
-  type Vec3 as ProjVec3,
-} from './diskProjection';
+import { type Vec3 as ProjVec3 } from './diskProjection';
 import {
   viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, outcode67EF, clipFrustum61B7,
   SNAPSHOT_VIEW, type ObjectView,
@@ -445,8 +442,7 @@ export function projectShipWorld(
       // frustum rejects would otherwise fold back into the middle of the picture.
       const q = outcode67EF(d) ? null : projectCameraSpaceFixed(d, objectView.ops);
       if (!q) culled++;
-      else if (insideClip(q.x, q.y)) dots.push(q);
-      else clippedAway++;
+      else dots.push(q);
       pen = null;
       continue;
     }
@@ -465,10 +461,11 @@ export function projectShipWorld(
         if (!pa || !pb) {
           culled++;
         } else {
-          // Then against the view, the way the original does at $61A9-$620F.
-          const c = clipSegment(pa.x, pa.y, pb.x, pb.y);
-          if (c) segments.push({ from: { x: c.ax, y: c.ay }, to: { x: c.bx, y: c.by } });
-          else clippedAway++;
+          // And that is the whole of it. $6DD5 adds 70 to x, takes 95 - y, and goes straight
+          // into its Bresenham - there is no screen-space clip in the renderer at all. The
+          // frustum has already bounded sx to +/-69 and sy to -28..96, so every point $68A1
+          // returns is on the page by construction.
+          segments.push({ from: pa, to: pb });
         }
       }
     }
@@ -481,16 +478,17 @@ export function projectShipWorld(
 
 /** Draw a world-space projection. Coordinates are already screen coordinates. */
 export function drawShipWorld(hires: Hires, projection: ShipWorldProjection): void {
+  // $6DD5 works in half-columns, so hand it back the x $68A1 produced rather than the
+  // doubled screen one. projectCameraSpaceFixed() always returns an even x, so this is exact.
   for (const s of projection.segments) {
-    hires.segment(Math.round(s.from.x), Math.round(s.from.y), Math.round(s.to.x), Math.round(s.to.y));
+    hires.segment6DD5(Math.round(s.from.x) / 2, Math.round(s.from.y),
+      Math.round(s.to.x) / 2, Math.round(s.to.y));
   }
   // A lone point is two pixels wide on the disk, not one. probe_project.mjs put a single
   // vertex through the real renderer 54 times and it came back as a 2-pixel blob every
   // time, at x and x+1 on the same row. Plotting one pixel left the starfield at half the
   // original's density - 142 pixels against 278.
   for (const p of projection.dots) {
-    const x = Math.round(p.x), y = Math.round(p.y);
-    hires.hplot(x, y);
-    hires.hplot(x + 1, y);
+    hires.halfColumn(Math.round(p.x) / 2, Math.round(p.y));
   }
 }

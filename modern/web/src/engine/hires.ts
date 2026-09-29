@@ -40,6 +40,44 @@ for (let i = 0; i <= 7; i++) {
 }
 
 
+/**
+ * $6BC2 and $6C4E - where a half-column lands, and which bits it lights.
+ *
+ * $6DD5 does not work in the Apple's 280 columns. Its two endpoints are the bytes $68A1
+ * produced, mapped by `x + 70` and `95 - y`, so x runs 1..139 - and $6DB5 turns that into a
+ * screen address and a mask through a pair of 140-entry tables:
+ *
+ *     $6DC8  LDX $B3 / LDA $6BC2,X    ; the byte within the row
+ *     $6DD1  LDA $6C4E,X              ; and the bits to OR into it
+ *
+ * Every mask has exactly two bits set, which is what makes a point two pixels wide. Twenty
+ * of the 140 set bit 7, and bit 7 is not a pixel - it picks the palette pair - so one
+ * half-column in seven lights a single pixel rather than a pair. That is not a rounding
+ * artefact to smooth over: it is the pattern the disk draws, and the capture decodes it the
+ * same way, seven pixels to a byte with bit 7 ignored.
+ *
+ * Read off the flight snapshot.
+ */
+export const HALF_COLUMN_BYTE: readonly number[] = [
+  0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5,
+  5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 8, 8, 9, 9, 9, 10, 10, 10, 10, 11,
+  11, 11, 12, 12, 12, 12, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 16, 16, 16, 16,
+  17, 17, 17, 18, 18, 18, 18, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 22, 22, 22,
+  22, 23, 23, 23, 24, 24, 24, 24, 25, 25, 25, 26, 26, 26, 26, 27, 27, 27, 28, 28,
+  28, 28, 29, 29, 29, 30, 30, 30, 30, 31, 31, 31, 32, 32, 32, 32, 33, 33, 33, 34,
+  34, 34, 34, 35, 35, 35, 36, 36, 36, 36, 37, 37, 37, 38, 38, 38, 38, 39, 39, 39,
+];
+
+export const HALF_COLUMN_MASK: readonly number[] = [
+  3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24,
+  96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6,
+  24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192,
+  6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48,
+  192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12,
+  48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3,
+  12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96, 3, 12, 48, 192, 6, 24, 96,
+];
+
 export class Hires {
   private displayCtx: CanvasRenderingContext2D;
   private offscreen: HTMLCanvasElement;
@@ -189,6 +227,66 @@ export class Hires {
    *   endpoints when x2 < x1, so a segment and its reverse light the same pixels. Without
    *   that swap one case in ten came out a row off.
    */
+  /**
+   * One half-column: the pair of pixels $6DB5's tables name.
+   *
+   * `ORA ($99),Y / STA ($99),Y` - the mask is OR-ed in, so nothing already lit is cleared.
+   *
+   * Twenty of the 140 masks set bit 7, and bit 7 is not a pixel. $6D8F handles those by
+   * carrying the second dot into the next byte:
+   *
+   *     $6DA2  BMI $6DA9              ; the mask has bit 7
+   *     $6DA9  ORA ($99),Y / STA      ; this byte - which lights bit 6 alone
+   *     $6DAD  INY / LDA #$01 / ORA   ; and bit 0 of the one after it
+   *
+   * so the pair is contiguous either way. Working it through for all 140 entries, a
+   * half-column lights exactly screen pixels `2x` and `2x + 1` - the tables are that, taken
+   * apart into a byte and a mask.
+   */
+  halfColumn(xh: number, y: number): void {
+    if (xh < 0 || xh >= HALF_COLUMN_BYTE.length || y < 0 || y >= H) return;
+    const base = HALF_COLUMN_BYTE[xh] * 7;
+    const mask = HALF_COLUMN_MASK[xh];
+    const paint = (x: number): void => {
+      if (x < 0 || x >= W) return;
+      const argb = this.argbAt(x);
+      if (argb) this.buf[y * W + x] = argb;
+    };
+    for (let bit = 0; bit < 7; bit++) if (mask & (1 << bit)) paint(base + bit);
+    if (mask & 0x80) paint(base + 7);          // $6DAD INY / LDA #$01
+    this.dirty = true;
+  }
+
+  /**
+   * $6DD5's line, run in the units it actually uses: half-columns, 1..139.
+   *
+   * `segment()` below runs the same Bresenham in the Apple's 280 columns and lights one
+   * pixel a step, which is close but not the same thing. The disk steps a half-column at a
+   * time and paints whatever pair the table names, so the rightmost half-column lights
+   * pixels 276 and 277 where a 280-column walk stops at 276 - and a diagonal advances two
+   * pixels across per row rather than one.
+   */
+  segment6DD5(x1: number, y1: number, x2: number, y2: number): void {
+    let x0 = Math.round(x1);
+    let y0 = Math.round(y1);
+    let xe = Math.round(x2);
+    let ye = Math.round(y2);
+    // $6DF5 LDA $B5 / SEC / SBC $B3 / BCC $6E38 - it always runs left to right.
+    if (xe < x0) { const tx = x0; x0 = xe; xe = tx; const ty = y0; y0 = ye; ye = ty; }
+    const dx = Math.abs(xe - x0);
+    const dy = -Math.abs(ye - y0);
+    const sx = x0 < xe ? 1 : -1;
+    const sy = y0 < ye ? 1 : -1;
+    let err = dx + dy;
+    for (;;) {
+      this.halfColumn(x0, y0);
+      if (x0 === xe && y0 === ye) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+  }
+
   segment(x1: number, y1: number, x2: number, y2: number): void {
     let x0 = Math.round(x1);
     let y0 = Math.round(y1);
