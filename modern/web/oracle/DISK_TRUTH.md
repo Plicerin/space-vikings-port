@@ -1882,6 +1882,69 @@ transports, tanks and missiles. None of it is checked against the port.
 
 ---
 
+## SUPPLY
+
+`SUPPLY.bas`, reached from flight by C, 1, 5 - COM line 270's
+`ON C GOTO 800,900,30,1200,20000` landing on 20000's RUN SUPPLY. `probe_supply.mjs`
+captures it; `supply_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| page 1 | **0 of 53,760 pixels differ** |
+| page 2 | **0 of 53,760** |
+
+Two pages of one screen: line 1450 holds the first at a `GET`, line 1460 sets `R1` and calls
+1400 again - which clears, prints the title and returns early at the `R1` test - and the
+second page is drawn over it. Line 1510 takes `1` back to the first.
+
+Unlike COM's chain, SUPPLY owns the screen: line 20 floods rows 0-123 with `HCOLOR= 1`, and
+line 1400 pokes 973,255, so the whole report is inverse - the fifth independent reading of
+that flag. Only line 1515 puts it back.
+
+### The thirteen cargo counters
+
+| address | line | printed as | multiplier |
+| --- | --- | --- | --- |
+| 38181 | 1410 | PLATINUM, POUNDS | x 10 |
+| 38183 | 1410 | GOLD, POUNDS | x 10 |
+| 38182 | 1420 | SILVER, POUNDS | x 20 |
+| 38180 | 1420 | TITANIUM, THOUSAND POUNDS | x 1 |
+| 38179 | 1430 | COLLAPSIUM, TONS | x 1 |
+| 38178 | 1430 | STEEL, TONS | x 1 |
+| 38177 | 1440 | FISSIONABLES, POUNDS | x 1 |
+| 38176 | 1470 | ELECTRONIC PARTS, CRATES | x 1 |
+| 38175 | 1470 | WEAPONS, CRATES | x 1 |
+| 38174 | 1480 | FIGHTER PARTS, CRATES | x 1 |
+| 38173 | 1480 | LUXURY FOODS, CASES | x 1 |
+| 38172 | 1485 | WINE/LIQUOR, CASES | x 100 |
+| 38171 | 1490 | ART WORKS, UNITS | x 10 |
+
+These are the same thirteen SHORE LEAVE line 2400 values for sale, and the two sets of
+numbers are **not** the same thing: 2400 prices them (`PEEK(38172) * 150`, and so on) while
+SUPPLY only scales them for display. The port's `totalValue()` used SUPPLY's display
+multipliers as if they were prices. It is gone; the real prices are quoted under SHORE LEAVE
+and remain unchecked.
+
+### A full-width PRINT does not always fill the window
+
+Line 1400 clears with `HTAB 2: VTAB C: PRINT "<39 spaces>"` into a window set by
+`POKE 32,1: POKE 33,39` - 39 characters into a 39-wide window. **Only 38 columns come out
+blanked.** Column 39, x 273-279, still shows the `HCOLOR= 1` flood underneath, odd pixels
+only. That was the entire disagreement on both pages: 3 pixels a row over 120 rows.
+
+GROUND FORCES line 100 is the same shape - 40 spaces into a window set by
+`POKE 32,0: POKE 33,40` - and there **all 40 columns are blanked**. Measured both ways: the
+GROUND FORCES menu has x 274, 276, 278 lit at row 0 and the battle screen that replaces it
+does not.
+
+So a `PRINT` of exactly the window width loses its last character in one case and not the
+other, and the difference is the left margin. The rule is recorded from the measurements;
+the mechanism is not derived. Every other clear on this disk is narrower than its window -
+STATUS prints 38 into 39, GROUND FORCES line 12 and SHORE LEAVE 2080 print 18 into 21, COM
+line 29 prints 20 into 40 - so this only ever shows up in these two places.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -1889,9 +1952,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Twelve of the 23 programs.** SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and
-  the four SHIP # n I.D. programs are extracted and readable but nothing has been compared
-  against them. STATUS, GALAXY MAP, RADAR, GROUND FORCES and SHORE LEAVE are done.
+- **Eleven of the 23 programs.** ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four
+  SHIP # n I.D. programs are extracted and readable but nothing has been compared against
+  them. STATUS, GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE and SUPPLY are done.
+- **Why a full-width PRINT behaves differently at left margin 0 and 1.** SUPPLY loses its
+  last character and GROUND FORCES does not; both are measured, neither is explained.
 - **Four of SHORE LEAVE's six sub-screens.** ENLIST TROOPS, SELL LOOT, REPAIR/RESTOCK and
   ESTABLISH BASE are not captured. REPAIR needs the ship in atmosphere; the others need
   credits, loot or an unbuilt base.

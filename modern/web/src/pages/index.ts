@@ -19,7 +19,7 @@ import { instrumentsScene, drawInstruments, drawPanelNeedles } from '../scenes/i
 import { galaxyMapScene, drawGalaxyMap, drawGalaxyCursor } from '../scenes/galaxyMap';
 import { comScene, drawComMainScreen, eraseComNeedleTracks } from '../scenes/com';
 import { statusScene, drawStatusReport, drawTroopReport } from '../scenes/status';
-import { supplyScene } from '../scenes/supply';
+import { supplyScene, drawSupplyPage1, drawSupplyPage2 } from '../scenes/supply';
 import { radarScene, drawRadarOverlay, drawRadarScreen, radarCamera } from '../scenes/radar';
 import { recallScene } from '../scenes/recall';
 import { shoreLeaveScene, drawShoreLeavePay, drawShoreLeaveCryogenics } from '../scenes/shoreLeave';
@@ -102,7 +102,7 @@ function boot(): void {
   (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments,
     ShapeRenderer, decodeShapeTableJson,
     parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW,
-    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics };
+    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2 };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();
