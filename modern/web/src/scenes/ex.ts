@@ -1,91 +1,102 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
+import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
+import type { ShapeTable } from '../engine/shapeTable';
 
-interface DebrisParticle {
-  angle: number;
-  speed: number;
-  dist: number;
-  size: number;
-  color: number;
+/**
+ * EX, the enemy ship's explosion - EX.bas, sixteen lines.
+ *
+ * STARSHIP SIMULATOR line 1560 runs it from inside the laser subroutine:
+ * `IF DP > PEEK(38204) AND PEEK(38205) < > 0 THEN PRINT "RUNEX"`.
+ *
+ * It never clears the screen. The burst is drawn straight over the flight view in the
+ * HCOLOR 3 line 5 sets, and the only thing that follows is a chain back to the simulator -
+ * no caption.
+ */
+
+/** Line 25 plots every segment from here. Line 6's flash is two pixels lower, at 140,65. */
+export const EX_ORIGIN = { x: 140, y: 60 } as const;
+export const EX_FLASH_AT = { x: 140, y: 65 } as const;
+/** Line 6, at SCALE= 2. BASIC shape numbers. */
+export const EX_FLASH_SHAPES = [2, 15, 16, 17, 18] as const;
+
+type H = import('../engine/hires').Hires;
+
+/**
+ * Line 6's flash.
+ *
+ * The original XDRAWs these, so over the flight view they invert rather than paint. The port
+ * draws them, which is the same thing over empty space and not the same over a star - a
+ * known simplification, not something measured.
+ */
+export function drawExFlash(hires: H, shapes: ShapeTable): void {
+  const r = new ShapeRenderer(hires);
+  r.rot = 0;
+  r.scale = 2;
+  hires.hcolor(3);
+  for (const n of EX_FLASH_SHAPES) r.draw(shapes, n - 1, EX_FLASH_AT.x, EX_FLASH_AT.y);
 }
 
-function drawDebrisParticles(hires: import('../engine/hires').Hires, cx: number, cy: number, particles: DebrisParticle[]): void {
-  for (const p of particles) {
-    const x = cx + Math.round(Math.cos(p.angle) * p.dist);
-    const y = cy + Math.round(Math.sin(p.angle) * p.dist * 0.7);
-    if (x < 0 || x > 279 || y < 0 || y > 123) continue;
-    hires.hcolor(p.color);
-    hires.line(x - p.size, y, x + p.size, y);
-    hires.line(x, y - p.size, x, y + p.size);
+/**
+ * Lines 7-30, the burst.
+ *
+ *     7  FOR X1 = 5 TO 130 STEP 8: Y1 = Y1 + 4.8: FOR J = 1 TO 15
+ *     20 X2 = X1 - (RND(1) * (X1 + X1)): Y2 = Y1 - (RND(1) * (Y1 + Y1))
+ *     21 IF Y2 > 65 THEN Y2 = 65
+ *     22 IF Y2 < - 60 THEN Y2 = - 60
+ *     25 HPLOT 140,60 TO 140 + X2,60 + Y2: NEXT
+ *
+ * Sixteen steps of fifteen segments - 240 in all - with the spread growing as X1 and Y1 do,
+ * which is why the middle is dense and the edges are sparse. Y1 starts at 20 (line 5) and is
+ * bumped before the first inner loop, so it runs 24.8 to 96.8.
+ *
+ * HPLOT truncates its coordinates, and every one here is positive.
+ */
+export function drawExBurst(hires: H, rnd: () => number = Math.random): number {
+  hires.hcolor(3);
+  let y1 = 20;
+  let drawn = 0;
+  for (let x1 = 5; x1 <= 130; x1 += 8) {
+    y1 += 4.8;
+    for (let j = 0; j < 15; j++) {
+      const x2 = x1 - rnd() * (x1 + x1);
+      let y2 = y1 - rnd() * (y1 + y1);
+      if (y2 > 65) y2 = 65;
+      if (y2 < -60) y2 = -60;
+      hires.line(EX_ORIGIN.x, EX_ORIGIN.y, Math.trunc(140 + x2), Math.trunc(60 + y2));
+      drawn++;
+    }
   }
+  return drawn;
 }
 
 export async function exScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
-  const { hires, state, audio } = ctx;
+  const { hires, state, audio, loader } = ctx;
   setScene('ex');
-  glog('destroy', 'enemy ship explosion (EX)');
 
-  const cx = 140;
-  const cy = 60;
+  let shapes: ShapeTable | null = null;
+  try {
+    shapes = decodeShapeTableJson(await loader.json('data/shapes/shape-table.json'));
+  } catch { /* the flash is skipped */ }
 
-  const particles: DebrisParticle[] = [];
-  for (let i = 0; i < 40; i++) {
-    particles.push({
-      angle: Math.random() * Math.PI * 2,
-      speed: 2 + Math.random() * 6,
-      dist: 2 + Math.random() * 5,
-      size: 1 + Math.floor(Math.random() * 2),
-      color: Math.random() < 0.3 ? 5 : Math.random() < 0.5 ? 6 : 1,
-    });
-  }
+  // 6, then 50 calls to the EXPL routine.
+  if (shapes) drawExFlash(hires, shapes);
+  audio.beep(60, 120);
+  await new Promise((r) => setTimeout(r, 120));
 
-  audio.beep(60, 100);
-  for (let frame = 0; frame < 4; frame++) {
-    hires.hgr();
-    hires.hcolor(5);
-    for (let y = 0; y < 124; y++) hires.line(0, y, 279, y);
-    hires.hcolor(3);
-    hires.line(cx - 10, cy, cx + 10, cy);
-    hires.line(cx, cy - 8, cx, cy + 8);
-    await new Promise(r => setTimeout(r, 40));
-  }
+  // 7-30
+  drawExBurst(hires);
+  audio.beep(90, 200);
 
-  audio.beep(120, 50);
-  for (let frame = 0; frame < 12; frame++) {
-    hires.hgr();
-    for (const p of particles) {
-      p.dist += p.speed;
-      if (frame > 3 && frame < 7) p.speed += 0.5;
-      if (frame >= 7) p.speed = Math.max(0.5, p.speed - 0.4);
-    }
-    drawDebrisParticles(hires, cx, cy, particles);
-    if (frame % 2 === 0) audio.beep(150 - frame * 8, 20);
-    await new Promise(r => setTimeout(r, 45));
-  }
-
-  for (let frame = 0; frame < 8; frame++) {
-    hires.hgr();
-    const survivors = particles.filter((_, i) => (i + frame) % 2 === 0);
-    for (const p of survivors) {
-      p.dist += p.speed;
-      p.color = 3;
-    }
-    drawDebrisParticles(hires, cx, cy, survivors);
-    audio.beep(40 + frame * 6, 15);
-    await new Promise(r => setTimeout(r, 50));
-  }
-
-  hires.hgr();
-  hires.hcolor(3);
-  hires.text('ENEMY SHIP DESTROYED', 9, 12);
-  await new Promise(r => setTimeout(r, 1500));
-
+  // 30: the enemy is gone and its model is blanked - though line 40's BLOAD DEBRIS writes
+  // over that same address immediately, so the 127 never survives to be read.
   state.shipKind = 0;
   state.shipVitality = 0;
-  state.enemyShips = Math.floor(state.enemyShips / 2);
-  if (state.enemyShips === 0) {
-    state.planets[state.planetIndex].defender = 0;
-  }
+  // 56: F = PEEK(38207) / 2: POKE 38207,F - POKE truncates.
+  state.enemyShips = Math.trunc(state.enemyShips / 2);
+  if (state.enemyShips === 0) state.planets[state.planetIndex].defender = 0;
+  glog('destroy', `enemy destroyed, ships left ${state.enemyShips}`);
 
-  scenes.run('starshipSimulator');
+  await new Promise((r) => setTimeout(r, 900));
+  return scenes.run('starshipSimulator');
 }

@@ -2192,6 +2192,65 @@ same fabricated list that was deleted from `orbit.ts`. None of it is on the disk
 
 ---
 
+## EX, the enemy explosion
+
+`EX.bas`, sixteen lines, run by STARSHIP SIMULATOR line 1560 from inside the laser
+subroutine: `IF DP > PEEK(38204) AND PEEK(38205) < > 0 THEN PRINT "RUNEX"`.
+`probe_ex.mjs` captures it; `ex_parity.mjs` compares.
+
+Reaching it needed the fire button, not a key. `DP` comes from line 1540 as
+`PEEK(38152) + (J2 / (TE + 1))`, so the probe leaves the enemy damage accumulator high and
+its limit low and then holds button 0 - apple2js exposes `buttonDown`/`buttonUp` on the IO,
+which is what line 185's `PEEK(-16287)` reads.
+
+### The burst
+
+```
+7  FOR X1 = 5 TO 130 STEP 8: Y1 = Y1 + 4.8: FOR J = 1 TO 15
+20 X2 = X1 - (RND(1) * (X1 + X1)): Y2 = Y1 - (RND(1) * (Y1 + Y1))
+21 IF Y2 > 65 THEN Y2 = 65
+22 IF Y2 < - 60 THEN Y2 = - 60
+25 HPLOT 140,60 TO 140 + X2,60 + Y2: NEXT
+```
+
+Sixteen steps of fifteen segments - **240 in all** - from (140,60), with the spread growing
+as `X1` and `Y1` do, which is why the middle is dense and the edges are sparse. `Y1` starts
+at 20 on line 5 and is bumped before the first inner loop, so it runs 24.8 to 96.8.
+
+It is random, so no pixel diff. With the flash and the starfield underneath in place - EX
+never clears, so both are on the page - the disk's 8,104 lit pixels sit inside the 7,610 to
+8,287 the port's own runs give. The origin is 9 of 9 lit.
+
+Leaving the starfield out is what the first comparison did, and it put the disk 278 pixels
+above the port's best run. Worth remembering for anything else that draws over flight.
+
+### What it leaves behind
+
+| | |
+| --- | --- |
+| 38205 | 3 -> 0, line 30 - no enemy ship |
+| 38207 | 30 -> 15, line 56's `F = PEEK(38207) / 2`, POKE truncating |
+| `$7879` | line 30 pokes 127, and line 40's `BLOAD DEBRIS` lands on the same address immediately - the blank never survives to be read |
+
+### Line 6's flash, and one thing not measured
+
+```
+6 SCALE= 2: XDRAW 2 AT 140,65: XDRAW 15 AT 140,65: XDRAW 16 ...: XDRAW 17 ...: XDRAW 18 ...
+```
+
+Five shapes at double scale, two pixels below the burst's origin. These are **XDRAW**, so
+over the flight view they invert rather than paint. The port draws them, which is the same
+thing over empty space and not the same over a star. That is a simplification, not a
+measurement.
+
+### What the port had
+
+Forty polar "debris particles" animated as crosses over twenty-four frames, a full-screen
+orange flash, `hgr()` between frames, and an `ENEMY SHIP DESTROYED` caption. EX clears
+nothing and prints nothing.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -2199,9 +2258,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Seven of the 23 programs.** EX, S/X, DMG, END and the four SHIP # n I.D. programs are
+- **Six of the 23 programs.** S/X, DMG, END and the four SHIP # n I.D. programs are
   extracted and readable but nothing has been compared against them. STATUS, GALAXY MAP,
-  RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT and RECALL are done.
+  RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL and EX are done.
+- **EX line 6's XDRAW.** The port draws the five flash shapes rather than XORing them, which
+  differs wherever the flight view already has a pixel.
 - **Four of RECALL's five branches.** Only line 2020 has been run; a new game always has the
   troops in cryogenic sleep.
 - **COLLECT's tech 1 path.** Lines 840-900, including the line 880 silver bug, have never
