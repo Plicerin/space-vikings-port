@@ -230,3 +230,69 @@ export function toCameraSpace6730(
   }
   return [out[0], out[1], out[2]];
 }
+
+/**
+ * $6631 - the per-object scale, three 16-bit factors from `$600E-$6013`.
+ *
+ * Row 0 of the matrix is multiplied by the first, row 1 by the second, row 2 by the third, so
+ * it scales the three **camera-space axes** rather than the model. Each row is skipped when
+ * its factor is `$7FFF`, which is why the middle one usually costs nothing.
+ *
+ * This is where the port's fitted focal lengths came from. `$68A1` divides x by z and scales
+ * by 69, and `$6DD5` doubles the result, so across the screen the focal length is
+ * `2 * 69 * factor0 / factor2`; down it is `62 * factor1 / factor2`. For the flight snapshot's
+ * 16000 / 32767 / 9541 those are 231.42 and 212.93, against the 230.90 and 212.80 that were
+ * fitted to captures.
+ */
+export function applyObjectScale(
+  m: RotationMatrix,
+  scale: readonly [number, number, number],
+): RotationMatrix {
+  const out = m.slice() as number[];
+
+  // $6631 has a bug, and it is load-bearing. Each row starts
+  //
+  //     LDX $600F / CPX #$7F / BNE $663F / LDA $600E / CMP #$FF / BEQ (skip row)
+  //     $663F  STA $78 / STX $79
+  //
+  // and the `BNE` jumps straight to the store. So unless the factor's high byte happens to be
+  // $7F, `LDA $600E` never runs and the factor's **low byte is whatever A last held**. Only
+  // the row's first multiply is affected; the other two reload the factor properly. In the
+  // flight snapshot that turns factor 16000 into 16125 for row 0, which is a 0.8% stretch
+  // across the screen, so it cannot be tidied away.
+  //
+  // A arrives holding the low byte of $8E, from the last `$633D` in $654E, and then follows
+  // every multiply's low byte through the block.
+  let acc = out[8] & 0xff;
+
+  for (let row = 0; row < 3; row++) {
+    const hi = (scale[row] >> 8) & 0xff;
+    if (hi === 0x7f) {
+      acc = scale[row] & 0xff;                        // $6638 LDA $600E
+      if (acc === 0xff) continue;                     // $663D BEQ - the row is left alone
+    }
+    const effective = s16(((hi << 8) | acc) & 0xffff); // $663F STA $78 / STX $79
+
+    for (let c = 0; c < 3; c++) {
+      // $635C is not symmetric - it complements its first operand and takes the magnitude of
+      // the second - and the block does not load them consistently. Row 0's columns 1 and 2
+      // put the matrix entry in $78 ($6656, $666F); every other multiply puts the factor
+      // there. Swapping the two changes the answer.
+      const f = c === 0 ? effective : scale[row];
+      const res = row === 0 && c > 0
+        ? mul635C(out[row * 3 + c], f)
+        : mul635C(f, out[row * 3 + c]);
+      out[row * 3 + c] = res;
+      acc = res & 0xff;
+    }
+  }
+  return out as unknown as RotationMatrix;
+}
+
+
+/**
+ * The scale the flight snapshot's one object carries, read at `$6631` by
+ * `oracle/probe_pipeline.mjs`. It is patched per object from the model stream at `$690F`, so
+ * this is a default rather than a constant of the renderer.
+ */
+export const SNAPSHOT_SCALE: readonly [number, number, number] = [16000, 32767, 9541];

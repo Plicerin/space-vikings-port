@@ -2774,13 +2774,109 @@ disk's own routines; `oracle/rotation_parity.mjs` runs the port over the same in
 A float rotation of the same three angles is out by up to **1133 in Q15 (0.035)**, at pitch
 214 bank 153 heading 186. That is the size of what `toCameraSpace()` currently gets wrong.
 
+### The per-object scale at $6631, and the bug in it
+
+`$654E` falls through into a scale that multiplies row 0 of the matrix by `$600E`, row 1 by
+`$6010` and row 2 by `$6012` - so it scales the three **camera-space axes**, not the model. A
+row whose factor is `$7FFF` is skipped.
+
+This is where the port's fitted focal lengths came from. `$68A1` divides x by z and scales by
+69, and `$6DD5` doubles the answer, so across the screen the focal length is
+`2 * 69 * factor0 / factor2` and down it is `62 * factor1 / factor2`. The flight snapshot's
+16000 / 32767 / 9541 give **231.42** and **212.93**, against the **230.90** and **212.80**
+that were fitted to captures. The fit was measuring this, one step removed.
+
+**Each row's first multiply uses a stale operand.** Every row begins
+
+```
+LDX $600F / CPX #$7F / BNE $663F / LDA $600E / CMP #$FF / BEQ (skip the row)
+$663F  STA $78 / STX $79
+```
+
+and the `BNE` jumps straight past the `LDA`. So unless the factor's high byte happens to be
+`$7F`, the factor's **low byte is whatever A last held** - which on entry is the low byte of
+`$8E`, from the last `$633D` in `$654E`, and thereafter is each multiply's own low byte. Only
+column 0 is affected; columns 1 and 2 reload the factor properly. In the flight snapshot that
+turns factor 16000 into **16125** for row 0, a 0.8% stretch across the screen, and it moves
+with the heading because `$8E` does. `$635C`'s operands are not loaded consistently either:
+row 0's columns 1 and 2 put the matrix entry in `$78`, everything else puts the factor there,
+and since `$635C` is not symmetric that changes the answer.
+
+### The frustum, at $67EF - the piece that makes the fixed-point divide safe
+
+`$68A1` does not clamp. Handed a camera-space point with `|y| > z` it wraps, and the folded
+result lands back in the middle of the picture: `(-269, -299, 290)` comes back as `-65, 94`,
+which is screen row 1. The disk never draws that, because it never projects it.
+
+`$61A9` transforms a vertex into `$60-$65` and calls `$67EF`, which leaves four bits in `$66`.
+Each is a 16-bit add or subtract followed by the `BMI/BVC/BVS` dance that asks whether N and V
+disagree - the signed "is this negative" test, correct even when the add overflows:
+
+| bit | test | plane |
+| --- | --- | --- |
+| `$40` | `x + z < 0` | `x = -z` |
+| `$20` | `z - x < 0` | `x = z` |
+| `$10` | `y + z < 0` | `y = -z` |
+| `$08` | `z - y < 0` | `y = z` |
+
+So the frustum is **`|x| <= z` and `|y| <= z`**: ninety degrees each way, in camera space and
+after the object scale. That is exactly the region where `$68A1` does not wrap, since `x/z` of
+1 is the clamp limit. A point behind the camera always has a bit set, because `|x| <= z` is
+impossible for negative z, so there is no separate near-plane test - and the port's `NEAR_Z`
+was standing in for a frustum it only covered one face of.
+
+`$6848` is the same routine for the second slot at `$68`, writing `$6E`. `$61B7` then runs
+Cohen-Sutherland: reject outright when `$66 AND $6E` is nonzero, otherwise pull the failing
+end onto its plane - `$6979` for the far end, `$695F` (which is `$6979` between two swaps) for
+the near one - at most ten times, the budget `$615E` sets in `$B1`. Running out of rounds is a
+rejection, not a draw. The four intersections are exact parametric solves at `$6B0D`, `$6A92`,
+`$6A0D` and inline at `$6992`.
+
+Checked over 631 points, including both sides of every plane, points exactly on them, points
+behind the camera and operands at the ends of sixteen bits where the adds overflow: **631 of
+631** agree with `|x| <= z, |y| <= z` (`oracle/probe_outcode.mjs`).
+
+### Wired in, and what it was worth
+
+`diskPipeline.ts` composes the whole chain and `shipBytecode.ts` now uses it, so the ship, the
+starfield and the ground all go through the disk's own arithmetic rather than the fit.
+`oracle/probe_pipeline.mjs` traps a live render at `$6631`, `$672A`, `$67D3` and `$68A1`, and
+`oracle/pipeline_parity.mjs` runs the port over the same inputs:
+
+| stage | at the fitted camera | with the ship close (z -4500) |
+| --- | --- | --- |
+| `$654E` matrix, as built | 9 of 9 | 9 of 9 |
+| `$6631` matrix, after the scale | 9 of 9 | 9 of 9 |
+| `$67D3` camera space | 269 of 269 | 248 of 248 |
+| `$68A1` screen bytes | 269 of 269 | 248 of 248 |
+
+and the rendered pixels:
+
+| | fitted float path | the disk's own arithmetic |
+| --- | --- | --- |
+| ship, mean over 11 states | 71.9% | **78.1%** |
+| ship, within one pixel | 98.8% | **99.5%** |
+| starfield, mean over 12 states | 38.9% | **100.0%** |
+| ground, mean over 12 states | 67.5% | **88.1%** |
+
+Every one of the 11 ship states matches or beats the float path bar one (`h250`, 82.9% to
+80.5%), every bounding box is now within a pixel of the disk's, and every height is exactly
+1.00x where the float path ranged 0.92x to 1.08x. The starfield is exact.
+
+Two things did the work. The frustum is one: without it the close-range ship scored 11.9%,
+because `$68A1`'s wrap put vertices the disk clips into the middle of the frame. The stale
+operand in `$6631` is the other - it is a real 0.8% and the fit could only average over it.
+
 ### What is still not done
 
-`toCameraSpace()` in `diskProjection.ts` is still the float version, and still rotates by two
-angles rather than three. All three pieces of the chain are now transcribed exactly - `$6DD5`,
-`$68A1` and `$654E`/`$635C` - so what remains is wiring, not reading: the port's world
-coordinates have to be put in the display list's integer units before the fixed-point path can
-replace the float one.
+`diskProjection.ts` is still generated by the fit and still exports the float path; nothing
+draws through it any more, but `radar.ts` and `cockpit.ts` pass the flight snapshot's scale
+rather than their own, which is right for the flight view and unverified for the others.
+
+The four intersection routines - `$6B0D`, `$6A92`, `$6A0D` and `$6992` - have not been
+transcribed. `clipFrustum61B7()` solves for the same planes rather than reproducing their
+arithmetic, so a **clipped** endpoint can sit a unit from where the disk puts it. Endpoints
+that were already inside are untouched, which is why this costs so little.
 
 ---
 

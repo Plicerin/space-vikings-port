@@ -1,8 +1,12 @@
 import type { Hires } from './hires';
 import {
-  toCameraSpace, projectCameraSpace, clipNear, clipSegment, insideClip,
+  clipSegment, insideClip,
   type Vec3 as ProjVec3,
 } from './diskProjection';
+import {
+  viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, outcode67EF, clipFrustum61B7,
+  SNAPSHOT_VIEW, type ObjectView,
+} from './diskPipeline';
 
 export interface ShipBytecodeHeaderOp {
   kind: 'set-state';
@@ -390,6 +394,11 @@ export function measureModelCentre(ops: ShipBytecodeOp[]): ProjVec3 | null {
  * mostly 1 followed by a string of 2s. Opcode 0 is a lone point (DEBRIS is nothing but
  * those) and opcode 3 ends a run - it is drawn as a line like 2, but the pen lifts after,
  * which is the reading that matches the shapes the disk produces.
+ *
+ * The transform is the disk's own, in fixed point: `diskPipeline.ts` builds the matrix the
+ * way $654E and $6631 do and divides the way $68A1 does. `view` carries the two things the
+ * display list supplies per object that the camera arguments do not - the bank angle and the
+ * camera-axis scale - and defaults to what the flight snapshot carried.
  */
 export function projectShipWorld(
   ops: ShipBytecodeOp[],
@@ -398,7 +407,18 @@ export function projectShipWorld(
   pitchByte: number,
   origin?: ProjVec3 | null,
   opcode3: 'lift' | 'draw' | 'move' = 'draw',
+  view?: Partial<Omit<ObjectView, 'camera' | 'pitch' | 'heading'>>,
 ): ShipWorldProjection {
+  const objectView: ObjectView = {
+    camera,
+    pitch: pitchByte,
+    heading: headingByte,
+    bank: view?.bank ?? SNAPSHOT_VIEW.bank,
+    scale: view?.scale ?? SNAPSHOT_VIEW.scale,
+    ops: view?.ops ?? SNAPSHOT_VIEW.ops,
+  };
+  // $62D5 and the fall-through at $6631: built once per object, not once per vertex.
+  const matrix = viewMatrix(objectView);
   const centre = origin ? measureModelCentre(ops) : null;
   const shift = origin && centre
     ? { x: origin.x - centre.x, y: origin.y - centre.y, z: origin.z - centre.z }
@@ -415,13 +435,15 @@ export function projectShipWorld(
     // three dimensions, before the divide. Projecting each vertex and dropping the ones
     // behind the camera loses every segment that straddles it, which over a ground plane
     // is most of them.
-    const d = toCameraSpace(
+    const d = toCameraSpaceFixed(
       { x: op.x + shift.x, y: op.y + shift.y, z: op.z + shift.z },
-      camera, headingByte, pitchByte,
+      camera, matrix,
     );
 
     if (op.opcode === 0) {                              // a point on its own
-      const q = projectCameraSpace(d);
+      // $61A9's outcode first: $68A1 wraps outside |x| <= z and |y| <= z, so a point the
+      // frustum rejects would otherwise fold back into the middle of the picture.
+      const q = outcode67EF(d) ? null : projectCameraSpaceFixed(d, objectView.ops);
       if (!q) culled++;
       else if (insideClip(q.x, q.y)) dots.push(q);
       else clippedAway++;
@@ -431,12 +453,15 @@ export function projectShipWorld(
     if (op.opcode === 1) { pen = d; continue; }         // start a run
     if (op.opcode === 3 && opcode3 === 'move') { pen = d; continue; }
     if (pen) {                                          // 2 and 3 draw
-      const near = clipNear(pen, d);
+      // $61B7: reject or clip in camera space, against |x| <= z and |y| <= z, before any
+      // divide. This is what keeps the disk's close-range ship inside its box - the near
+      // plane alone is not enough, because $68A1 wraps on the side planes too.
+      const near = clipFrustum61B7(pen, d);
       if (!near) {
         culled++;
       } else {
-        const pa = projectCameraSpace(near.a);
-        const pb = projectCameraSpace(near.b);
+        const pa = projectCameraSpaceFixed(near.a, objectView.ops);
+        const pb = projectCameraSpaceFixed(near.b, objectView.ops);
         if (!pa || !pb) {
           culled++;
         } else {
