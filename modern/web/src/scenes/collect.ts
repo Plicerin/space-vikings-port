@@ -2,146 +2,171 @@ import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 import { clearPendingConquestCollection } from '../engine/commander';
 
+/**
+ * COLLECT, the loot award after a won ground assault - COLLECT.bas.
+ *
+ * GROUND FORCES line 805 chains here once the planet surrenders. It prints a message for the
+ * planet's tech level, adds loot, and goes on to COM.
+ *
+ * It draws only into the band GROUND FORCES' line 170 clears - rows 11-14, columns 0-38 -
+ * and it inherits `$3CD` = 255 from there, so both messages are inverse. Everything else on
+ * the page is the battle screen underneath.
+ */
+
+/** Line 10000's DATA. Note GROOMBRIDGE **1618**, as STATUS spells it - COM has 168. */
 const PLANET_NAMES = [
   'SOL', 'ALPHA CENTAURI', "BARNARD'S STAR", 'WOLF 359', 'LUYTEN',
   'LALANDE 21185', 'SIRIUS', 'VARCAR', 'XANADON', 'EPSILON ERIDANA',
   'CYGNI', 'PROCYON', 'TAU CETI', 'LACAILLE 9352', 'LARSEN-C',
-  'GROOMBRIDGE 168', 'KRUGER 60', 'EPSILON INDI', 'ARGO', 'SHIVANDA',
+  'GROOMBRIDGE 1618', 'KRUGER 60', 'EPSILON INDI', 'ARGO', 'SHIVANDA',
 ];
 
-function cap255(v: number): number {
-  return Math.min(255, Math.round(v));
+/** Line 805's `ON TECH + 1 GOSUB 820,840,910,1070,1090`. */
+export const COLLECT_MESSAGES: string[][] = [
+  ['PLANET IS NON-HABITABLE.', 'THERE IS NO LOOT TO GATHER, SIR.'],
+  ['PLANET IS PRIMITIVE. THE ONLY LOOT',
+   'IS A LITTLE GOLD AND SILVER AND SOME',
+   'WINES AND LIQUORS, SIR.'],
+  ['PLANET IS IN THE LIMITED ATOMIC STAGE.',
+   'THERE ARE NO HIGH TECHNOLOGY PRODUCTS',
+   'AVAILABLE, BUT THERE IS AN ABUNDANCE',
+   'OF OTHER GOODS, SIR!'],
+  ['PLANET HAS A SOPHISTICATED TECHNOLOGY.', "WE'LL GET PLENTY OF LOOT HERE, SIR."],
+  ['PLANET HAS A SUPERIOR TECHNOLOGY.', "WE'VE HIT IT BIG THIS TIME, SIR!!!"],
+];
+
+const INVERSE = { invert: true } as const;
+type H = import('../engine/hires').Hires;
+
+/** Line 170: `FOR C = 12 TO 15: VTAB C: PRINT "<39 spaces>"` into a window at left 0. */
+export function clearCollectBand(hires: H): void {
+  for (let r = 12; r <= 15; r++) hires.text(' '.repeat(39), 1, r, INVERSE);
 }
 
-function saveSnapshot(state: import('../engine/gameState').GameState): import('../engine/gameState').GameState['loot'] {
-  return { ...state.loot };
+/** Lines 802-805. `VTAB 12: HTAB 1` is 0-based row 11, column 0. */
+export function drawCollectMessage(hires: H, tech: number): void {
+  clearCollectBand(hires);
+  const lines = COLLECT_MESSAGES[tech] ?? [];
+  for (let i = 0; i < lines.length; i++) hires.text(lines[i], 1, 12 + i, INVERSE);
 }
 
-function showDeltas(hires: import('../engine/hires').Hires, before: import('../engine/gameState').GameState['loot'], after: import('../engine/gameState').GameState['loot']): number {
-  const items: [string, number, number][] = [
-    ['PLATINUM', after.platinum - before.platinum, 10],
-    ['GOLD', after.gold - before.gold, 10],
-    ['SILVER', after.silver - before.silver, 20],
-    ['TITANIUM', after.titaniumKlb - before.titaniumKlb, 2],
-    ['COLLAPSIUM', after.collapsiumTons - before.collapsiumTons, 50],
-    ['STEEL', after.steelTons - before.steelTons, 0.5],
-    ['FISSIONABLES', after.fissionablesLb - before.fissionablesLb, 3],
-    ['ELECTRONICS', after.electronicCrates - before.electronicCrates, 25],
-    ['WEAPONS', after.weaponCrates - before.weaponCrates, 40],
-    ['FTR.PARTS', after.fighterPartCrates - before.fighterPartCrates, 30],
-    ['FOOD', after.luxuryFoodCases - before.luxuryFoodCases, 5],
-    ['WINE', after.wineCases - before.wineCases, 2],
-    ['ART', after.artUnits - before.artUnits, 100],
-  ];
+/** Line 16, after its own `GOSUB 160` has cleared the band again. */
+export function drawCollectSuccess(hires: H, planetIndex: number): void {
+  clearCollectBand(hires);
+  hires.text(`OPERATION ${PLANET_NAMES[planetIndex] ?? ''} IS A`, 1, 12, INVERSE);
+  hires.text('SUCCESS, SIR!', 1, 13, INVERSE);
+}
 
-  hires.hcolor(3);
-  hires.text('LOOT GAINED', 15, 15);
-  hires.hcolor(1);
+export interface CollectLoot {
+  /** Keyed by address, as SUPPLY reads them. */
+  [address: number]: number;
+}
 
-  let r = 16;
-  let totalVal = 0;
-  for (const [name, delta, valPerUnit] of items) {
-    if (delta > 0) {
-      hires.text(`+${name} ${Math.round(delta)}`, 2, r);
-      const v = Math.round(delta * valPerUnit);
-      hires.text(`${v} CR`, 30, r);
-      totalVal += v;
-      r++;
-    }
+/**
+ * Lines 850-1050, bugs included.
+ *
+ * Two of them are in the original and the port reproduces both:
+ *
+ * - **Line 880 pokes `J`, not `F`.** Line 870 works out silver into `F` and tests `J`, and
+ *   880 stores `J` - still gold's value from 850. So at tech 1, silver comes out equal to
+ *   gold. This path is not exercised above tech 1 and has not been seen on the machine.
+ * - **Line 960 pokes 31180, not 38180.** Titanium is never awarded, and `$79CC` - inside the
+ *   ship model BLOADed to `$7879` - is written instead. Confirmed: a tech 3 assault left
+ *   titanium at 0 and took 31180 from 68 to 0.
+ *
+ * Line 920 halves the rates once per trip: `IF PEEK(301) = 1 THEN J1 = J1 * .6: J2 = J2 * .6`,
+ * then it pokes 301 to 1. H/D line 5 pokes it back to 0, so the first haul after a jump is
+ * the full one.
+ */
+export function awardLoot(
+  loot: CollectLoot,
+  tech: number,
+  alreadyCollected: boolean,
+  rnd: () => number = Math.random,
+): { loot: CollectLoot; modelByteWritten: number | null } {
+  const out = { ...loot };
+  const cap = (v: number) => (v > 255 ? 255 : Math.floor(v));
+
+  if (tech === 1) {
+    const gold = cap(out[38183] + rnd() * 5);
+    out[38183] = gold;
+    // 870/880: F is computed and discarded; J is stored.
+    void cap(out[38182] + rnd() * 5);
+    out[38182] = gold;
+    out[38173] = cap(out[38173] + rnd() * 10);
+    return { loot: out, modelByteWritten: null };
   }
+  if (tech < 2) return { loot: out, modelByteWritten: null };
 
-  hires.hcolor(5);
-  hires.text(`TOTAL: ${totalVal} CREDITS`, 14, r + 1);
-  return totalVal;
+  // 910, 1070, 1090 set the two rates before calling 920.
+  let j1: number;
+  let j2: number;
+  if (tech === 2) { j1 = 0; j2 = 10; }
+  else if (tech === 3) { j2 = 7; j1 = 10; }
+  else { j2 = 15; j1 = 15; }
+  if (alreadyCollected) { j1 *= 0.6; j2 *= 0.6; }
+
+  out[38183] = cap(out[38183] + rnd() * j2);   // 925 gold
+  out[38182] = cap(out[38182] + rnd() * j2);   // 940 silver
+  out[38181] = cap(out[38181] + rnd() * j2);   // 950 platinum
+  const stray = cap(out[38180] + rnd() * j2);  // 960 - poked to 31180, so titanium never moves
+  out[38179] = cap(out[38179] + rnd() * j1);   // 970 collapsium
+  out[38178] = cap(out[38178] + rnd() * j2);   // 980 steel
+  out[38177] = cap(out[38177] + rnd() * j2);   // 990 fissionables
+  out[38176] = cap(out[38176] + rnd() * j1);   // 1000 electronic parts
+  out[38175] = cap(out[38175] + rnd() * j1);   // 1010 weapons
+  out[38174] = cap(out[38174] + rnd() * j2);   // 1020 fighter parts
+  out[38173] = cap(out[38173] + rnd() * 20);   // 1030 luxury foods
+  out[38172] = cap(out[38172] + rnd() * j2);   // 1040 wine/liquor
+  out[38171] = cap(out[38171] + rnd() * j1);   // 1050 art works
+  return { loot: out, modelByteWritten: stray };
+}
+
+function lootToState(state: import('../engine/gameState').GameState, loot: CollectLoot): void {
+  const l = state.loot;
+  l.artUnits = loot[38171];
+  l.wineCases = loot[38172];
+  l.luxuryFoodCases = loot[38173];
+  l.fighterPartCrates = loot[38174];
+  l.weaponCrates = loot[38175];
+  l.electronicCrates = loot[38176];
+  l.fissionablesLb = loot[38177];
+  l.steelTons = loot[38178];
+  l.collapsiumTons = loot[38179];
+  l.titaniumKlb = loot[38180];
+  l.platinum = loot[38181];
+  l.silver = loot[38182];
+  l.gold = loot[38183];
 }
 
 export async function collectScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
-  const { hires, state, input } = ctx;
+  const { hires, state, scenes: _s } = ctx as SceneContext & { scenes?: unknown };
+  void _s;
   setScene('collect');
 
-  const tech = state.planets[state.planetIndex].defender;
-  const name = PLANET_NAMES[state.planetIndex];
-  const before = saveSnapshot(state);
+  const tech = state.planets[state.planetIndex]?.defense ?? 0;
 
-  hires.hgr();
-  hires.hcolor(1);
-  hires.line(1, 1, 139, 1);
-  hires.line(139, 1, 139, 110);
-  hires.line(139, 110, 1, 110);
-  hires.line(1, 110, 1, 1);
+  // 13: the tech message, then line 810's delay.
+  drawCollectMessage(hires, tech);
+  await new Promise((r) => setTimeout(r, 2500));
 
-  hires.hcolor(3);
-  hires.text('LOOT COLLECTION', 6, 2);
-
-  hires.hcolor(1);
-  if (tech === 0) {
-    hires.text('PLANET IS NON-', 2, 4);
-    hires.text('HABITABLE.', 2, 5);
-    hires.text('THERE IS NO LOOT', 2, 6);
-    hires.text('TO GATHER, SIR.', 2, 7);
-  } else if (tech === 1) {
-    hires.text('PLANET IS PRIMITIVE.', 2, 4);
-    hires.text('THE ONLY LOOT IS A', 2, 5);
-    hires.text('LITTLE GOLD AND', 2, 6);
-    hires.text('SILVER AND SOME', 2, 7);
-    hires.text('WINES AND LIQUORS.', 2, 8);
-    state.loot.gold = cap255(state.loot.gold + Math.random() * 5);
-    state.loot.silver = cap255(state.loot.silver + Math.random() * 5);
-    state.loot.wineCases = cap255(state.loot.wineCases + Math.random() * 10);
-  } else if (tech === 2) {
-    hires.text('LIMITED ATOMIC STAGE.', 2, 4);
-    hires.text('NO HIGH TECH PRODUCTS', 2, 5);
-    hires.text('BUT ABUNDANCE OF', 2, 6);
-    hires.text('OTHER GOODS, SIR!', 2, 7);
-    distributeLoot(state, 0, 10);
-  } else if (tech === 3) {
-    hires.text('SOPHISTICATED TECH.', 2, 4);
-    hires.text("WE'LL GET PLENTY OF", 2, 5);
-    hires.text('LOOT HERE, SIR!', 2, 6);
-    distributeLoot(state, 10, 7);
-  } else if (tech >= 4) {
-    hires.text('SUPERIOR TECHNOLOGY.', 2, 4);
-    hires.text("WE'VE HIT IT BIG", 2, 5);
-    hires.text('THIS TIME, SIR!!!', 2, 6);
-    distributeLoot(state, 15, 15);
-  }
-
-  hires.hcolor(3);
-  hires.text(`OPERATION ${name}`, 4, 13);
-  hires.text('IS A SUCCESS, SIR!', 4, 14);
-
-  const after = state.loot;
-  const total = showDeltas(hires, before, after);
-
-  glog('collect', `tech=${tech} planet=${name} value=${total}`);
-  state.planets[state.planetIndex].looted = true;
+  const before: CollectLoot = {
+    38171: state.loot.artUnits, 38172: state.loot.wineCases, 38173: state.loot.luxuryFoodCases,
+    38174: state.loot.fighterPartCrates, 38175: state.loot.weaponCrates,
+    38176: state.loot.electronicCrates, 38177: state.loot.fissionablesLb,
+    38178: state.loot.steelTons, 38179: state.loot.collapsiumTons,
+    38180: state.loot.titaniumKlb, 38181: state.loot.platinum,
+    38182: state.loot.silver, 38183: state.loot.gold,
+  };
+  const { loot } = awardLoot(before, tech, state.collectedThisTrip === true);
+  lootToState(state, loot);
+  state.collectedThisTrip = true;   // line 921's POKE 301,1
   clearPendingConquestCollection(state, state.planetIndex);
 
-  hires.hcolor(5);
-  hires.text('PRESS ANY KEY...', 2, 20);
-
-  if (state.commanderMode) {
-    await new Promise(r => setTimeout(r, 60));
-    return scenes.run('starshipSimulator');
-  }
-  await input.waitForKey();
+  // 16
+  drawCollectSuccess(hires, state.planetIndex);
+  glog('collect', `tech=${tech} planet=${PLANET_NAMES[state.planetIndex]}`);
+  await new Promise((r) => setTimeout(r, 1500));
 
   return scenes.run('com');
-}
-
-function distributeLoot(state: import('../engine/gameState').GameState, j1: number, j2: number): void {
-  const l = state.loot;
-  l.platinum = cap255(l.platinum + Math.random() * j2);
-  l.gold = cap255(l.gold + Math.random() * j2);
-  l.silver = cap255(l.silver + Math.random() * j2);
-  l.titaniumKlb = cap255(l.titaniumKlb + Math.random() * j2);
-  l.collapsiumTons = cap255(l.collapsiumTons + Math.random() * j1);
-  l.steelTons = cap255(l.steelTons + Math.random() * j2);
-  l.fissionablesLb = cap255(l.fissionablesLb + Math.random() * j2);
-  l.electronicCrates = cap255(l.electronicCrates + Math.random() * j1);
-  l.weaponCrates = cap255(l.weaponCrates + Math.random() * j1);
-  l.fighterPartCrates = cap255(l.fighterPartCrates + Math.random() * j2);
-  l.luxuryFoodCases = cap255(l.luxuryFoodCases + Math.random() * 20);
-  l.wineCases = cap255(l.wineCases + Math.random() * j2);
-  l.artUnits = cap255(l.artUnits + Math.random() * j1);
 }

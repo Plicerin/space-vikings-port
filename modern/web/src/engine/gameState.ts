@@ -311,6 +311,13 @@ export class GameState {
    */
   energy = ENERGY_FULL;
 
+  /**
+   * Byte 301 ($12D). COLLECT line 920 halves its loot rates when this is 1 and line 921 sets
+   * it; H/D line 5 pokes it back to 0. So the first haul after a hyperdrive jump is the full
+   * one and every later haul on the same trip is worth 60%.
+   */
+  collectedThisTrip = false;
+
   /** Immediate re-assault recovery flag after ground-forces defeat.
    *  Set when assault fails, reset on conquest success. */
   pendingGroundForcesNeedsRecovery = false;

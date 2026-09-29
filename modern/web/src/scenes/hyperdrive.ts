@@ -135,6 +135,8 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   state.bank = 0;
 
   state.energy = Math.max(0, state.energy - jumpCost);
+  // Line 5's POKE 301,0 - COLLECT's loot rates go back to full for the new trip.
+  state.collectedThisTrip = false;
 
   // Lines 90-93. TECH is the destination's, because line 26 has already moved 38209.
   const tech = state.planets[state.planetIndex]?.defense ?? 0;

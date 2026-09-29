@@ -2064,6 +2064,87 @@ port follows the listing; the discrepancy is recorded rather than explained.
 
 ---
 
+## COLLECT
+
+`COLLECT.bas`, chained from GROUND FORCES line 805 once a planet surrenders.
+`probe_collect.mjs` reaches it by pressing 1 for ATTACK PLANET and waiting the battle out;
+`collect_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| COLLECT's band, rows 11-14 | **0 of 8,960 pixels differ** |
+
+It writes nothing else. The band is the one GROUND FORCES' line 170 clears, and `$3CD` is
+still 255 from there, so both messages are inverse over the battle screen.
+
+### The loot rates
+
+Line 805's `ON TECH + 1 GOSUB 820,840,910,1070,1090` picks the message and the rates, and
+line 920 does the awarding:
+
+| tech | J1 | J2 |
+| --- | --- | --- |
+| 0 | nothing at all | |
+| 1 | its own short path at 850-900 | |
+| 2 | 0 | 10 |
+| 3 | 10 | 7 |
+| 4 | 15 | 15 |
+
+J1 covers collapsium, electronic parts, weapons and art works; J2 the rest; luxury foods is
+always `RND(1) * 20`. At tech 2 J1 is **0**, which is what "THERE ARE NO HIGH TECHNOLOGY
+PRODUCTS AVAILABLE" means mechanically.
+
+Measured on a tech 3 assault, every gain fell inside its rate: art 4, weapons 9, electronics
+6 and collapsium 7 against J1 = 10; wine 2, fighter parts 4, fissionables 1, steel 0,
+platinum 5, silver 4 and gold 4 against J2 = 7; luxury foods 4 against 20.
+
+Line 920 also halves both rates on any haul after the first in a trip -
+`IF PEEK(301) = 1 THEN J1 = J1 * .6: J2 = J2 * .6`, then 921 sets 301. H/D line 5 pokes it
+back to 0, so a jump restores the full rate.
+
+### Two bugs in the original, one confirmed
+
+**Line 960 pokes the wrong address.**
+
+```
+960 J = PEEK(38180) + (RND(1) * J2): GOSUB 915: POKE 31180,J
+```
+
+38180 is titanium; **31180** is `$79CC`, inside the ship model BLOADed to `$7879`. So
+titanium is never awarded and a byte of the model is overwritten instead. Confirmed on the
+machine: after the assault titanium was still 0 and 31180 had gone from **68 to 0**. SUPPLY
+will print TITANIUM = 0 for the whole game no matter what is looted.
+
+**Line 880 stores the wrong variable.**
+
+```
+870 F = PEEK(38182) + (RND(1) * 5): IF J > 255 THEN J = 255
+880 POKE 38182,J
+```
+
+`F` is computed and thrown away, the cap tests `J`, and 880 stores `J` - still gold's value
+from line 850. Silver should come out equal to gold. **This is not confirmed**: it is the
+tech 1 path, and the assault reached was tech 3, which goes through line 920 where 940 pokes
+38182 correctly. The captured silver and gold both read 4, but those are independent draws
+and prove nothing. The port reproduces the bug from the listing.
+
+### Two smaller things
+
+- **A third spelling list.** COLLECT line 10000's DATA has `GROOMBRIDGE 1618`, as STATUS does
+  and COM does not. Two of the three programs that carry the twenty names agree with each
+  other and not with COM.
+- **The oracle's RND is deterministic from a cold boot.** Two runs of this probe produced
+  identical loot - art 4, wine 2, luxury 4, fighter 4, weapons 9, electronics 6,
+  fissionables 1, steel 0, collapsium 7, platinum 5, silver 4, gold 4. Useful: RND-driven
+  screens are reproducible as long as the route to them is.
+
+### What the port had
+
+A `LOOT GAINED` table listing every item's delta with a per-unit value. COLLECT prints no
+such thing, and those per-unit values were another set of invented prices.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -2071,9 +2152,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Nine of the 23 programs.** COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
+- **Eight of the 23 programs.** RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
   programs are extracted and readable but nothing has been compared against them. STATUS,
-  GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT and H/D are done.
+  GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT, H/D and COLLECT are done.
+- **COLLECT's tech 1 path.** Lines 840-900, including the line 880 silver bug, have never
+  been run - every assault reached so far has been tech 3.
 - **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read
   0. The read was taken after the simulator had resumed and may simply be too late, but that
   is not established.
