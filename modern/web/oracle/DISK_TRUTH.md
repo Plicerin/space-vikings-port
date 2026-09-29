@@ -2004,6 +2004,66 @@ the draw, so the scene and the documentation share one copy of it.
 
 ---
 
+## H/D, the hyperdrive jump
+
+`H/D.bas`, run by STARSHIP SIMULATOR line 209: `IF K = 24 THEN PRINT "RUNH/D"`, where K is
+the key code less 176 - so 24 is 200, `H` with the high bit set. `probe_hd.mjs` captures it;
+`hd_parity.mjs` compares.
+
+Line 1 bounces straight back unless a destination is set: `IF PEEK(38210) = 1 OR PEEK(38209)
+= PEEK(38163) OR PEEK(38163) = 0`. 38163 is what COM line 880's SET COURSE pokes, and it is
+0 on a new game.
+
+### The screen cannot be compared, so what can was
+
+Line 17 blanks rows 0-15, then line 20 draws **175 lines from (140,63)** - `C1,C2` set at
+line 14 - to `RND(1) * 279, RND(1) * 125`, in HCOLOR 3. Line 80 sets `R = 2` and jumps back
+to 20, which runs the same loop again in the HCOLOR 0 of line 76 and rubs them out. Two runs
+of the original do not agree with each other, so a pixel diff would mean nothing.
+
+| | |
+| --- | --- |
+| lit pixels, rows 0-125 | disk 10,520; the port's own runs give 9,342 to 10,957 |
+| around the origin (140,63) | 9 of 9 lit |
+| rows 126-127 | 0 lit on both - line 17 clears to y 127, line 20 reaches y 125 |
+
+What the port had instead was an animation: eighty polar "warp lines" over 2.7 seconds, with
+`HYPERDRIVE CHARGE` and `WARP DRIVE ENGAGED` captions. None of that is on the disk.
+
+### The jump cost, confirmed on the machine
+
+This is the useful part. The `D1` formula was derived from the listing and argued from
+GALAXY MAP line 3020; the capture measures it:
+
+| | |
+| --- | --- |
+| planet | 1 -> 5 |
+| X table | 15 -> 22 |
+| `INT(SQR(3 * dX^2) + .6)` | **12** |
+| energy | 63 -> 51, a cost of **12** |
+
+So the hyperdrive really does charge `|dX| * sqrt(3)` and really does ignore Y and Z.
+
+Everything else lines 50-93 do checks out too: `Z` came back -9908, and line 70 retries until
+`ABS(BV%)` is at least 7000; pitch and bank are 0 from line 75; `38240 + 5` is 1, the visited
+flag line 16 sets; and 38209 has become the destination, line 26.
+
+Line 73 is `A = RND(1) * 255`, so the heading lands in 0 to 254 - the port was using 256.
+
+### One thing lines 90-93 say that the capture did not show
+
+```
+90 TECH = PEEK(38282 + PEEK(38209)): IF TECH < 2 THEN POKE 38150,0
+93 IF TECH > 1 THEN POKE 38150,TECH * 60: POKE 38204,TECH * 60: POKE 38160,0: POKE 38161,0
+```
+
+Planet 5's tech is 2, so line 93 should leave 38150 at 120. Read after H/D had chained on,
+**38150 was 0**. The read happened once STARSHIP SIMULATOR was running again, so the
+simulator most likely overwrote it - but that is a guess, and nothing here pins it down. The
+port follows the listing; the discrepancy is recorded rather than explained.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -2011,9 +2071,12 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Ten of the 23 programs.** H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four
-  SHIP # n I.D. programs are extracted and readable but nothing has been compared against
-  them. STATUS, GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY and ORBIT are done.
+- **Nine of the 23 programs.** COLLECT, RECALL, EX, S/X, DMG, END and the four SHIP # n I.D.
+  programs are extracted and readable but nothing has been compared against them. STATUS,
+  GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY, ORBIT and H/D are done.
+- **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read
+  0. The read was taken after the simulator had resumed and may simply be too late, but that
+  is not established.
 - **Why a full-width PRINT behaves differently at left margin 0 and 1.** SUPPLY loses its
   last character and GROUND FORCES does not; both are measured, neither is explained.
 - **Four of SHORE LEAVE's six sub-screens.** ENLIST TROOPS, SELL LOOT, REPAIR/RESTOCK and

@@ -21,6 +21,11 @@ function drawStarfield(hires: import('../engine/hires').Hires, seed: number): vo
   }
 }
 
+/** Line 14's C1, C2 - where every streak starts. */
+export const HD_ORIGIN = { x: 140, y: 63 } as const;
+/** Line 20's FOR H = 1 TO 175. */
+export const HD_STREAKS = 175;
+
 export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input, audio } = ctx;
 
@@ -65,103 +70,36 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   state.jumpDistance = distance;
   glog('hyperdrive', `jumping to ${dst.name} dist=${distance.toFixed(1)}`);
 
-  const cx = 140;
-  const cy = 60;
-  const lines: WarpLine[] = [];
-  const linePool = 80;
-  for (let i = 0; i < linePool; i++) {
-    lines.push({
-      angle: Math.random() * Math.PI * 2,
-      length: 2 + Math.random() * 8,
-      speed: 40 + Math.random() * 120,
-      phase: Math.random(),
-      color: 3,
-    });
-  }
-
-  let elapsed = 0;
-  const CHARGE_DURATION = 0.6;
-  const WARP_DURATION = 1.8;
-  const TOTAL_DURATION = CHARGE_DURATION + WARP_DURATION + 0.3;
-  let lastT = performance.now();
-  let done = false;
-
+  // Lines 17-20 and 76-80, the jump itself.
+  //
+  // Line 17 blanks rows 0-15 with printed spaces, then line 20 draws 175 straight lines from
+  // C1,C2 - set at line 14 to (140,63) - to `RND(1) * 279, RND(1) * 125`, in the HCOLOR 3
+  // line 14 also sets. Line 80 sets R = 2 and jumps back to 20, which runs the same loop
+  // again with HCOLOR 0 from line 76, rubbing the streaks out. The targets are random, so
+  // this cannot be compared pixel for pixel; the origin, the extent and the clear can.
+  //
+  // What was here was an animation of eighty polar "warp lines" over 2.7 seconds, with
+  // HYPERDRIVE CHARGE and WARP DRIVE ENGAGED captions, none of which is on the disk.
   input.clearKey();
+  hires.hcolor(1);
+  for (let r = 1; r <= 16; r++) hires.text(' '.repeat(40), 1, r);
 
-  await new Promise<void>((resolve) => {
-    function frame(now: number) {
-      if (done) { resolve(); return; }
-      const dt = Math.min(0.05, (now - lastT) / 1000);
-      lastT = now;
-      elapsed += dt;
-      if (elapsed >= TOTAL_DURATION) { done = true; resolve(); return; }
+  const targets: Array<[number, number]> = [];
+  hires.hcolor(3);
+  for (let i = 0; i < HD_STREAKS; i++) {
+    // HPLOT truncates, and both expressions are non-negative.
+    const tx = Math.floor(Math.random() * 279);
+    const ty = Math.floor(Math.random() * 125);
+    targets.push([tx, ty]);
+    hires.line(HD_ORIGIN.x, HD_ORIGIN.y, tx, ty);
+    audio.beep(200 + Math.floor(Math.random() * 1800), 4);   // line 20's CALL NOISE
+  }
+  await new Promise((r) => setTimeout(r, 700));
 
-      hires.hgr();
+  // 76, 80
+  hires.hcolor(0);
+  for (const [tx, ty] of targets) hires.line(HD_ORIGIN.x, HD_ORIGIN.y, tx, ty);
 
-      if (elapsed < CHARGE_DURATION) {
-        const p = elapsed / CHARGE_DURATION;
-        const chargeLines = Math.round(p * 30);
-        hires.hcolor(1);
-        for (let i = 0; i < chargeLines; i++) {
-          const a = Math.random() * Math.PI * 2;
-          const len = 4 + p * 20;
-          hires.line(cx, cy,
-            cx + Math.round(Math.cos(a) * len),
-            cy + Math.round(Math.sin(a) * len));
-        }
-        if (p > 0.3) {
-          hires.hcolor(6);
-          hires.text('HYPERDRIVE CHARGE', 11, 12);
-        }
-        const beepHz = Math.round(80 + p * 400);
-        audio.beep(beepHz, 30);
-      } else if (elapsed < CHARGE_DURATION + WARP_DURATION) {
-        const p = (elapsed - CHARGE_DURATION) / WARP_DURATION;
-
-        for (const line of lines) {
-          line.length += line.speed * dt;
-          line.phase += dt * (0.5 + p * 2);
-          const a = line.angle + line.phase * 0.3;
-
-          if (Math.random() < dt * 3) {
-            line.color = Math.random() < 0.3 ? 1 : Math.random() < 0.5 ? 6 : 3;
-          }
-
-          const len = Math.min(line.length % 120, 140);
-          hires.hcolor(line.color);
-          const x1 = cx + Math.round(Math.cos(a) * (len * 0.15));
-          const y1 = cy + Math.round(Math.sin(a) * (len * 0.15));
-          const x2 = cx + Math.round(Math.cos(a) * len);
-          const y2 = cy + Math.round(Math.sin(a) * len);
-          hires.line(x1, y1, x2, y2);
-        }
-
-        if (Math.random() < dt * 20) {
-          audio.beep(800 + Math.round(Math.random() * 1200), 15);
-        }
-
-        hires.hcolor(5);
-        hires.text('WARP DRIVE ENGAGED', 10, 12);
-      } else {
-        const flash = (elapsed - CHARGE_DURATION - WARP_DURATION) / 0.3;
-        if (flash < 0.5) {
-          hires.hcolor(1);
-          for (let y = 0; y < 124; y++) hires.line(0, y, 279, y);
-        } else {
-          drawStarfield(hires, Math.round(performance.now()));
-          hires.hcolor(1);
-          hires.text('JUMP COMPLETE', 13, 12);
-        }
-        audio.beep(200, 40);
-      }
-
-      requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-  });
-
-  // H/D line 6: SD = SD + D1 + .3 - the same D1, not the true distance.
-  state.stardate += jumpCost + 0.3;
   state.planetIndex = state.navDestination;
   state.navDestination = null;
   state.commanderMapTarget = null;
@@ -191,11 +129,23 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
     z = Math.round(10000 - Math.random() * 20000);
   } while (Math.abs(z) < 7000);
   state.z = z;
-  state.heading = Math.floor(Math.random() * 256);
+  // Line 73 is `A = RND(1) * 255`, so 0 to 254 - not 255.
+  state.heading = Math.floor(Math.random() * 255);
   state.pitch = 0;
   state.bank = 0;
 
   state.energy = Math.max(0, state.energy - jumpCost);
+
+  // Lines 90-93. TECH is the destination's, because line 26 has already moved 38209.
+  const tech = state.planets[state.planetIndex]?.defense ?? 0;
+  if (tech < 2) {
+    state.planetVitalityLimit = 0;
+  } else {
+    state.planetVitalityLimit = tech * 60;
+    state.shipDestructionLimit = tech * 60;
+    state.planetVitality = 0;
+    state.shipVitality = 0;
+  }
 
   return scenes.run('starshipSimulator');
 }
