@@ -1945,6 +1945,64 @@ line 29 prints 20 into 40 - so this only ever shows up in these two places.
 
 ---
 
+## ORBIT
+
+`ORBIT.bas`, twenty lines, run by STARSHIP SIMULATOR line 158:
+`IF PEEK(38210) = 1 AND Y > 4000 THEN PRINT "RUNORBIT"`. `probe_orbit.mjs` captures it;
+`orbit_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| ORBIT's own area, rows 0-125 | **0 of 35,280 pixels differ** |
+| the whole page | **0 of 53,760** |
+
+It is a transition, not a destination: it draws one screen, repositions the ship, BLOADs
+PLANET # 0 and a ship model and chains straight back to the simulator without ever waiting
+for a key. Line 10 floods only rows 0-125, so the panel below survives, and line 5 pokes
+973,255 - so line 20's three PRINTs are a solid inverse band with the message in black
+through the middle. Line 26 puts the flag back.
+
+Lines 27-37 leave the ship at **X 700, Y 200, Z 2000, heading 190**, with line 25 clearing
+the atmosphere flag and line 29 overriding the heading it read one line earlier.
+
+### Reaching it needed the Applesoft variable, not the bytes
+
+The obvious way in is to poke 38210 and Y. The atmosphere flag takes, but Y does not: the
+main loop keeps Y as a BASIC variable and line 140 writes it back over `$731D`, and line 8's
+read only happens on the pass that runs it. Measured, the loop is about **a hundred frames a
+pass**, so poking memory loses the race almost every time - after forty pokes the bytes read
+5000 and the BASIC `Y` still read 206.
+
+`VAR_READER` gives the variable's address, so the probe writes the Applesoft float directly:
+5000 is `8D 1C 40 00 00`, exponent 13 + 128 and a mantissa of 0.6103515625. That takes on the
+next pass.
+
+### Two things in the listing that do not reach the screen
+
+- **Line 2's row-23 clear**, `VTAB 24: HTAB 1: PRINT "<17 spaces>";: HTAB 24: PRINT
+  "<16 spaces>"`, lands on cells INSTRUMENTS never draws into - measured, columns 0-16 and
+  23-38 of row 23 are empty on the original's page either way. It is a no-op.
+- **Line 21's `POKE 974,64`** comes before line 22's HPLOT, but 974 only gates the character
+  generator, not HPLOT, so the lamp is drawn. It is there to keep line 30's BLOAD commands
+  off the hi-res screen.
+
+### The needles are not ORBIT's to lose
+
+The first comparison left 18 pixels over, at rows 132-134 and 165-169 - the bank and pitch
+needles. ORBIT's line 2 erases only the speed and energy tracks, so it did not remove them;
+the page simply does not have them. STARSHIP SIMULATOR line 180 records the positions to
+erase only `IF OO = 1`, so the flight loop is double-buffering and which hi-res page carries
+the needles depends on the flip phase when ORBIT takes over. Nothing here pins that phase
+down, so the harness draws no needles and says why.
+
+### Not wired into the port
+
+The draw lives in `scenes/orbitScreen.ts`. `scenes/orbit.ts` still renders its own version -
+`hgr()`, HCOLOR 3 instead of inverse, and no needle-track erase - because that file is
+carrying another agent's uncommitted work and was left alone. It needs a one-line switch.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -1952,9 +2010,12 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Eleven of the 23 programs.** ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four
+- **Ten of the 23 programs.** H/D, COLLECT, RECALL, EX, S/X, DMG, END and the four
   SHIP # n I.D. programs are extracted and readable but nothing has been compared against
-  them. STATUS, GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE and SUPPLY are done.
+  them. STATUS, GALAXY MAP, RADAR, GROUND FORCES, SHORE LEAVE, SUPPLY and ORBIT are done.
+- **`scenes/orbit.ts` still draws its own ORBIT screen.** The verified draw is in
+  `scenes/orbitScreen.ts`; switching orbit.ts over is a one-line change, not made because
+  that file holds another agent's uncommitted work.
 - **Why a full-width PRINT behaves differently at left margin 0 and 1.** SUPPLY loses its
   last character and GROUND FORCES does not; both are measured, neither is explained.
 - **Four of SHORE LEAVE's six sub-screens.** ENLIST TROOPS, SELL LOOT, REPAIR/RESTOCK and
