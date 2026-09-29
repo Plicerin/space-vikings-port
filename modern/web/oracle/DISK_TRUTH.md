@@ -2520,12 +2520,47 @@ Nothing else moved. COM, STATUS, SUPPLY, GALAXY MAP, GROUND FORCES, COLLECT, REC
 frame and shape parity are all still exact, and the three renderer harnesses are unchanged at
 98.8%, 91.7% and 99.5%.
 
-### `Hires.segment()` is still a placeholder
+### The renderer's own line, at $6DD5
 
-The 3D renderer at `$6000` plots its own segments in machine code that has not been
-disassembled, so `segment()` keeps the textbook Bresenham the ship, star and ground numbers
-were measured against. Whether `$6000` uses this same routine is untested - it is a
-different piece of code, and the way to find out is to read it, not to try it and see.
+`$6000` never calls the ROM - a scan of `$6000-$9000` finds no `JSR` or `JMP` anywhere into
+`$F400-$F7FF`. The clipper falls through to `JSR $6DD5`, which takes two endpoints from
+`$B3-$B6`, one byte each.
+
+It maps them into screen space itself:
+
+```
+$6DD5  LDA $B3 / CLC / ADC #$46 / STA $B3      ; x + 70
+$6DE3  LDA $B4 / EOR #$FF / CLC / ADC #$60     ; 95 - y
+$6DF5  LDA $B5 / SEC / SBC $B3 / BCC $6E38     ; x2 < x1 -> swap the endpoints
+```
+
+and then dispatches to one of several octant-specialised inner loops through a
+**self-modifying** `JMP` whose target is written to `$6FED`/`$6FEE`. Reading that is a poor
+way to learn what it draws, so `probe_line6000.mjs` calls it instead - ten slopes and
+directions, on a blank page 2, reading back exactly which pixels come out.
+
+| | |
+| --- | --- |
+| every point | **two pixels wide** - this is where `drawShipWorld`'s doubling comes from |
+| a 45 degree line | **one** logical pixel per row |
+| direction | a segment and its reverse light the same pixels |
+
+So the renderer's line is **8-connected** - ordinary Bresenham - where Applesoft's HLIN is
+4-connected. Two line routines on one disk that genuinely differ, which is what
+`Hires.line()` and `Hires.segment()` now are.
+
+The left-to-right swap was the only thing `segment()` was missing. Nine of the ten cases
+matched without it; `(60,30)-(-60,-30)` came out a row off, and it is the reverse of a case
+that matched. With the swap, **all ten match $6DD5 exactly**.
+
+The screen mapping is worth keeping too: `x + 70` doubled is `2x + 140`, and the port's
+fitted `SCREEN_CENTRE_X` of 139 is that same centre - independent agreement between a
+fitted projection and the machine code.
+
+Ship exact overlap moved 72.2% to 71.9% while within-one-pixel held at 98.8%, and ground was
+unchanged at 67.5% and 99.5%. The line routine is now checked directly against the machine,
+so that small shift is the projection's residual error landing differently, not evidence
+about the line.
 
 ---
 
@@ -2562,10 +2597,6 @@ is what is genuinely not known, roughly in order of how much it matters.
   SHORE LEAVE lines 2170, 2400-2406 and 3060, and none of it is checked against the port.
 - **GROUND FORCES' combat resolution.** Lines 500-690 are readable and are now quoted in
   this file, but the port's version was not derived from them and has not been checked.
-- **The renderer's own line drawing.** `$6000` plots segments in machine code that has not
-  been disassembled. Applesoft's HLIN now is - see "The ROM's line routine" - but whether
-  $6000 calls it or rolls its own is untested. `Hires.segment()` is a placeholder either
-  way.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.

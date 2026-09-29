@@ -171,20 +171,31 @@ export class Hires {
   }
 
   /**
-   * A line drawn by the renderer at $6000, not by Applesoft.
+   * A line drawn by the renderer at $6000, not by Applesoft - and they are not the same.
    *
-   * These are two different routines on the disk and they do not agree. `line()` reproduces
-   * HPLOT TO, measured off RADAR's reticle. The 3D renderer plots its own segments in
-   * machine code, and that code has not been disassembled - so this keeps the textbook
-   * Bresenham the port has always used here rather than assuming the two match. Applying the
-   * HPLOT rule to ship wireframes cost 0.2 points of within-one-pixel agreement, which is
-   * the evidence that they are not the same routine.
+   * $6000 never calls the ROM: a scan of $6000-$9000 finds no JSR or JMP anywhere into
+   * $F400-$F7FF. Its clipper falls through to `JSR $6DD5`, which takes two endpoints from
+   * $B3-$B6, one byte each, maps them into screen space itself (`ADC #$46` on x, and
+   * `EOR #$FF: ADC #$60` on y, so x + 70 and 95 - y) and dispatches to an octant-specialised
+   * inner loop through a self-modifying JMP at $6FED.
+   *
+   * Measured by calling it with ten different slopes and directions rather than reading the
+   * self-modifying code - `probe_line6000.mjs`:
+   *
+   * - Every point is **two pixels wide**, which is where drawShipWorld's doubling comes from.
+   * - It is **8-connected**: a 45 degree line gives one logical pixel per row, not the two
+   *   the ROM's HLIN would give. So this really is textbook Bresenham and `line()` is not.
+   * - **It always draws left to right.** `$6DF5 LDA $B5: SEC: SBC $B3: BCC $6E38` swaps the
+   *   endpoints when x2 < x1, so a segment and its reverse light the same pixels. Without
+   *   that swap one case in ten came out a row off.
    */
   segment(x1: number, y1: number, x2: number, y2: number): void {
     let x0 = Math.round(x1);
     let y0 = Math.round(y1);
-    const xe = Math.round(x2);
-    const ye = Math.round(y2);
+    let xe = Math.round(x2);
+    let ye = Math.round(y2);
+    // $6DF5's BCC $6E38: the routine swaps so x always runs left to right.
+    if (xe < x0) { const tx = x0; x0 = xe; xe = tx; const ty = y0; y0 = ye; ye = ty; }
     const dx = Math.abs(xe - x0);
     const dy = -Math.abs(ye - y0);
     const sx = x0 < xe ? 1 : -1;
