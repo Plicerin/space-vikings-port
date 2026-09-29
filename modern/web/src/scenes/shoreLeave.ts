@@ -48,6 +48,77 @@ async function readNumber(ctx: SceneContext, col: number, row: number): Promise<
   }
 }
 
+
+/**
+ * SHORE LEAVE's frame - line 14's box and line 2080's clear.
+ *
+ * Like GROUND FORCES, SHORE LEAVE never clears or fills the screen. Line 14 draws the same
+ * box COM does and line 2080 blanks rows 1-12 with eighteen printed spaces, so COM's twelve
+ * readouts, its 40-character row 14 and the HCOLOR 6 flood are all still on the page.
+ *
+ * The clear lands inside the box without touching it: columns 1-18 are x 7-132 and rows 1-12
+ * are y 8-103, while the box sits at x 1 and 139 and y 1 and 110.
+ *
+ * HCOLOR comes from line 14 and nothing changes it - $E4 reads 42 = $2A = HCOLOR 1 while the
+ * pay screen holds - and $3CD is 0, so every one of these screens is green and normal video.
+ */
+export function drawShoreLeaveFrame(hires: import('../engine/hires').Hires): void {
+  hires.hcolor(1);
+  hires.line(1, 1, 139, 1);
+  hires.line(139, 1, 139, 110);
+  hires.line(139, 110, 1, 110);
+  hires.line(1, 110, 1, 1);
+  for (let r = 2; r <= 13; r++) hires.text(' '.repeat(18), 2, r);
+}
+
+/**
+ * Lines 2082 and 2085 - the pay screen, which is where `ON J GOTO` falls through to when
+ * GROUND FORCES option 3 leaves 38388 at 0.
+ *
+ * Line 2081's `VTAB 2` puts the first line on 0-based row 1; the original prints no title
+ * here at all.
+ */
+export function drawShoreLeavePay(
+  hires: import('../engine/hires').Hires,
+  d: { troops: number; credits: number },
+): void {
+  drawShoreLeaveFrame(hires);
+  const lines = [
+    'TROOPS READY FOR',
+    'SHORE LEAVE, SIR.',
+    'BACK PAY COMES TO',
+    `${d.troops} CREDITS.`,
+    '',
+    `YOU HAVE ${Math.floor(d.credits)}`,
+    'CREDITS.',
+    'PAY THEM (Y/N)?',
+  ];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]) hires.text(lines[i], 2, 2 + i);
+  }
+}
+
+/**
+ * Lines 4000-4020 - CRYOGENICS, reached by GROUND FORCES option 8, which pokes 38388 to 5.
+ * Line 4 sends that one past line 5's surrender check, so it is the one sub-screen the
+ * opening game can reach without anything else happening first.
+ *
+ * `VTAB 4` puts both lines on 0-based rows 3 and 4.
+ */
+export function drawShoreLeaveCryogenics(
+  hires: import('../engine/hires').Hires,
+  troopLocation: number,
+): void {
+  drawShoreLeaveFrame(hires);
+  let a: string;
+  let b: string;
+  if (troopLocation === 1 || troopLocation === 2) { a = 'TROOPS NOT ON'; b = 'BOARD, SIR.'; }
+  else if (troopLocation === 3) { a = 'TROOPS ARE BEING'; b = 'REVIVED, SIR.'; }
+  else { a = 'TROOPS ARE BEING'; b = 'PUT IN CRYOGENICS'; }
+  hires.text(a, 2, 4);
+  hires.text(b, 2, 5);
+}
+
 export async function shoreLeaveScene(
   ctx: SceneContext,
   scenes: SceneManager,
@@ -85,28 +156,8 @@ export async function shoreLeaveScene(
 async function shoreLeavePay(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input } = ctx;
 
-  hires.hgr();
-  hires.hcolor(1);
-  hires.line(1, 1, 139, 1);
-  hires.line(139, 1, 139, 110);
-  hires.line(139, 110, 1, 110);
-  hires.line(1, 110, 1, 1);
-
-  hires.hcolor(3);
-  hires.text('SHORE LEAVE', 4, 2);
-  hires.hcolor(1);
-
   const pay = state.forces.troops;
-  writeLines(hires, 2, 4, [
-    'TROOPS READY FOR',
-    'SHORE LEAVE, SIR.',
-    `BACK PAY COMES TO`,
-    `${pay} CREDITS.`,
-    '',
-    `YOU HAVE ${Math.floor(state.credits)}`,
-    'CREDITS.',
-  ]);
-  hires.text('PAY THEM (Y/N)?', 2, 11);
+  drawShoreLeavePay(hires, { troops: pay, credits: state.credits });
 
   const yes = await getYN(ctx);
 
@@ -114,7 +165,6 @@ async function shoreLeavePay(ctx: SceneContext, scenes: SceneManager): Promise<v
     let m = state.forces.morale - 2;
     if (m < 1) m = 1;
     state.forces.morale = m as 1 | 2 | 3 | 4 | 5 | 6;
-    hires.text('NOT PAID.', 2, 13);
   } else if (pay > state.credits) {
     writeLines(hires, 2, 13, ["YOU DON'T HAVE", 'ENOUGH CREDITS, SIR!']);
     let m = state.forces.morale - 2;
@@ -125,7 +175,6 @@ async function shoreLeavePay(ctx: SceneContext, scenes: SceneManager): Promise<v
     if (m > 6) m = 6;
     state.forces.morale = m as 1 | 2 | 3 | 4 | 5 | 6;
     state.credits = Math.floor(state.credits - pay);
-    hires.text('TROOPS PAID.', 2, 13);
   }
 
   state.forces.troopLocation = 2;

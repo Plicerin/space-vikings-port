@@ -1814,6 +1814,74 @@ against the port.
 
 ---
 
+## SHORE LEAVE
+
+`SHORE LEAVE.bas`, reached from GROUND FORCES. `probe_shoreleave.mjs` captures it;
+`shoreleave_parity.mjs` compares.
+
+| | |
+| --- | --- |
+| CRYOGENICS | **0 of 53,760 pixels differ** |
+| the pay screen | **0 of 53,760** |
+
+### It is a dispatcher
+
+```
+20 J = PEEK(38388): POKE 38388,0: ON J GOTO 2200,2400,2500,2100,4000
+```
+
+and 38388 is set by whichever GROUND FORCES option chained here - 4 ENLIST sets 1, 5 SELL
+LOOT sets 2, 6 REPAIR/RESTOCK sets 3, 7 ESTABLISH BASE sets 4, 8 CRYOGENICS sets 5. Option 3
+leaves it at 0, so `ON J GOTO` falls through to 2080 and the shore-leave pay screen. Six
+sub-screens in one program.
+
+All six share a frame: line 14 draws the same box COM does, and `GOSUB 2080` blanks rows 1-12
+with eighteen printed spaces. Nothing clears or fills, so COM's twelve readouts, its
+40-character row 14 and the HCOLOR 6 flood are all still underneath - the same arrangement as
+GROUND FORCES, and comparing it means replaying the same chain.
+
+The clear lands inside the box without touching it: columns 1-18 are x 7-132 and rows 1-12
+are y 8-103, while the box is at x 1 and 139 and y 1 and 110.
+
+`$E4` reads 42 = `$2A` = HCOLOR 1 and `$3CD` reads 0 while the pay screen holds, so these
+screens are green and normal video - the fourth independent reading of those two.
+
+### Two gates, and one that turns out not to be a gate
+
+Line 5 bounces back to GROUND FORCES unless `PEEK(38208)` is set, and line 4 sends
+CRYOGENICS past it. The probe pokes 38208 to reach the pay screen - and then found it was
+**already 1** on a fresh game. SOL starts surrendered. That is worth recording because
+38219+1 reads 100 rather than 1, so the two "this planet is ours" bytes do not agree in form
+and only one of them is a flag.
+
+Line 2505 gates REPAIR on `PEEK(38210) = 0 OR PEEK(29469) > 22` - the atmosphere flag and the
+ship's Y - so in deep space it prints `YOU MUST LAND ON / PLANET FIRST.` rather than the
+repair list. That is why the repair screen is not captured here, and it is the screen whose
+line 2500 DATA settled the twelve system addresses and the energy byte's 0-63 scale.
+
+### What the port had
+
+`hgr()`, a `SHORE LEAVE` title the original never prints on that screen, the text starting
+two rows too low, and `NOT PAID.` / `TROOPS PAID.` messages that are nowhere in lines
+2088-2099 - the original changes morale silently and chains out. The refusal at 2090,
+`YOU DON'T HAVE / ENOUGH CREDITS, SIR!`, is real and stays.
+
+### The economy, quoted but unchecked
+
+Loot is valued at 2400-2406, thirteen counters at 38171-38183 with a price each and the
+total doubled:
+
+```
+2400 L = PEEK(38171) * (300 * RND(1)): L = L + (PEEK(38172) * 150): ...
+2406 L = L * 2
+```
+
+and a base costs `C = 20000 + ((RND(1) * 5000) * (RND(1) * 10))` at line 2170. Weapons are
+priced at 3060 as `INT((RND(1) + .2) * 4 * MU(n))` with `MU` = 50, 75, 40, 30 for fighters,
+transports, tanks and missiles. None of it is checked against the port.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -1821,9 +1889,14 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Thirteen of the 23 programs.** SHORE LEAVE, SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX,
-  S/X, DMG, END and the four SHIP # n I.D. programs are extracted and readable but nothing
-  has been compared against them. STATUS, GALAXY MAP, RADAR and GROUND FORCES are done.
+- **Twelve of the 23 programs.** SUPPLY, ORBIT, H/D, COLLECT, RECALL, EX, S/X, DMG, END and
+  the four SHIP # n I.D. programs are extracted and readable but nothing has been compared
+  against them. STATUS, GALAXY MAP, RADAR, GROUND FORCES and SHORE LEAVE are done.
+- **Four of SHORE LEAVE's six sub-screens.** ENLIST TROOPS, SELL LOOT, REPAIR/RESTOCK and
+  ESTABLISH BASE are not captured. REPAIR needs the ship in atmosphere; the others need
+  credits, loot or an unbuilt base.
+- **The economy.** Loot values, base cost and weapon prices are quoted in this file from
+  SHORE LEAVE lines 2170, 2400-2406 and 3060, and none of it is checked against the port.
 - **GROUND FORCES' combat resolution.** Lines 500-690 are readable and are now quoted in
   this file, but the port's version was not derived from them and has not been checked.
 - **The renderer's own line drawing.** `$6000` plots segments in machine code that has not
