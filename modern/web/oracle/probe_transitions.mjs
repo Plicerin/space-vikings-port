@@ -62,7 +62,7 @@ const which = async () => {
 // settle: a chain can pass through an intermediate program that runs for a second or so -
 // INSTRUMENTS between the galaxy map and COM is the case in point - so "no change" has to
 // mean no change for longer than that, or the capture is of the program in the middle.
-const step = async (label, key, { settle = 22, tries = 800 } = {}) => {
+const step = async (label, key, { settle = 22, tries = 800, settlePixels = true } = {}) => {
   const chain = [];
   if (key !== null) await a2.key(key, { holdFrames: 40, afterFrames: 20 });
   let stable = 0;
@@ -73,8 +73,26 @@ const step = async (label, key, { settle = 22, tries = 800 } = {}) => {
     else if (w !== '(other)') stable++;
     if (stable >= settle && chain.length > (key === null ? 0 : 1)) break;
   }
-  // and a moment more, so the screen it settled on has finished drawing itself
-  for (let i = 0; i < 25; i++) await a2.frames(10);
+  // and then wait for the drawing itself to stop.
+  //
+  // Settling on the program is not enough. COM floods 124 hi-res lines from BASIC and then
+  // prints its readouts, its box and its menu, which takes far longer than the program has
+  // been loaded - the first capture of `galaxy map -> COM` caught it between line 70 and line
+  // 90, with the damage grid up and no menu, and that went into the golden as though it were
+  // the finished screen. So count the lit pixels until they stop changing. The flight view
+  // never repeats, so it passes `settlePixels: false` and keeps the fixed wait.
+  if (settlePixels) {
+    let prev = -1, still = 0;
+    for (let i = 0; i < 200; i++) {
+      await a2.frames(10);
+      const lit = (await a2.readRange(0x2000, 0x4000)).reduce((a, b) => a + (b ? 1 : 0), 0);
+      if (lit === prev) still++; else still = 0;
+      prev = lit;
+      if (still >= 12) break;
+    }
+  } else {
+    for (let i = 0; i < 25; i++) await a2.frames(10);
+  }
   const page = decodeHgr(await a2.readRange(0x2000, 0x4000));
   const points = [];
   for (let y = 0; y < HGR_H; y++) for (let x = 0; x < HGR_W; x++) {
@@ -98,7 +116,7 @@ console.log('  step                       programs run                          
 const steps = [];
 // The flight screen never repeats, so it gets a fixed settle rather than a stable one.
 for (let i = 0; i < 20; i++) await a2.frames(10);
-steps.push(await step('in flight', null, { settle: 1, tries: 2 }));
+steps.push(await step('in flight', null, { settle: 1, tries: 2, settlePixels: false }));
 steps.push(await step('flight -> COM', 'C'));
 steps.push(await step('COM -> computer', '1'));
 steps.push(await step('computer -> galaxy map', '3'));

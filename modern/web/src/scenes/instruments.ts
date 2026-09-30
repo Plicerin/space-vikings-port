@@ -97,7 +97,131 @@ export function drawPanelLamps(
   lamp(hires, BAND_A, 37, st.f === 0 ? 0x0e : 0x10);
 }
 
-export function drawInstruments(hires: import('../engine/hires').Hires): void {
+/**
+ * The eight gauge bars, and the two ways the disk paints them.
+ *
+ * GALAXY MAP has them in BASIC, which is what makes them readable at all:
+ *
+ *     5500 HCOLOR= CH: FOR J = LY TO LY + 4: HPLOT LX,J TO LX + 9,J: NEXT: RETURN
+ *
+ * Ten pixels wide, five rows tall, at (7,153) (72,153) (200,153) (262,153) and the same four
+ * at 161 - one under each of the labels MANUAL/AUTO, ORBIT/DAMAGE, MISSILE/LASER and
+ * COND/SHIELD. Lines 5000-5160 choose each bar's HCOLOR from a byte of game state, and those
+ * bytes are the same ones $9602 reads: 38164 is $9514, 38165 is $9515, 38210 is $9542.
+ *
+ * So `LAMP_BYTES` is not a table of lamp shapes at all - it is these eight bars, in white or
+ * green, plus blue and orange for COND, written out as the bytes they land on.
+ *
+ * The two painters differ in one way that the captures show plainly. $9602 **stores** two whole
+ * byte columns, so it takes out whatever else was in them: the gauge boxes' own vertical edges
+ * at x 17, 71, 82 and 272 vanish under it. 5500 **plots a line**, so only x LX..LX+9 is touched
+ * and those edges survive. Measured on the machine, `oracle/probe_panelpath.mjs`: entering COM
+ * from flight row 153 reads c0=$40 c1=$55 c2=$02, and coming back through INSTRUMENTS and
+ * GALAXY MAP it reads c0=$00 c1=$55 c2=$0a - the $08 being the box edge at x 17.
+ */
+export type GaugeColor = 1 | 3 | 5 | 6;
+
+/** The four gauge columns, by the x GALAXY MAP 5500 starts them at. */
+const GAUGE_X = [7, 72, 200, 262] as const;
+
+/**
+ * The six bytes 5000-5160 read.
+ *
+ * Which value means which colour is the disk's, from the listing. Which *state* each value
+ * stands for is taken from the captures, not from the labels: the disk's flight screen has
+ * 38164 and 38201 both at something other than 1, with the ship in manual and the shields
+ * down, so 0 is the resting value of both and 1 is the other one. Guessing from the words
+ * MANUAL and AUTO would have got this backwards - white marks AUTO on the resting screen.
+ */
+export interface GaugeState {
+  /** PEEK(38201) - SHIELD, at (262,161). 1 draws it green, anything else white. */
+  shields: number;
+  /** PEEK(38202) - MISSILE at (7,161) and LASER at (72,161). */
+  weapon: number;
+  /** PEEK(38165), $9515 - COND at (200,161). 1 green, 2 blue, 3 orange, else nothing. */
+  condition: number;
+  /** PEEK(38164), $9514 - MANUAL at (7,153) and AUTO at (72,153). */
+  manual: number;
+  /** PEEK(38210), $9542 - ORBIT at (200,153). 0 green, 1 white. */
+  orbit: number;
+  /** PEEK(38393) - DAMAGE at (262,153). 0 green, 1 orange. */
+  damage: number;
+}
+
+/**
+ * One bar.
+ *
+ * `store` is $9602's form: after the line is plotted, the rest of the two byte columns the bar
+ * sits in is cleared, because the machine wrote those bytes whole. `plot` is 5500's, which
+ * leaves them. Everything inside LX..LX+9 is the same either way - hplot() writes black on the
+ * columns a phased HCOLOR does not paint, exactly as Applesoft's does.
+ */
+function gaugeBar(
+  hires: import('../engine/hires').Hires,
+  lx: number, ly: number, ch: GaugeColor, mode: 'store' | 'plot',
+): void {
+  hires.hcolor(ch);
+  for (let j = ly; j <= ly + 4; j++) hires.line(lx, j, lx + 9, j);
+  if (mode !== 'store') return;
+  const from = Math.floor(lx / 7) * 7;
+  const to = Math.floor((lx + 9) / 7) * 7 + 6;
+  hires.hcolor(0);
+  for (let j = ly; j <= ly + 4; j++) {
+    for (let x = from; x < lx; x++) hires.hplot(x, j);
+    for (let x = lx + 10; x <= to; x++) hires.hplot(x, j);
+  }
+}
+
+/** GALAXY MAP lines 5000-5160, in their order. */
+export function drawGaugeBars(
+  hires: import('../engine/hires').Hires,
+  g: GaugeState,
+  mode: 'store' | 'plot',
+): void {
+  // 5000-5020
+  gaugeBar(hires, GAUGE_X[3], 161, g.shields === 1 ? 1 : 3, mode);
+  // 5030-5040
+  if (g.weapon !== 1) {
+    gaugeBar(hires, GAUGE_X[0], 161, 3, mode);
+    gaugeBar(hires, GAUGE_X[1], 161, 1, mode);
+  } else {
+    gaugeBar(hires, GAUGE_X[1], 161, 3, mode);
+    gaugeBar(hires, GAUGE_X[0], 161, 1, mode);
+  }
+  // 5050-5080. Nothing is drawn for a condition byte outside 1-3, which is the disk's own
+  // behaviour: 5060, 5065 and 5070 each test one value and there is no else.
+  const cond: Record<number, GaugeColor> = { 1: 1, 2: 6, 3: 5 };
+  if (cond[g.condition]) gaugeBar(hires, GAUGE_X[2], 161, cond[g.condition], mode);
+  // 5090-5100
+  if (g.manual !== 1) {
+    gaugeBar(hires, GAUGE_X[1], 153, 3, mode);
+    gaugeBar(hires, GAUGE_X[0], 153, 1, mode);
+  } else {
+    gaugeBar(hires, GAUGE_X[0], 153, 3, mode);
+    gaugeBar(hires, GAUGE_X[1], 153, 1, mode);
+  }
+  // 5110-5130
+  gaugeBar(hires, GAUGE_X[2], 153, g.orbit === 1 ? 3 : 1, mode);
+  // 5140-5160
+  gaugeBar(hires, GAUGE_X[3], 153, g.damage === 1 ? 5 : 1, mode);
+}
+
+/** The six state bytes, read off the port's own state rather than out of a page of RAM. */
+export function gaugeStateFromGame(state: import('../engine/gameState').GameState): GaugeState {
+  return {
+    shields: state.shieldsOn ? 1 : 0,
+    weapon: state.weaponMode === 'missile' ? 1 : 0,
+    condition: state.condition === 'green' ? 1 : state.condition === 'blue' ? 2 : 3,
+    manual: state.autopilot ? 1 : 0,
+    orbit: state.inOrbit ? 1 : 0,
+    damage: state.damage.hullPct < 100 ? 1 : 0,
+  };
+}
+
+export function drawInstruments(
+  hires: import('../engine/hires').Hires,
+  opts: { gauges?: boolean } = {},
+): void {
   // All instruments drawn instantly — no artificial delays.
   hires.hcolor(1);
 
@@ -175,8 +299,10 @@ export function drawInstruments(hires: import('../engine/hires').Hires): void {
   hires.text('XHDNG', 25, 23);
   hires.text('YHDNG', 34, 23);
 
-  // INSTRUMENTS line 210: POKE 38189,10: CALL 38402.
-  drawPanelLamps(hires, { ...LAMPS_AT_CAPTURE });
+  // INSTRUMENTS line 210: POKE 38189,10: CALL 38402 - but only `IF PEEK(38391) <> 77`, which
+  // is false on the way back from the galaxy map. `gauges: false` is that path: the boxes go
+  // down bare and GALAXY MAP's own GOSUB 5000 paints the bars over them a moment later.
+  if (opts.gauges !== false) drawPanelLamps(hires, { ...LAMPS_AT_CAPTURE });
 }
 
 export async function instrumentsScene(ctx: SceneContext, scenes: SceneManager): Promise<void> {

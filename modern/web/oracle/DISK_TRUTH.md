@@ -4799,6 +4799,93 @@ The 63 are the panel, and they are the same 63 that STATUS and the return from i
 fault, in `drawInstruments`, counted four times. The panel entered from flight is a second,
 larger one: 2205 against 3241, and on that step it is now the **only** difference.
 
+### The instrument panel
+
+The transition harness put two faults in the panel: 2,676 pixels on the panel COM shows coming
+from flight, and 63 on the one it shows coming back through the galaxy map, the second of them
+reported identically by four separate steps. Both turned out to be the same misunderstanding.
+
+**The eight indicators are not lamps. They are bars, and GALAXY MAP draws them in BASIC:**
+
+    5500 HCOLOR= CH: FOR J = LY TO LY + 4: HPLOT LX,J TO LX + 9,J: NEXT: RETURN
+
+Ten pixels wide, five rows tall, at (7,153) (72,153) (200,153) (262,153) and the same four at
+161 - one under each of MANUAL/AUTO, ORBIT/DAMAGE, MISSILE/LASER and COND/SHIELD. Lines
+5000-5160 pick each bar's HCOLOR from a byte of game state, and those bytes are the ones $9602
+reads: 38164 is $9514, 38165 is $9515, 38210 is $9542. So `LAMP_BYTES`, which
+`probe_gauges.mjs` read out of $9602 a byte at a time, is just these eight bars in white or
+green, with blue and orange for COND, written out as the bytes they land on. White is the full
+run; green, blue and orange are half-density, which is why a bar is `$7f $07` one way and
+`$55 $02` the other.
+
+**The disk paints them two different ways, and the difference is visible.** $9602 **stores**
+two whole byte columns, so it takes out whatever else was in them - the gauge boxes' own
+vertical edges at x 17, 71, 82 and 272 disappear under it. 5500 **plots a line**, so only
+LX..LX+9 is touched and those edges survive. `probe_panelpath.mjs` watched row 153 along the
+route: entering COM from flight it reads `c0=$40 c1=$55 c2=$02`, and coming back through
+INSTRUMENTS and GALAXY MAP it reads `c0=$00 c1=$55 c2=$0a`, the `$08` being the box edge at
+x 17.
+
+Which painter runs is decided by one line. INSTRUMENTS 210 is
+
+    210 IF PEEK(38391) < > 77 THEN POKE 38189,10: CALL 38402: PRINT "^DRUN STARSHIP SIMULATOR"
+
+and the return from the galaxy map arrives with 38391 = 77, so on that path INSTRUMENTS draws
+the boxes bare and never calls $9602 at all; GALAXY MAP line 1's own `GOSUB 5000` fills them a
+moment later. Two things were checked before believing this. `probe_lampmerge.mjs` filled page 1
+with `$7f` and called $9602: the bytes came back unchanged, so it stores and does not OR, and
+the surviving box edges cannot be its doing. `probe_lampphase.mjs` rendered the port's panel in
+all 96 flag phases against every capture: none got below 63, so the residue was never a phase.
+
+**And `c0` - the last 13 pixels - is COM's.** Line 20 ends
+
+    POKE 32,0: HOME: FOR J = 1 TO 14: PRINT " ": NEXT
+
+Fourteen blanks, one character cell each, down column 0 from the top of whatever text window COM
+inherited. From flight that window is the default and they fall on rows 0 to 13, under the fill.
+Coming back from the galaxy map, GALAXY MAP has left it at `WNDTOP 19, WNDBTM 23` - the band its
+caption uses - so they fall on rows 19 to 23 and blank the first cell of four rows of the panel,
+taking the gauge boxes' left edge at x 6 and the left end of the orange rule at x 5. The
+character generator has no scroll, so once the prints reach the window's bottom they simply keep
+rewriting that row. Measured: `probe_panelpath.mjs` reads `wnd L1 W39 T19 B23` all the way
+through INSTRUMENTS and GALAXY MAP, and `c0` goes to `$00` at COM line 20.
+
+**The panel the port was drawing in flight was its own.** Seven of INSTRUMENTS' lines instead of
+its twenty-odd, the three titles in normal video instead of inverse, no X, Y, Z, XHDNG or YHDNG
+labels, an invented third row of indicators labelled RADAR and H/DRIVE that the disk has no
+trace of, and the five readouts printed on row 23 **on top of** the labels instead of on row 24
+under them - STARSHIP SIMULATOR 155 is `VTAB 24`. It also rounded where `INT` floors.
+
+Two senses had to be taken from the captures rather than from the words. The disk's flight
+screen has 38164 and 38201 both at something other than 1, with the ship in manual and the
+shields down, so 0 is the resting value of each. Reading MANUAL and AUTO as labels would have
+got it backwards: white marks AUTO on the resting screen.
+
+One more, found in passing: `drawComMainScreen` erases COM line 8's two needle tracks only when
+it is handed the shape table, and `comScene` was not handing it one, so the speed and energy
+needles the flight loop left at y 133 were still standing in COM.
+
+With all of that, `transition_parity.mjs` reports the panel - rows 124 to 191 - as **exact on
+every step of the route**, and five of the six compared screens exact in full:
+
+| step | disk lit | port lit | differing |
+| --- | --- | --- | --- |
+| flight -> COM | 11698 | 11705 | **0** |
+| COM -> computer | 11862 | 11869 | **0** |
+| galaxy map -> COM | 11487 | 11487 | **0** |
+| COM -> computer | 11651 | 11651 | **0** |
+| status -> on | 34369 | 34369 | **0** |
+| computer -> status | 35020 | 32991 | 2029 |
+
+Two notes on that table. Text row 23 - line 155's five numbers - is left out of the count on the
+two steps that carry it: they are the ship's live position and the two machines are not at the
+same point in the same flight. And the `galaxy map -> COM` capture was wrong before this: the
+probe settled on the **program** and caught COM between line 70 and line 90, with the damage
+grid up and no menu, and that went into the golden as a finished screen. It now waits for the
+lit-pixel count to stop changing as well, which is also what turned `computer -> status` from
+32,991 into 35,020 - so **STATUS's first page is short by 2,029 pixels in rows 41 to 123**, and
+that is the one thing on this route still outstanding. Its second page is exact.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

@@ -2,6 +2,7 @@ import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 import { drawOptions, drawPrompt, getChoice, writeLines, clearLines } from '../engine/menu';
 import { ShapeRenderer } from '../engine/shapeTable';
+import { getPanelShapes } from './instruments';
 
 const PLANET_NAMES = [
   'SOL', 'ALPHA CENTAURI', "BARNARD'S STAR", 'WOLF 359', 'LUYTEN',
@@ -175,6 +176,7 @@ export function drawComMainScreen(
   hires: import('../engine/hires').Hires,
   status: Record<number, number> = COM_FRESH_SHIP,
   shapes: import('../engine/shapeTable').ShapeTable | null = null,
+  window: { top: number; bottom: number } = { top: 0, bottom: 24 },
 ): void {
   // No hgr(). COM.bas line 20 floods rows 0 to 123 and never touches what is below, so the
   // instrument panel is still standing underneath it - measured, the original's page has
@@ -182,6 +184,19 @@ export function drawComMainScreen(
   if (shapes) eraseComNeedleTracks(hires, shapes);
 
   fillBackground(hires, 6, 0, 123);
+
+  // The rest of line 20: `POKE 32,0: HOME: FOR J = 1 TO 14: PRINT " ": NEXT`. Fourteen blanks,
+  // one cell each, down column 0 from the top of whatever window COM inherited - and the
+  // character generator has no scroll, so once they reach the window's bottom they keep
+  // rewriting that row. From flight the window is the default and they fall on rows 0 to 13,
+  // under the fill. Coming back through the galaxy map it is rows 19 to 23, and there they
+  // blank the first cell of four rows of the instrument panel.
+  hires.hcolor(0);
+  for (let j = 0; j < 14; j++) {
+    const row = Math.min(window.top + j, window.bottom);
+    if (row > 23) break;
+    hires.text(' ', 1, row + 1);
+  }
 
   // COM fills and then clears its text window over the fill, so the menu area is black and
   // only the right-hand side keeps the background. Measured off the original's own page:
@@ -264,7 +279,13 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
   }
 
   mainMenu: for (;;) {
-    drawComMainScreen(hires, comStatusBytes(state));
+    // The third argument is what erases the two needle tracks - COM line 8. Without it the
+    // speed and energy needles the flight loop left at y 133 were still standing in COM, and
+    // the transition capture showed them as the port's only marks up there.
+    drawComMainScreen(hires, comStatusBytes(state), getPanelShapes(), state.textWindow);
+    // Line 21, the next thing COM runs: `POKE 34,0: POKE 35,23`. Whatever window COM was
+    // handed, it owns it from here on, so the galaxy map's does not outlive this screen.
+    state.textWindow = { top: 0, bottom: 23 };
 
     const mainChoice = await getChoice(input, hires, 1, 5);
 

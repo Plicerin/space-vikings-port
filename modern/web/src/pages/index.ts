@@ -30,7 +30,7 @@ import { initCopyButton } from '../engine/gameLog';
 // ── Scene imports ──────────────────────────────────────────────────────────
 import { startScene } from '../scenes/start';
 import { cockpitScene } from '../scenes/cockpit';
-import { instrumentsScene, drawInstruments, drawPanelNeedles } from '../scenes/instruments';
+import { instrumentsScene, drawInstruments, drawPanelNeedles, drawPanelLamps } from '../scenes/instruments';
 import { galaxyMapScene, drawGalaxyMap, drawGalaxyCursor, eraseGalaxyCursor3210 } from '../scenes/galaxyMap';
 import { comScene, drawComMainScreen, eraseComNeedleTracks } from '../scenes/com';
 import { statusScene, drawStatusReport, drawTroopReport } from '../scenes/status';
@@ -115,7 +115,7 @@ function boot(): void {
 
   // Handles for the frame-parity harness (oracle/frame_parity.mjs), which renders a
   // screen on a throwaway Hires and diffs it against the original disk's hi-res page.
-  (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments,
+  (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments, drawPanelLamps,
     ShapeRenderer, decodeShapeTableJson,
     parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW,
     projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, eraseGalaxyCursor3210, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu, drawShipId, project68A1, project68A1ToScreen,

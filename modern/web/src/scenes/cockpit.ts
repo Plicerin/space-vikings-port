@@ -10,7 +10,8 @@ import {
 } from '../engine/math3d';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import type { ShapeTable } from '../engine/shapeTable';
-import { drawPanelNeedles, erasePanelNeedles, setPanelShapes } from './instruments';
+import { drawPanelNeedles, erasePanelNeedles, setPanelShapes, drawInstruments,
+  drawGaugeBars, gaugeStateFromGame } from './instruments';
 import type { PanelNeedles } from './instruments';
 import {
   computeShipPointScale,
@@ -1536,14 +1537,19 @@ function drawHUD(
   showControls: boolean,
   panelShapes: ShapeTable | null,
 ) {
-  hires.hcolor(1);
-  hires.line(123, 145, 1, 145);
-  hires.line(1, 145, 1, 128);
-  hires.line(1, 128, 279, 128);
-  hires.line(279, 128, 279, 145);
-  hires.line(279, 145, 157, 145);
-  hires.line(123, 128, 123, 183);
-  hires.line(157, 128, 157, 183);
+  // The panel is INSTRUMENTS', not this file's.
+  //
+  // The disk draws it once, before the simulator starts, and the simulator only puts the four
+  // needles, the eight gauge bars and line 155's five numbers on top of it. What stood here
+  // was a second panel written from scratch - seven of INSTRUMENTS' lines instead of its
+  // twenty-odd, the three titles in normal video instead of inverse, no X/Y/Z or XHDNG/YHDNG
+  // labels, and an invented third row of indicators labelled RADAR and H/DRIVE that the disk
+  // has no trace of. Against the disk's own screen it was 2,205 pixels to 3,241.
+  //
+  // `gauges: false` because the bars come from the game's state below, not from the phase
+  // `LAMPS_AT_CAPTURE` froze.
+  drawInstruments(hires, { gauges: false });
+  drawGaugeBars(hires, gaugeStateFromGame(state), 'store');
 
   // STARSHIP SIMULATOR lines 159, 170, 173 and 180 - the four needles.
   //
@@ -1565,56 +1571,21 @@ function drawHUD(
     prevNeedles = needles;
   }
 
-  const pill = (px: number, py: number, on: boolean, color: number): void => {
-    if (on) {
-      hires.hcolor(color);
-      for (let yy = py; yy <= py + 5; yy++) hires.line(px, yy, px + 11, yy);
-    } else {
-      hires.hcolor(3);
-      hires.line(px, py, px + 11, py);
-      hires.line(px + 11, py, px + 11, py + 5);
-      hires.line(px + 11, py + 5, px, py + 5);
-      hires.line(px, py + 5, px, py);
-    }
-  };
-
-  pill(6, 152, !state.autopilot, 1);
-  pill(71, 152, state.autopilot, 1);
-  pill(6, 160, state.weaponMode === 'missile', 1);
-  pill(71, 160, state.weaponMode === 'laser', 1);
-  pill(200, 152, state.inOrbit, 1);
-  const condColor = state.condition === 'green' ? 1
-    : state.condition === 'blue' ? 6 : 5;
-  pill(261, 152, state.damage.hullPct < 100, 5);
-  pill(200, 160, true, condColor);
-  pill(261, 160, state.shieldsOn, 1);
-pill(6, 168, state.damage.radarPct > 0, 1);
-pill(71, 168, state.damage.hyperdrivePct > 0, 1);
-
-  hires.hcolor(1);
-  hires.text(' SPEED ', 4, 18);
-  hires.text('TURN', 19, 18);
-  hires.text(' ENERGY ', 30, 18);
-hires.text('MANUAL', 4, 20);
-hires.text('AUTO', 13, 20);
-hires.text('ORBIT', 24, 20);
-hires.text('DAMAGE', 32, 20);
-hires.text('MISSILE', 4, 21);
-hires.text('LASER', 13, 21);
-hires.text('COND', 24, 21);
-hires.text('SHIELD', 32, 21);
-hires.text('RADAR', 4, 22);
-hires.text('H/DRIVE', 13, 22);
-
+  // STARSHIP SIMULATOR line 155, which is all the simulator itself prints on the panel:
+  //
+  //   VTAB 24: HTAB 1: PRINT INT(X/2);" ";: HTAB 7: PRINT INT(Y/2);" ";: HTAB 13:
+  //     PRINT INT(Z/2);" ";: HTAB 26: PRINT INT(H*Q);"  ";: HTAB 35: PRINT INT(P*Q);"  ";
+  //
+  // Row 24, one row **below** INSTRUMENTS' X, Y, Z, XHDNG and YHDNG labels on row 23. The port
+  // printed the numbers on row 23, on top of the labels, which is why the disk's screen has
+  // them and the port's did not. INT is a floor, not a round.
   hires.hcolor(3);
-  const fmt = (n: number) => Math.round(n / 2).toString().padEnd(6);
-  hires.text(fmt(state.x), 1, 23);
-  hires.text(fmt(state.y), 7, 23);
-  hires.text(fmt(state.z), 13, 23);
-  const hd = ((headingRad * 180) / Math.PI).toFixed(0).padEnd(4);
-  const pd = ((pitchRad * 180) / Math.PI).toFixed(0).padEnd(4);
-  hires.text(hd, 25, 23);
-  hires.text(pd, 34, 23);
+  const at = (v: string, col: number) => hires.text(v, col, 24);
+  at(`${Math.floor(state.x / 2)} `, 1);
+  at(`${Math.floor(state.y / 2)} `, 7);
+  at(`${Math.floor(state.z / 2)} `, 13);
+  at(`${Math.round((headingRad * 180) / Math.PI)}  `, 26);
+  at(`${Math.round((pitchRad * 180) / Math.PI)}  `, 35);
 
   // Combat info line
   if (state.commanderMode) {

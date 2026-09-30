@@ -1,5 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
-import { drawInstruments } from './instruments';
+import { drawInstruments, drawGaugeBars, gaugeStateFromGame } from './instruments';
 import { setScene, log as glog } from '../engine/gameLog';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import type { ShapeTable } from '../engine/shapeTable';
@@ -243,9 +243,20 @@ export async function galaxyMapScene(ctx: SceneContext, scenes: SceneManager): P
         // lit pixels in rows 152-191 and COM shows 1808 there with only 203 in common, so the
         // panel really is painted over it. Going straight to COM left the map's "PRESS SPACE
         // TO RETURN" sitting under COM's menu, which is what playing it showed.
+        //
+        // INSTRUMENTS line 210 is `IF PEEK(38391) <> 77 THEN POKE 38189,10: CALL 38402: ...`
+        // and this is the path that arrives with 38391 = 77, so it draws the gauge boxes and
+        // never calls $9602. What fills them is GALAXY MAP's own line 1: `GOSUB 5000`, whose
+        // 5500 plots each bar as a line instead of storing two byte columns - which is why the
+        // boxes' vertical edges at x 17, 71, 82 and 272 are still there on this screen and are
+        // not on the one COM shows coming from flight.
         glog('galaxyMap', 'return');
         hires.hgr();
-        drawInstruments(hires);
+        drawInstruments(hires, { gauges: false });
+        drawGaugeBars(hires, gaugeStateFromGame(state), 'plot');
+        // GALAXY MAP leaves the text window at rows 19 to 23 - the band its caption uses - and
+        // COM line 20's fourteen blanks land there rather than at the top of the screen.
+        state.textWindow = { top: 19, bottom: 23 };
         return scenes.run('com');
       }
 

@@ -183,6 +183,19 @@ export class GameState {
    *  saved game exists. Set by SAVE GAME, cleared by NEW GAME. */
   savedGameSentinel: number = 0;
 
+  /**
+   * The Apple's text window top and bottom, WNDTOP and WNDBTM at $22 and $23.
+   *
+   * Carried between scenes because one program's window changes what the next one's PRINTs
+   * land on. COM line 20 ends `POKE 32,0: HOME: FOR J = 1 TO 14: PRINT " ": NEXT`, and where
+   * those fourteen blanks go depends entirely on the window it inherited. From flight it is the
+   * default 0 to 24 and they land on rows 0 to 13, which COM clears anyway. Coming back through
+   * the galaxy map, GALAXY MAP has left it at 19 to 23 for its caption, so they land on rows 19
+   * to 23 - and blank the first character cell of each, taking out the gauge boxes' left edge
+   * at x 6 and the left end of the orange rule at x 5. Measured: oracle/probe_panelpath.mjs.
+   */
+  textWindow: { top: number; bottom: number } = { top: 0, bottom: 24 };
+
   // ---------------------------------------------------------------------
   // Damage Control (the right-hand panel in the master computer screen)
   // ---------------------------------------------------------------------

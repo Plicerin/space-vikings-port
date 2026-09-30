@@ -83,6 +83,15 @@ const litIn = (on, from, to) => {
 const COMPARE = new Set(['flight -> COM', 'COM -> computer', 'galaxy map -> COM',
   'computer -> status', 'status -> on']);
 
+// Text row 23, y 184 to 191, is STARSHIP SIMULATOR line 155's five numbers - INT(X/2),
+// INT(Y/2), INT(Z/2) and the two headings. They are the ship's live position, and the two
+// machines are not at the same point in the same flight, so the digits there are never going
+// to agree. The row is left out of the count on the steps that carry it, and what is left is
+// the drawing. The panel it sits in is compared in full.
+const LIVE_READOUT = { from: 184, to: 191 };
+const skipped = (label, y) => (label === 'flight -> COM' || label === 'COM -> computer')
+  && y >= LIVE_READOUT.from && y <= LIVE_READOUT.to;
+
 console.log(`${golden.steps.length} steps along the same route`);
 console.log('');
 console.log('  step                        disk lit   port lit   differing   verdict');
@@ -92,7 +101,10 @@ golden.steps.forEach((g, i) => {
   const want = diskOf(g);
   const got = Uint8Array.from(shots[i].on);
   let diff = 0;
-  for (let k = 0; k < want.length; k++) if ((want[k] ? 1 : 0) !== (got[k] ? 1 : 0)) diff++;
+  for (let k = 0; k < want.length; k++) {
+    if (skipped(g.label, Math.floor(k / HGR_W))) continue;
+    if ((want[k] ? 1 : 0) !== (got[k] ? 1 : 0)) diff++;
+  }
   const panelWant = litIn(want, 124, HGR_H - 1);
   const panelGot = litIn(got, 124, HGR_H - 1);
   const compared = COMPARE.has(g.label);
@@ -109,6 +121,7 @@ golden.steps.forEach((g, i) => {
 // moved, not that it is missing, and the row bands say which part of the screen moved it: the
 // caption and the top of the menu, the menu body and the damage grid, and the panel.
 const BANDS = [['rows 0-40', 0, 40], ['rows 41-123', 41, 123], ['rows 124-191', 124, HGR_H - 1]];
+const diffOf = new Map();
 console.log('');
 console.log('  where the difference is, by row band (disk / port / differing):');
 golden.steps.forEach((g, i) => {
@@ -118,6 +131,7 @@ golden.steps.forEach((g, i) => {
   const cells = BANDS.map(([name, a, b]) => {
     let d = 0;
     for (let y = a; y <= b; y++) for (let x = 0; x < HGR_W; x++) {
+      if (skipped(g.label, y)) continue;
       const k = y * HGR_W + x;
       if ((want[k] ? 1 : 0) !== (got[k] ? 1 : 0)) d++;
     }
@@ -129,6 +143,27 @@ golden.steps.forEach((g, i) => {
   const mask = new Uint8Array(want.length);
   for (let k = 0; k < want.length; k++) mask[k] = (want[k] ? 1 : 0) !== (got[k] ? 1 : 0) ? 1 : 0;
   // the route visits `COM -> computer` twice, so the step number keeps the two apart
+  // and, for a residue small enough to read, the rows themselves
+  const rows = [];
+  for (let y = 0; y < HGR_H; y++) {
+    const dw = [], dp = [];
+    if (skipped(g.label, y)) continue;
+    for (let x = 0; x < HGR_W; x++) {
+      const k = y * HGR_W + x;
+      if (want[k] && !got[k]) dw.push(x);
+      if (!want[k] && got[k]) dp.push(x);
+    }
+    if (dw.length || dp.length) rows.push({ y, diskOnly: dw, portOnly: dp });
+  }
+  if (diffOf.get(g.label) === undefined) diffOf.set(g.label, rows);
+  if (rows.length && rows.reduce((a, r) => a + r.diskOnly.length + r.portOnly.length, 0) <= 200) {
+    console.log(`      the rows that differ:`);
+    for (const r of rows) {
+      console.log(`        y=${String(r.y).padStart(3)}` +
+        (r.diskOnly.length ? `  disk only ${r.diskOnly.join(' ')}` : '') +
+        (r.portOnly.length ? `  port only ${r.portOnly.join(' ')}` : ''));
+    }
+  }
   const name = `diff-${i}-` + g.label.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
   fs.mkdirSync('captured/transitions', { recursive: true });
   fs.writeFileSync(`captured/transitions/${name}.png`, toPng(mask));
