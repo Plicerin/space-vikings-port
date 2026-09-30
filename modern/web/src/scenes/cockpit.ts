@@ -64,9 +64,25 @@ const W1 = 20000;
 const W2 = -20000;
 const OPENING_VIEW_TOLERANCE = 40;
 const FRAME_DT_SCALE = 0.72;
-// Measured from the original DSK: at S=120, Z advances in exact 120-unit
-// chunks about every 500 ms, or approximately two STARSHIP SIMULATOR loops/sec.
-const BASIC_SIMULATOR_TICK_SECONDS = 0.5;
+/**
+ * How long one pass of STARSHIP SIMULATOR's main loop takes.
+ *
+ * Line 129 moves the ship `S` units along its heading once a pass - `X1 = S * (ZP * XH)` and so
+ * on - so the step is right and the only question is how often it happens. This used to say 500
+ * milliseconds, from the repo's own reading of a trace. The machine says otherwise:
+ * `oracle/probe_flightspeed.mjs` samples X, Y and Z out of line 8's own cells at 29467, 29469
+ * and 29471 often enough to see each jump, and gets steps of exactly 30, 60 and 120 at those
+ * three speeds, **2.5 to 2.6 seconds apart at every one of them**. End to end that is 36 units a
+ * second at full speed against the port's 239 - five times too fast, and it showed: a few
+ * seconds of play put the ship at X 18,000, past every bound the game uses. Line 192 only runs
+ * the damage tick inside X -3500 to 4500, Y -3000 to 3000, Z -6000 to 2000, and line 156
+ * re-enters the atmosphere inside a 900-unit cube, so the whole game happens in a box the port
+ * was crossing in about five seconds.
+ *
+ * Nothing in the pixel harnesses could catch this. The flight view moves every frame and is the
+ * one screen they do not compare.
+ */
+const BASIC_SIMULATOR_TICK_SECONDS = 2.55;
 const TURN_RATE = 0.9;
 const FIRE_COOLDOWN_SECONDS = 0.45;
 const SHIP_SCALE_MIN = 0.02;
@@ -531,7 +547,9 @@ const enemy = spawnEnemy(state);
       );
       if (!runs.tick) return;
       const nearPlanet = true;
-      if (Math.random() < 2 * dt) {
+      // Lines 190 and 192 are part of the same pass as the movement, so they run at the same
+      // rate. This was `2 * dt`, the old half-second pass written out by hand.
+      if (Math.random() < dt / BASIC_SIMULATOR_TICK_SECONDS) {
         enemyAttack(nearPlanet);
         // `IF RND(1) < .5 AND PEEK(38207) > 0 THEN GOSUB 5000` - one bolt, right after the
         // tick, and only while the planet still has a battery standing.
@@ -1587,25 +1605,13 @@ function drawHUD(
   at(`${Math.round((headingRad * 180) / Math.PI)}  `, 26);
   at(`${Math.round((pitchRad * 180) / Math.PI)}  `, 35);
 
-  // Combat info line
-  if (state.commanderMode) {
-    hires.hcolor(5);
-    hires.text('BOT ACTIVE - PRESS P TO DISABLE', 5, 1);
-  } else if (state.autopilot) {
-    hires.hcolor(5);
-    hires.text('AUTOPILOT ACTIVE - PRESS A TO DISABLE', 1, 1);
-  } else if (state.enemyShips > 0 && !state.atmosphere) {
-    hires.hcolor(5);
-    hires.text(`ENEMY:${state.enemyShips}`, 1, 1);
-  }
-  if (state.planetSurrendered) {
-    hires.hcolor(1);
-    hires.text('SURRENDERED', 1, 2);
-  }
-    if (state.missilesRemaining > 0) {
-      hires.hcolor(1);
-      hires.text(`MIS:${state.missilesRemaining}`, 30, 1);
-    }
+  // Nothing else is printed over the view.
+  //
+  // What stood here was a status line of the port's own - ENEMY:n and MIS:n across the top,
+  // SURRENDERED under them, and a banner for the autopilot and the commander bot. The only
+  // thing STARSHIP SIMULATOR prints up there is line 156's crosshair, and the disk's own flight
+  // capture shows the star field and that crosshair and nothing besides. All four of those
+  // readings are already on the panel or in SHIP STATUS, which is where the game puts them.
 
   // Controls overlay
   if (showControls) {

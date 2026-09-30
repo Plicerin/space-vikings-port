@@ -142,7 +142,14 @@ export interface GaugeState {
   condition: number;
   /** PEEK(38164), $9514 - MANUAL at (7,153) and AUTO at (72,153). */
   manual: number;
-  /** PEEK(38210), $9542 - ORBIT at (200,153). 0 green, 1 white. */
+  /**
+   * PEEK(38210), $9542 - the gauge under ORBIT at (200,153). 0 green, 1 white.
+   *
+   * Despite the label it is not "in orbit": **RE line 25 sets it to 1** on the way down and
+   * ORBIT line 25 sets it back to 0 on the way up, and each of them paints this very bar to
+   * match - RE white at its line 22, ORBIT green at its line 21. It is the atmosphere flag,
+   * which is also how STARSHIP SIMULATOR 156 and 158 use it.
+   */
   orbit: number;
   /** PEEK(38393) - DAMAGE at (262,153). 0 green, 1 orange. */
   damage: number;
@@ -213,7 +220,7 @@ export function gaugeStateFromGame(state: import('../engine/gameState').GameStat
     weapon: state.weaponMode === 'missile' ? 1 : 0,
     condition: state.condition === 'green' ? 1 : state.condition === 'blue' ? 2 : 3,
     manual: state.autopilot ? 1 : 0,
-    orbit: state.inOrbit ? 1 : 0,
+    orbit: state.atmosphere ? 1 : 0,
     damage: state.damage.hullPct < 100 ? 1 : 0,
   };
 }

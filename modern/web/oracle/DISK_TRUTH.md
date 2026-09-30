@@ -4922,6 +4922,90 @@ of the nine-significant-digit rule.
 
 Both pages: **30,093 lit against 30,093 and 31,466 against 31,466, nothing differing.**
 
+### Playing it: the ship was five times too fast
+
+Flying the port for a few seconds put the ship at X 18,000. Every bound the game uses is far
+inside that - line 192 only runs the damage tick while X is between -3500 and 4500, Y between
+-3000 and 3000 and Z between -6000 and 2000, and line 156 re-enters the atmosphere inside a
+900-unit cube - so the whole game happens in a box the port was crossing in about five seconds.
+
+`oracle/probe_flightspeed.mjs` measures it on both sides. Line 129 is the movement:
+
+    129 ... X1 = S * (ZP * XH): Z1 = S * ZP * ZH: X = X + X1: Z = Z + Z1: Y1 = S * YP: Y = Y + Y1
+
+so the step is the speed byte itself, once a pass. Sampling X, Y and Z out of line 8's own cells
+at 29467, 29469 and 29471 often enough to see each jump gives steps of exactly **30, 60 and 120**
+at those three speeds, **2.5 to 2.6 seconds apart at every one of them**. The step was right in
+the port and the pass was not: it ran one every 500 milliseconds, from the repo's own reading of
+a trace, and the comment in the source said so.
+
+| speed | disk | port before | port after |
+| --- | --- | --- | --- |
+| 30 | 12.0 units/s | 60.0 | **12.0** |
+| 60 | 24.0 units/s | 119.5 | **24.0** |
+| 120 | 36.0 units/s | 239.2 | 48.0 |
+
+The 120 row is the machine's own doing: its pass stretches to about 3.3 seconds at full speed
+while the port's stays at 2.55, so the port is a third fast there and exact at the other two.
+Two traps in measuring it are worth keeping. **The speed byte cannot be poked** - line 210 is
+`POKE 38157,S` and runs every pass, so the BASIC variable puts it straight back, and the first
+run of this got the same 36 units a second at every "speed". And **a two-byte read of X or Z can
+tear**, because line 140 POKEs the two halves separately; at speed 120 that showed as steps of
+-136 and 256 whose sum is the real 120.
+
+Nothing in the pixel harnesses could have caught this. The flight view moves every frame and is
+the one screen they do not compare.
+
+### And three more things that only show up in play
+
+**The flight view had a status line the disk has no trace of.** ENEMY:n and MIS:n across the
+top, SURRENDERED under them, and banners for the autopilot and the commander bot. The only thing
+STARSHIP SIMULATOR prints over the view is line 156's crosshair, and the disk's own flight
+capture shows the star field, that crosshair and nothing else. All four readings are already on
+the panel or in SHIP STATUS.
+
+**RE's position bytes were being read unsigned.** Lines 27-35 leave the ship at `Y1 = 0: Y2 = 4`
+and `Z1 = 168: Z2 = 228`, and those go through line 6600's decode, where a high byte of 128 or
+more is negative: Y is **1024**, not 0, and Z is **-7000**, not 58,536. Taken unsigned, Z landed
+past line 133's 20,000-unit wrap, so **every re-entry threw the ship to the edge of the map** -
+flying into the planet put it at Z -19,365. RE's screen was wrong too: line 10 floods orange
+(`HCOLOR= 5`), not black, and line 5's `POKE 973,255` makes the message at line 20 inverse with a
+blank band above and below it. All of that is now in `src/scenes/reentryScreen.ts`, beside
+ORBIT's, because `reentry.ts` is carrying another agent's uncommitted work.
+
+**And the gauge under ORBIT is the atmosphere flag.** 38210 is not "in orbit": RE line 25 sets it
+to 1 on the way down and ORBIT line 25 sets it back to 0 on the way up, and each of them paints
+that very bar to match - RE white at its line 22, ORBIT green at its line 21, exactly what
+GALAXY MAP's 5110 and 5120 would choose. The port was driving it from its own `inOrbit`.
+
+### The ground assault
+
+Attacking a planet showed four more, all of them in GROUND FORCES:
+
+- **The instrument panel was being wiped.** Line 100 is `POKE 35,16: HOME: FOR C = 1 TO 16:
+  VTAB C: PRINT <40 spaces>` - it blanks text rows 0 to 15 and nothing below them, so the panel
+  stands under the battle. The port cleared the page.
+- **The battle had effects of the port's own**: a white rule across the box, twenty
+  pseudo-random dots, orange crosses, a coloured progress bar with its own frame, and a
+  SURRENDER heading with a percentage under it, clipped to `URRENDER` at the right margin. The
+  whole of the disk's per-round update is line 4010 - five numbers at HTAB 33 and the projection
+  at VTAB 8, HTAB 18 - over the box lines 110 to 145 put down once.
+- **The projection was printed a row too high**, beside PROBABILITY instead of OF SUCCESS :.
+- **The messages were the port's own text.** Line 150's `POKE 973,255` is never put back except
+  inside 4010, so everything printed during the assault is inverse, and line 170's blank is
+  inverse spaces - rows 11 to 14 are a solid white band with the messages in black through it.
+  The port printed green text on the fill, in half-width lines indented by one, where the disk
+  prints single full-width lines from column 0.
+- **The assault ended on the wrong quantity.** Line 670 is `IF TR = 0` - the troops. The port
+  ended it when the transports ran out.
+- **Any key retreats.** 1100 reads the key and 1110 works out which one it is, and then **1115 is
+  `K = 82`**, unconditionally, so 1120's `IF K = 82` is always true. The port asked for R.
+
+One thing found along the way and not acted on: **LT, the byte A, B, W and S poke to pick which
+gauge $9602 updates, is 38167** - and STATUS line 1386 reads 38167 as the high byte of
+`(PEEK(38167) * 256) + PEEK(38159)`, the count it tests for "THE TROOPS ARE ALL DEAD!". The two
+uses are the original's, not the port's.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

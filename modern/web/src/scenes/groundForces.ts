@@ -215,7 +215,9 @@ function commanderChoice(state: GameState): number {
 async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input, audio } = ctx;
 
-  hires.hgr();
+  // No hgr(). Line 100 is `POKE 32,0: POKE 33,40: POKE 34,0: POKE 35,16: HOME: FOR C = 1 TO
+  // 16: VTAB C: PRINT <40 spaces>: NEXT` - it blanks text rows 0 to 15 and nothing below them,
+  // so the instrument panel is still standing under the battle. Clearing the page took it away.
   drawGroundForcesBattle(hires);
 
   if (state.planetSurrendered) {
@@ -242,97 +244,101 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
     return scenes.run('com');
   }
 
+  // Line 150's `POKE 973,255` is never put back except inside 4010, so **everything printed
+  // during the assault is inverse** - and line 170's blank is inverse spaces, which makes rows
+  // 11 to 14 a solid white band with the messages in black through it. The port was printing
+  // green text on the fill.
+  //
+  // The messages themselves are single PRINTs at the window's left edge, which line 100 put at
+  // column 0. Every break below is the disk's; the port had its own, half the width and
+  // indented by one.
+  const INVERSE = { invert: true } as const;
+  /** Line 170: `FOR C = 12 TO 15: VTAB C: PRINT <39 spaces>`, and the cursor left on row 11. */
+  const band = (): void => {
+    for (let r = 12; r <= 15; r++) hires.text(' '.repeat(39), 1, r, INVERSE);
+  };
+  const say = (lines: string[], from = 12): void => {
+    for (let i = 0; i < lines.length; i++) hires.text(lines[i], 1, from + i, INVERSE);
+  };
+
   if (transports === 0) {
-    hires.hcolor(5);
-    writeLines(hires, 2, 12, ['THERE ARE NO', 'TRANSPORTS', 'AVAILABLE!'], 5);
+    // 175
+    say(['THERE ARE NO TRANSPORTS AVAILABLE!']);
     await commanderWait(state, 2000);
     return scenes.run('com');
   }
 
-  hires.hcolor(1);
-  writeLines(hires, 2, 12, ['ALL TRANSPORTS', 'AWAY, SIR!']);
+  band();
+  let messageRow = 12;
+  say(['ALL TRANSPORTS AWAY, SIR!'], messageRow++);
   audio.beep(440, 100);
   await wait(2000);
 
+  // 180's second half: `IF PEEK(38210) = 0`, so it is only said on the way in from space.
   if (!state.atmosphere) {
-    writeLines(hires, 2, 14, ['TRANSPORTS ENTERING', 'ATMOSPHERE!']);
+    say(['TRANSPORTS ENTERING ATMOSPHERE!'], messageRow++);
     await commanderWait(state, 2000);
   }
 
   if (fighters > 0) {
-    writeLines(hires, 2, 16, ['FIGHTERS LAUNCHING', 'FROM TRANSPORTS!']);
+    say(['FIGHTERS LAUNCHING FROM TRANSPORTS!'], messageRow++);
     await commanderWait(state, 2000);
   }
+
+  // 195: `R4 = 1: GOSUB 170` - the band goes back down and the cursor with it.
+  band();
 
   const tech = state.planets[state.planetIndex].defender;
 
-  hires.hcolor(1);
+  // 210: `ON C + 1 GOTO 220,300,330,400,450`.
   if (tech === 0) {
-    writeLines(hires, 2, 12, ['PLANET IS NON', 'HABITABLE. THERE IS NO', 'ENEMY TO RESIST', 'LANDING FORCE.']);
+    say(['PLANET IS NON HABITABLE. THERE IS NO', 'ENEMY TO RESIST LANDING FORCE.']);
     await commanderWait(state, 3000);
+    // 230, 240: blank again, take the loot, and go straight back to COM. There is no battle
+    // for a world with nothing on it.
+    band();
     markPlanetConquered(state);
     glog('attack', 'surrendered - no resistance');
     await commanderWait(state, 2000);
-    hires.text('TROOPS COLLECTING', 2, 12);
-    hires.text('LOOT.', 2, 13);
-    await commanderWait(state, 1500);
     return scenes.run('collect');
   } else if (tech === 1) {
-    writeLines(hires, 2, 12, ['PLANET IS VERY PRIMITIVE.', 'THE LOCAL INHABITANTS ARE', 'UNABLE TO RESIST THE', 'LANDING FORCE!!!', 'PLANET SECURE WITH', 'MINIMUM OF FIGHTING!']);
+    say(['PLANET IS VERY PRIMITIVE.', 'THE LOCAL INHABITANTS ARE UNABLE TO',
+      'RESIST THE LANDING FORCE!!!', 'PLANET SECURE WITH MINIMUM OF FIGHTING!']);
+    // 305: `POKE 38150,0` - SP is zero, so the first round of 550 already has VP >= SP.
     state.planetVitality = 0;
     await commanderWait(state, 3000);
   } else if (tech === 2) {
-    writeLines(hires, 2, 12, ['PLANET IS IN THE LIMITED', 'ATOMIC STAGE OF', 'DEVELOPMENT!']);
+    say(['PLANET IS IN THE LIMITED ATOMIC STAGE', 'OF DEVELOPMENT!']);
     await commanderWait(state, 3000);
+    // 340
     if (!state.planetSurrendered) {
-      hires.text('ATTACK FORCE IS', 2, 15);
-      hires.text('MEETING RESISTANCE!!', 2, 16);
+      say(['ATTACK FORCE IS MEETING RESISTANCE!!'], 14);
       await commanderWait(state, 2000);
     }
   } else if (tech === 3) {
-    writeLines(hires, 2, 12, ['PLANET HAS COMPARABLE', 'TECHNOLOGY TO US!']);
+    // 400: the second line lands on row 12, because of the VTAB 13 between them.
+    say(['PLANET HAS COMPARABLE TECHNOLOGY TO US!']);
     await commanderWait(state, 3000);
-    writeLines(hires, 2, 15, ['HEAVY COUNTER ATTACK', 'HAS BEEN LAUNCHED!']);
+    say(['HEAVY COUNTER ATTACK HAS BEEN LAUNCHED!'], 13);
     await commanderWait(state, 3000);
   } else {
-    writeLines(hires, 2, 12, ['PLANET HAS SUPERIOR', 'TECHNOLOGY TO OURS!']);
+    // 450. "COUNTER ATTACK!!!" is printed with a trailing semicolon and GOOD LUCK follows it on
+    // the same row after a pause, three spaces along.
+    say(['PLANET HAS SUPERIOR TECHNOLOGY TO OURS!']);
     await commanderWait(state, 3000);
     if (!state.planetSurrendered) {
-      writeLines(hires, 2, 15, ['THE ENEMY HAS LAUNCHED', 'A VERY HEAVY', 'COUNTER ATTACK!!!', 'GOOD LUCK, SIR!!!']);
+      say(['THE ENEMY HAS LAUNCHED A VERY HEAVY', 'COUNTER ATTACK!!!'], 13);
+      await commanderWait(state, 1000);
+      hires.text('   GOOD LUCK, SIR!!!', 18, 14, INVERSE);
       await commanderWait(state, 2000);
     }
   }
 
-  function drawBattleFX(vp: number, sp: number, round: number): void {
-    hires.hcolor(3);
-    hires.line(10, 84, 270, 84);
-    hires.hcolor(1);
-    for (let i = 0; i < 20; i++) {
-      const gx = 10 + (round * 13 + i * 37) % 260;
-      const gy = 86 + (round * 7 + i * 23) % 34;
-      hires.hplot(gx, gy);
-    }
-    hires.hcolor(5);
-    for (let i = 0; i < 1 + (round % 3); i++) {
-      const ex = 20 + (round * 41 + i * 97) % 240;
-      const ey = 87 + (round * 19 + i * 53) % 30;
-      hires.line(ex - 2, ey, ex + 2, ey);
-      hires.line(ex, ey - 2, ex, ey + 2);
-    }
-    const pct = Math.min(100, Math.round((vp / Math.max(1, sp)) * 100));
-    hires.hcolor(1);
-    hires.line(60, 118, 220, 118);
-    hires.line(60, 118, 60, 123);
-    hires.line(220, 118, 220, 123);
-    const fill = Math.round((pct / 100) * 150);
-    const barColor = pct >= 80 ? 5 : pct >= 40 ? 6 : 1;
-    hires.hcolor(barColor);
-    for (let y = 119; y <= 122; y++) hires.line(61, y, 61 + fill, y);
-    hires.hcolor(3);
-    hires.text('SURRENDER', 31, 15);
-    hires.text(`${pct}%`, 32, 16);
-  }
-
+  // What stood here was a `drawBattleFX` of the port's own: a white rule across the box, twenty
+  // pseudo-random green dots, orange crosses, a coloured progress bar with its own frame, and a
+  // SURRENDER heading with a percentage under it. GROUND FORCES draws none of that. Its whole
+  // per-round update is line 4010 - the five numbers at HTAB 33 and the projection at VTAB 8,
+  // HTAB 18 - over the box and labels lines 110 to 145 put down once.
   let sp = state.planetVitalityLimit;
   let vp = state.planetVitality;
   // ET, line 500: `ET = PEEK(38206) * 500`. Line 570 takes some off every round and nothing
@@ -342,7 +348,6 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
   let enemyTroops = 0;
 
   for (let round = 0; round < 200; round++) {
-    drawBattleFX(vp, sp, round);
     // Lines 550-598 and 4000, in diskCombat.ts, transcribed from the listing and checked
     // against a real assault on the disk. Three things here were wrong: T2 in the losing
     // branch is a multiply, transports can go UP, and line 4000 truncates every round.
@@ -370,7 +375,9 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
     hires.text(`${Math.round(troops)}   `, 33, 6);
     hires.text(`${Math.round(tanks)}   `, 33, 7);
     hires.text(`${Math.round(missiles)}   `, 33, 8);
-    hires.text(`${ps}%   `, 18, 7);
+    // 4010's `VTAB 8: HTAB 18: PRINT PS;"%"` - row 7, beside OF SUCCESS :, not row 6 beside
+    // PROBABILITY. 145 prints PROBABILITY at VTAB 7 and OF SUCCESS : on the line after it.
+    hires.text(`${ps}%   `, 18, 8);
 
     audio.beep(200 + Math.random() * 200, 30);
     await commanderWait(state, 200);
@@ -379,25 +386,29 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
       state.planetVitality = 0;
       markPlanetConquered(state);
         hires.hcolor(3);
-        clearLines(hires, 2, 12, 30, 6);
-        writeLines(hires, 2, 12, ['THE PLANET HAS', 'SURRENDERED!'], 3);
+        // 660: `R4 = 1: GOSUB 170` then one line at column 0.
+        band();
+        say(['THE PLANET HAS SURRENDERED!']);
         glog('attack', 'victory');
         await commanderWait(state, 3000);
 
         if (state.planets.every(p => p.surrendered)) {
-          writeLines(hires, 2, 15, ['ALL SYSTEMS HAVE', 'SURRENDERED!', 'YOU HAVE WON!'], 3);
+          say(['ALL SYSTEMS HAVE SURRENDERED!', 'YOU HAVE WON!'], 14);
           glog('victory', 'all 20 systems conquered');
           await commanderWait(state, 5000);
           return scenes.run('end');
         }
 
-        writeLines(hires, 2, 12, ['TROOPS ARE NOW', 'COLLECTING LOOT.']);
+        band();
+        say(['TROOPS ARE NOW COLLECTING LOOT.']);
       await commanderWait(state, 1500);
       state.forces.troops = Math.round(troops) + troopsLeft;
       return scenes.run('collect');
     }
 
-  if (Math.round(transports) === 0) {
+  // 670 is `IF TR = 0` - the troops, not the transports. Losing every transport with troops
+  // still aboard is not how the assault ends.
+  if (Math.round(troops) === 0) {
     state.planets[state.planetIndex].groundAssaultFailed = true;
     state.forces.troopLocation = 0;
     state.forces.troopPlanetIndex = -1;
@@ -405,8 +416,8 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
     state.pendingGroundForcesDefeatPlanet = state.planetIndex;
     state.pendingGroundForcesNeedsRecovery = true;
       hires.hcolor(5);
-      clearLines(hires, 2, 12, 30, 6);
-      writeLines(hires, 2, 12, ['THE BATTLE IS LOST!', 'ALL TROOPS HAVE BEEN', 'DESTROYED!!!'], 5);
+      band();
+      say(['THE BATTLE IS LOST! ALL TROOPS', 'HAVE BEEN DESTROYED!!!']);
       glog('attack', 'defeat - troops lost');
       await commanderWait(state, 3000);
       return scenes.run('com');
@@ -415,8 +426,10 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
     const k = input.peekKey();
     if (k > 0) {
       input.clearKey();
-      const ch = String.fromCharCode(k & 0x7f).toUpperCase();
-      if (ch === 'R') {
+      // 1100 reads the key and 1110 works out which one it is - and then **1115 is `K = 82`**,
+      // unconditionally, so 1120's `IF K = 82` is always true and any key at all retreats. The
+      // port asked for R.
+      {
         state.planets[state.planetIndex].groundAssaultFailed = true;
         state.forces.troopLocation = 0;
         state.forces.troopPlanetIndex = -1;
@@ -427,8 +440,8 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
         state.pendingGroundForcesNeedsRecovery = true;
         state.forces.morale = m as 1 | 2 | 3 | 4 | 5 | 6;
         hires.hcolor(5);
-        clearLines(hires, 2, 12, 30, 6);
-        writeLines(hires, 2, 12, ['GROUND FORCES', 'RETREATING, SIR!', 'PLANET NOT SECURED!'], 5);
+        band();
+        say(['GROUND FORCES RETREATING, SIR!', 'PLANET NOT SECURED!']);
         glog('attack', 'retreat');
         await commanderWait(state, 2000);
         return scenes.run('com');
