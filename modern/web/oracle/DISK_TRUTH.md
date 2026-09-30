@@ -5311,6 +5311,31 @@ Three things had to be got right to take the capture at all, and each was wrong 
   the replay then looked as though the port were drawing eight times too much. Line 40 is the
   first thing past the loops.
 
+### S/X's burst, and a stopping point that prints
+
+S/X is EX through the looking glass. Line 5 is `HCOLOR= 0: Y1 = 20: POKE 973,255: PRINT "^L"` -
+the form feed through the character generator with the inverse flag set leaves the page solid
+white - and then lines 7 to 30 are the **same loop as EX**, drawing the same 240 segments in
+black. `sx_parity.mjs` had line 5's fill and line 40's message exact, 433 dark pixels on row 21
+either side, but of the burst it could only say that the disk's 45,481 lit pixels fell inside the
+44,970 to 45,913 the port produced over twelve random runs.
+
+The same replay as EX settles it. `oracle/probe_sxburst.mjs` takes the seed at `$00C9` as S/X
+reaches line 7 and the page either side of the loops, and `oracle/sx_burst_parity.mjs` redraws
+them: **7,771 pixels taken off on both sides, 0 of 53,760 differing.**
+
+Getting there needs 3350 - `POKE 38193,J: DMG = 0: IF J = 0 THEN PRINT "^DRUNS/X"` - so the hull
+has to reach zero through the damage tick, which means 38208 held at 0 for lines 190 and 192 to
+call 3000 at all, and 38193 held at 1 so the first hit finishes it.
+
+**And the stopping point matters more here than in EX.** Line 30 is the outer `NEXT` and comes
+round sixteen times, so line 40 is the marker - but S/X's line 40 *prints*, at `SPEED= 127`, and
+a single 60Hz frame is long enough for the first character of "YOUR SHIP HAS BEEN DESTROYED!!" to
+reach the page. The first run of this captured the **Y of YOUR** and reported it as twelve pixels
+the port had failed to draw: x 30-34, y 168-174, which is text row 21 column 4, exactly where
+line 40's `VTAB 22: HTAB 5` puts it. Stepping in thousand-cycle pieces and stopping the instant
+CURLIN reads 40 gives the page as the loops left it.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
