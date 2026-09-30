@@ -106,6 +106,143 @@ export function baseRefusal2100(g: BaseGate): string | null {
   return null;
 }
 
+// ---- 2500-2540, the repair bill --------------------------------------------------------------
+//
+// ```
+// 2500 DATA SHIELD,38200,ENERGY,38199,# 1 ENGINE,38198,# 2 ENGINE,38197,COMPUTER,38196,
+//      RADAR,38195,ENV. CONTROL,38194,HULL DMG.,38193,HYPERDRIVE,38190,MISSILES,38187,
+//      LASER,38186,NAV. COMP.,38184
+// 2505 IF PEEK(38210) = 0 OR PEEK(29469) > 22 THEN "YOU MUST LAND ON PLANET FIRST."
+// 2510 PRINT "  REPAIR SHIP": FOR J = 1 TO 12: READ A$: READ LO
+// 2520 D = PEEK(LO): IF D < 100 AND J <> 10 AND J <> 2 THEN ...
+//      CD = INT((RND(1) * 150) * (100 - ((D / 100) * 100))) ... P = P + CD: POKE LO,100
+// 2524 IF D < 63 AND J = 2 THEN D2 = 63 - D: D2 = D2 * (100 / 63)
+// 2525 IF D < 63 AND J = 2 THEN D1 = INT((D2 / 100) * 100) ...
+//      CD = INT((RND(1) * 200) * (100 - D1)) ... P = P + CD: POKE LO,63
+// 2530 IF D < 100 AND J = 10 THEN ...
+//      CD = INT((RND(1) * 100) * (100 - PEEK(LO))) ... P = P + CD: POKE LO,100
+// 2540 NEXT
+// ```
+//
+// Each RND sits inside its own THEN, so a system already at full costs no draw at all - which
+// makes the number of draws part of what a replay checks, not only their values.
+//
+// Three things here that reading the listing loosely would miss.
+//
+// - **Energy is the odd one out twice over.** It is the only system with a threshold of 63
+//   rather than 100, the only one restored to 63 rather than 100, and its cost runs the wrong
+//   way: `D1` is the damage rescaled onto 0..100 and the price is `100 - D1`, so the *worse*
+//   the energy the *cheaper* the repair. Every other system charges `100 - D`, which gets
+//   dearer the more broken it is. Confirmed on the machine, not inferred: energy at 17 gave
+//   D2 = 73.0159 and D1 = 73, and the byte came back 63.
+// - **NAV. COMP. is repaired and charged for.** It is J = 12, so it falls into 2520 with
+//   everything else. The port skipped it.
+// - **Missiles are a count, not a percentage.** J = 10 restores 38187 to 100, so the repair
+//   screen is also where the missile rack is refilled, at `RND(1) * 100` a missile short.
+
+/** 2500's DATA, in the order 2510's `FOR J = 1 TO 12` reads it. */
+export const REPAIR_SYSTEMS = [
+  { name: 'SHIELD', address: 38200 },
+  { name: 'ENERGY', address: 38199 },
+  { name: '# 1 ENGINE', address: 38198 },
+  { name: '# 2 ENGINE', address: 38197 },
+  { name: 'COMPUTER', address: 38196 },
+  { name: 'RADAR', address: 38195 },
+  { name: 'ENV. CONTROL', address: 38194 },
+  { name: 'HULL DMG.', address: 38193 },
+  { name: 'HYPERDRIVE', address: 38190 },
+  { name: 'MISSILES', address: 38187 },
+  { name: 'LASER', address: 38186 },
+  { name: 'NAV. COMP.', address: 38184 },
+] as const;
+
+/** 2505: the ship has to be down, and low enough. `29469` is the Y coordinate's low byte. */
+export function repairAvailable2505(atmosphere: boolean, yLow: number): boolean {
+  return atmosphere && yLow <= 22;
+}
+
+export interface RepairLine {
+  /** J, 1-based, as the FOR loop counts it. */
+  index: number;
+  name: string;
+  address: number;
+  /** D, the byte before the repair. */
+  before: number;
+  /** CD for this system, or 0 when it was not worth repairing and no draw was made. */
+  cost: number;
+  /** What the POKE leaves behind: 63 for energy, 100 for the rest. */
+  restoredTo: number;
+  /** Whether this system drew. */
+  drew: boolean;
+}
+
+/**
+ * One pass of 2510-2540 over all twelve systems.
+ *
+ * `values` is the twelve bytes in `REPAIR_SYSTEMS` order. Returns each line, the running total
+ * `P` that 2560 bills, and the bytes as the POKEs leave them.
+ */
+export function repairBill2500(
+  values: readonly number[],
+  rnd: () => number = Math.random,
+): { lines: RepairLine[]; total: number; after: number[] } {
+  const lines: RepairLine[] = [];
+  const after = values.slice();
+  let total = 0;
+
+  for (let i = 0; i < REPAIR_SYSTEMS.length; i++) {
+    const j = i + 1;                       // J counts from 1
+    const d = values[i] ?? 0;
+    const sys = REPAIR_SYSTEMS[i];
+    let cost = 0;
+    let restoredTo = d;
+    let drew = false;
+
+    if (j === 2) {
+      // 2524/2525. Note the price falls as the damage rises.
+      if (d < 63) {
+        const d2 = (63 - d) * (100 / 63);
+        const d1 = Math.trunc((d2 / 100) * 100);
+        cost = Math.trunc(rnd() * 200 * (100 - d1));
+        restoredTo = 63;
+        drew = true;
+      }
+    } else if (j === 10) {
+      // 2530. It re-PEEKs the byte rather than using D, which is the same value either way.
+      if (d < 100) {
+        cost = Math.trunc(rnd() * 100 * (100 - d));
+        restoredTo = 100;
+        drew = true;
+      }
+    } else if (d < 100) {
+      // 2520. `100 - ((D / 100) * 100)` is written out rather than folded to `100 - D`: the
+      // machine carries a 32-bit mantissa, so the round trip through the division is where a
+      // difference would show up if there is one.
+      cost = Math.trunc(rnd() * 150 * (100 - ((d / 100) * 100)));
+      restoredTo = 100;
+      drew = true;
+    }
+
+    if (drew) { total += cost; after[i] = restoredTo; }
+    lines.push({ index: j, name: sys.name, address: sys.address, before: d, cost, restoredTo, drew });
+  }
+  return { lines, total, after };
+}
+
+/**
+ * 2560-2610: what happens when the bill is presented.
+ *
+ * `IF CR < P THEN 2600` and answering anything but Y at 2580 both land at 2605, which makes
+ * the local government angry: 2610 pokes 38208 to 0 - the planet un-surrenders - and clears
+ * 38219 + planet. Not having the credits also zeroes them at 2602.
+ */
+export function repairPayment2560(credits: number, total: number, paying: boolean):
+  { paid: boolean; credits: number; planetLost: boolean } {
+  if (credits < total) return { paid: false, credits: 0, planetLost: true };
+  if (!paying && total > 0) return { paid: false, credits, planetLost: true };
+  return { paid: true, credits: Math.trunc(credits - total), planetLost: false };
+}
+
 /**
  * SHORE LEAVE 3000 and 3060 - the weapons, and what one costs.
  *

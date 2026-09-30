@@ -8,7 +8,8 @@ import { viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, projectCameraS
   projectWorldPointFixed, outcode67EF, clipFrustum61B7, clipEnd6979 } from '../engine/diskPipeline';
 import { projectWorldPoint as projectWorldPointFloat } from '../engine/diskProjection';
 import { soundGen9276, laser92D1, expl9276 } from '../engine/diskSound';
-import { lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS } from '../engine/diskEconomy';
+import { lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS, rollArtRate,
+  repairBill2500, repairAvailable2505, repairPayment2560, REPAIR_SYSTEMS } from '../engine/diskEconomy';
 import { combatRound550, truncate4000 } from '../engine/diskCombat';
 import { damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS,
   UNDAMAGED_SYSTEMS, spawnGroundBolt5000, stepGroundBolt5095, groundBoltSpent5095,
@@ -123,7 +124,8 @@ function boot(): void {
     viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, projectCameraSpaceBytes,
     projectWorldPointFixed, projectWorldPointFloat, outcode67EF, clipFrustum61B7, clipEnd6979,
     soundGen9276, laser92D1, expl9276,
-    lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS,
+    lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS, rollArtRate,
+    repairBill2500, repairAvailable2505, repairPayment2560, REPAIR_SYSTEMS,
     combatRound550, truncate4000,
     damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS, UNDAMAGED_SYSTEMS,
     spawnGroundBolt5000, stepGroundBolt5095, groundBoltSpent5095, groundBoltStep5090,

@@ -1,5 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
-import { lootValue2400, rollArtRate } from '../engine/diskEconomy';
+import { lootValue2400, rollArtRate, repairBill2500 } from '../engine/diskEconomy';
 import { setScene, log as glog } from '../engine/gameLog';
 import { clearPendingConquestCollection } from '../engine/commander';
 import { writeLines } from '../engine/menu';
@@ -275,69 +275,41 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
   hires.text('REPAIR SHIP', 4, 2);
   hires.hcolor(1);
 
-  const systems: [string, number, number][] = [
-    ['SHIELD', state.damage.shieldsPct, 100],
-    ['ENERGY', state.damage.powerPct, 100],
-    ['#1 ENGINE', state.damage.engine1Pct, 100],
-    ['#2 ENGINE', state.damage.engine2Pct, 100],
-    ['COMPUTER', state.damage.computerPct, 100],
-    ['RADAR', state.damage.radarPct, 100],
-    ['ENV CTRL', state.damage.envPct, 100],
-    ['HULL DMG', state.damage.hullPct, 100],
-    ['H-DRIVE', state.damage.hyperdrivePct, 100],
-    ['MISSILES', state.damage.missilePct, 100],
-    ['LASER', state.damage.laserPct, 100],
-    ['NAV COMP', 100, 100],
-  ];
+  // 2500's DATA, in the order 2510's `FOR J = 1 TO 12` reads it, mapped onto the port's
+  // fields. `repairBill2500` has the three branches: 2520 for most systems at `RND * 150`,
+  // 2525 for energy - which alone uses a threshold of 63, restores to 63, and gets *cheaper*
+  // the worse it is - and 2530 for the missile rack at `RND * 100`.
+  //
+  // Nav. comp. is 38184 and the port has no field for it; nothing in the game damages it, so
+  // it is passed as 100, which is what 2520's `IF D < 100` skips. On the disk a damaged one
+  // would be repaired and charged for like any other.
+  const dmg = state.damage;
+  const bill = repairBill2500([
+    dmg.shieldsPct, dmg.powerPct, dmg.engine1Pct, dmg.engine2Pct, dmg.computerPct,
+    dmg.radarPct, dmg.envPct, dmg.hullPct, dmg.hyperdrivePct, dmg.missilePct,
+    dmg.laserPct, 100,
+  ]);
+  const totalCost = bill.total;
+  const [shieldsAfter, powerAfter, engine1After, engine2After, computerAfter, radarAfter,
+    envAfter, hullAfter, hyperdriveAfter, missileAfter, laserAfter] = bill.after;
+  dmg.shieldsPct = shieldsAfter;
+  dmg.powerPct = powerAfter;
+  dmg.engine1Pct = engine1After;
+  dmg.engine2Pct = engine2After;
+  dmg.computerPct = computerAfter;
+  dmg.radarPct = radarAfter;
+  dmg.envPct = envAfter;
+  dmg.hullPct = hullAfter;
+  dmg.hyperdrivePct = hyperdriveAfter;
+  dmg.missilePct = missileAfter;
+  dmg.laserPct = laserAfter;
 
-  let totalCost = 0;
+  // 2520-2530 each print the system and the percentage it was at before the repair.
   let row = 4;
-
-  for (const [name, pct, max] of systems) {
-    if (pct < max && name !== 'NAV COMP') {
-      const dmgFrac = (max - pct) / max;
-      let cost = 0;
-      if (name === 'ENERGY') {
-        const d2 = (100 - pct);
-        cost = Math.floor((Math.random() * 200) * (100 - d2));
-        state.damage.powerPct = 100;
-      } else if (name === 'MISSILES') {
-        cost = Math.floor((Math.random() * 100) * (100 - pct));
-        state.damage.missilePct = 100;
-      } else if (name === 'SHIELD') {
-        cost = Math.floor((Math.random() * 150) * dmgFrac * 100);
-        state.damage.shieldsPct = 100;
-      } else if (name === '#1 ENGINE') {
-        cost = Math.floor((Math.random() * 150) * dmgFrac * 100);
-        state.damage.engine1Pct = 100;
-      } else if (name === '#2 ENGINE') {
-        cost = Math.floor((Math.random() * 150) * dmgFrac * 100);
-        state.damage.engine2Pct = 100;
-      } else if (name === 'COMPUTER') {
-        cost = Math.floor((Math.random() * 150) * dmgFrac * 100);
-        state.damage.computerPct = 100;
-      } else if (name === 'RADAR') {
-        cost = Math.floor((Math.random() * 150) * dmgFrac * 100);
-        state.damage.radarPct = 100;
-      } else if (name === 'ENV CTRL') {
-        cost = Math.floor((Math.random() * 150) * dmgFrac * 100);
-        state.damage.envPct = 100;
-      } else if (name === 'HULL DMG') {
-        cost = Math.floor((Math.random() * 150) * dmgFrac * 100);
-        state.damage.hullPct = 100;
-      } else if (name === 'H-DRIVE') {
-        cost = Math.floor((Math.random() * 150) * dmgFrac * 100);
-        state.damage.hyperdrivePct = 100;
-      } else if (name === 'LASER') {
-        cost = Math.floor((Math.random() * 150) * dmgFrac * 100);
-        state.damage.laserPct = 100;
-      }
-      totalCost += cost;
-      if (row < 18) {
-        hires.text(`${name}: ${Math.round(pct)}%`, 2, row);
-        row++;
-      }
-    }
+  for (const line of bill.lines) {
+    if (!line.drew || row >= 18) continue;
+    hires.text(`${line.name}: ${Math.round(line.before)}%`, 2, row);
+    row++;
   }
 
   state.damage.laserOperational = state.damage.laserPct >= 10;
@@ -391,7 +363,8 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
     }
   }
 
-  await buyWeapons(ctx);
+  // BUY WEAPONS is not part of REPAIR/RESTOCK, whatever the menu calls it: the only GOSUB 3000
+  // on the disk is at 2290, inside ENLIST TROOPS, so it is called from there instead.
 
   hires.hcolor(5);
   hires.text('PRESS ANY KEY...', 2, 20);
@@ -509,6 +482,9 @@ async function enlistTroops(ctx: SceneContext, scenes: SceneManager): Promise<vo
     state.forces.troops = Math.min(20000, state.forces.troops + en);
     state.credits = Math.floor(state.credits - en);
     glog('enlist', `troops=+${en} credits=${state.credits}`);
+    // 2290 `TR = TR + EN: CR = CR - EN: GOSUB 3000` - paying the troops is what takes you to
+    // the weapons, and 3060's prices are drawn there.
+    await buyWeapons(ctx);
   }
 
   hires.hcolor(5);

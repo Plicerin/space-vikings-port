@@ -3886,6 +3886,82 @@ take shields off.
 gives 20 hits, 6 batteries destroyed - 5240's 30% - with the hull, radar, engines, computer and
 laser all still at 100.
 
+### SHORE LEAVE's prices
+
+Four of SHORE LEAVE's screens draw, and this file quoted the listing for them for a long time
+without ever running it. `oracle/probe_rndprices.mjs` drives all four and records every draw with
+the executing line; `replay_parity.mjs` then replays them through the port's own
+`repairBill2500`, `weaponCost3060`, `lootValue2400` and `baseCost2170`.
+
+| | |
+| --- | --- |
+| the repair bill, all twelve systems, to the credit | **12 of 12** |
+| the total the bill comes to | **58017 against 58017** |
+| what each system is poked back to | **12 of 12** |
+| draws the repair takes | **12 of 12** |
+| the four weapon prices at 3060 | **4 of 4** |
+| the loot sale at 2400 | **55014 against 55014** |
+| a base at 2170 | **37914 against 37914**, and the untruncated product too |
+
+**The value a line computes is not visible at the draw that made it**, so the probe stops on the
+line after each one and reads the variable. That is forced rather than convenient: `2080`, the
+routine that clears the screen, is `FOR C = 2 TO 13: ... NEXT` and **leaves C = 14 behind**, and
+3020 calls it before every one of 3060's four prices. Reading C one draw later gives 14 every
+time, which is exactly what the first recording showed.
+
+#### The repair bill, 2500-2540
+
+```
+2500 DATA SHIELD,38200,ENERGY,38199,# 1 ENGINE,38198,# 2 ENGINE,38197,COMPUTER,38196,
+     RADAR,38195,ENV. CONTROL,38194,HULL DMG.,38193,HYPERDRIVE,38190,MISSILES,38187,
+     LASER,38186,NAV. COMP.,38184
+2520 D = PEEK(LO): IF D < 100 AND J <> 10 AND J <> 2 THEN
+     CD = INT((RND(1) * 150) * (100 - ((D / 100) * 100))) ... POKE LO,100
+2524 IF D < 63 AND J = 2 THEN D2 = 63 - D: D2 = D2 * (100 / 63)
+2525 IF D < 63 AND J = 2 THEN D1 = INT((D2 / 100) * 100)
+     CD = INT((RND(1) * 200) * (100 - D1)) ... POKE LO,63
+2530 IF D < 100 AND J = 10 THEN CD = INT((RND(1) * 100) * (100 - PEEK(LO))) ... POKE LO,100
+```
+
+Each RND is inside its own THEN, so a system already at full costs no draw at all - which makes
+the **number** of draws part of what is checked, not only their values.
+
+- **Energy is the odd one out three times over.** Its threshold is 63 rather than 100, it is
+  restored to **63** rather than 100, and its price runs backwards: `D1` is the damage rescaled
+  onto 0..100 and the cost is `100 - D1`, so the *worse* the energy the *cheaper* the repair.
+  Every other system charges `100 - D` and gets dearer as it breaks. Read off the machine, not
+  inferred: energy at 17 gave D2 = 73.0159, D1 = 73, and the byte came back 63.
+- **NAV. COMP. is repaired and charged for.** It is J = 12, so 2520 takes it with the rest. The
+  port skipped it outright.
+- **Missiles are a count, not a percentage.** J = 10 restores 38187 to 100, so the repair screen
+  is also where the missile rack is refilled.
+- **`100 - ((D / 100) * 100)` is not obviously `100 - D`** on a machine carrying a 32-bit
+  mantissa. It came out exact for all ten systems tested, so the round trip through the division
+  does not move INT - at least for these values.
+
+#### Where BUY WEAPONS actually lives
+
+Not in REPAIR/RESTOCK, whatever the menu calls it. The only `GOSUB 3000` on the disk is at
+**2290, inside ENLIST TROOPS**: `TR = TR + EN: CR = CR - EN: GOSUB 3000`. Paying for troops is
+what takes you to the weapons. The port had it hanging off the repair screen. 3060 is
+`C = INT((RND(1) + .2) * 4 * MU(J1 + 1))` with MU = 50, 75, 40, 30 for fighters, transports,
+tanks and missiles, so the four prices run 40-240, 60-360, 32-192 and 24-144.
+
+#### What the port had
+
+`lootValue2400`, `baseCost2170` and `weaponCost3060` were already right and the replay confirms
+them on the values. The repair was not: it gated energy at 100 instead of 63, computed
+`100 - (100 - pct)` where the disk computes `100 - INT((63 - D) * (100 / 63))`, restored energy
+to 100 instead of 63, and left nav. comp. out. `shoreLeave.ts` now calls `repairBill2500`, and
+`buyWeapons` has moved to the enlist path. Driven through the running game: every system comes
+back at 100 with energy at 63, the bill is charged, and the four weapon prices appear after
+enlisting.
+
+Left alone as gates rather than prices: **2210's once-per-trip flag on enlisting** (38389, which
+2285 clears again when the troop count is refused) has no equivalent in the port's state, and
+neither does 2106's 38149 on building a base, which `baseRefusal2100` already takes as an
+argument but nothing supplies.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -3918,9 +3994,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
-- **Replaying the rest.** The damage tick, the combat, COLLECT's thirteen loot draws and line
-  5000's ground fire are replayed and exact. SHORE LEAVE's base and weapon prices are the last
-  thing still checked by range rather than by replay.
+- **Replaying is done.** The damage tick, the combat, COLLECT's thirteen loot draws, line
+  5000's ground fire and all four of SHORE LEAVE's price screens are replayed and exact.
+  Nothing RND-driven is still checked by range alone.
 - **The game logic is done.** The economy, GROUND FORCES' combat, the damage model, the
   weapons and all five of RECALL's branches have been run against the disk, and there is no
   enemy AI to do. What is left of the BASIC is COLLECT's tech-1 path and two of SHORE LEAVE's

@@ -370,7 +370,131 @@ if (fs.existsSync(groundFile)) {
   }
 }
 
-const total = bad + (combatBad ?? 0) + (lootBad ?? 0) + (groundBad ?? 0);
+// ---- SHORE LEAVE's prices -------------------------------------------------------------------
+//
+// Four screens draw: the repair bill at 2520-2530, a weapon's price at 3060, the art in a loot
+// sale at 2400, and a base at 2170. This drives the port's own `repairBill2500`,
+// `weaponCost3060`, `lootValue2400` and `baseCost2170` with the machine's recomputed draws.
+//
+// The value a line computes is not visible at the draw that made it, so probe_rndprices.mjs
+// stops on the line just after each one and reads the variable. It has to: `2080`, which clears
+// the screen, is `FOR C = 2 TO 13: ... NEXT` and leaves **C = 14** behind, and 3020 calls it
+// before every one of 3060's four prices - so reading C at the next draw would give 14 every
+// time rather than the previous price.
+const priceFile = 'captured/replay/prices.json';
+let priceBad = null;
+if (fs.existsSync(priceFile)) {
+  const S = JSON.parse(fs.readFileSync(priceFile, 'utf8'));
+  const C = S.calls;
+  const at = (line) => C.map((c, k) => (c.line === line ? k : -1)).filter((k) => k >= 0);
+  const repairIdx = C.map((c, k) => ([2520, 2525, 2530].includes(c.line) ? k : -1)).filter((k) => k >= 0);
+  const weaponIdx = at(3060);
+  const lootIdx = at(2400);
+  const baseIdx = at(2170);
+  const nSys = S.systems.length;
+
+  const b5 = await chromium.launch({ headless: true });
+  const p5 = await b5.newPage();
+  await p5.goto(PORT_URL, { waitUntil: 'load' });
+  await p5.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.repairBill2500),
+    null, { timeout: 30000 });
+
+  const out = await p5.evaluate(({ calls, repairIdx, weaponIdx, lootIdx, baseIdx, values, counts }) => {
+    const sv = window.__spaceVikings;
+    const drawn = calls.map((c) => sv.rndEFAE(c.seed, c.a4).value);
+    const from = (at) => {
+      let k = at;
+      const f = () => drawn[k++];
+      f.used = () => k - at;
+      return f;
+    };
+    const rRepair = from(repairIdx[0]);
+    const repair = sv.repairBill2500(values, rRepair);
+    const weapons = weaponIdx.map((k, n) =>
+      sv.weaponCost3060(sv.WEAPONS[n].unit, from(k)));
+    const rLoot = from(lootIdx[0]);
+    const loot = sv.lootValue2400(counts, sv.rollArtRate(rLoot));
+    const rBase = from(baseIdx[0]);
+    const base = sv.baseCost2170(rBase);
+    return { repair, repairUsed: rRepair.used(), weapons, loot, base,
+      drawnBase: [drawn[baseIdx[0]], drawn[baseIdx[0] + 1]] };
+  }, {
+    calls: C.map((c) => ({ seed: c.seed, a4: c.a4 })),
+    repairIdx, weaponIdx, lootIdx, baseIdx,
+    // the twelve system bytes as they stood at the first repair draw
+    values: C[repairIdx[0]].bytes.slice(0, nSys),
+    // the thirteen cargo counters as they stood at 2400's draw
+    counts: C[lootIdx[0]].bytes.slice(nSys),
+  });
+  await b5.close();
+
+  priceBad = 0;
+  const bad = (why) => { priceBad++; return '   ' + why; };
+
+  // Each system's own cost comes out of P, which the recording carries at every draw: P at one
+  // draw is the running total before it, so the differences are the individual bills.
+  const pAt = repairIdx.map((k) => C[k].vars.P ?? 0);
+  const machineCost = repairIdx.map((k, n) =>
+    (n + 1 < pAt.length ? pAt[n + 1] : S.repairEnd.P) - pAt[n]);
+
+  console.log('');
+  console.log('SHORE LEAVE, the repair bill at 2520-2530:');
+  console.log('   J  system          was  restored     disk cost    port cost');
+  S.systems.forEach(([name], n) => {
+    const line = out.repair.lines[n];
+    const want = machineCost[n];
+    const okCost = line.cost === want;
+    const okByte = line.restoredTo === S.repairEnd.bytes[n];
+    if (!okCost) bad('cost');
+    if (!okByte) bad('byte');
+    console.log(`  ${String(n + 1).padStart(2)}  ${name.padEnd(14)} ${String(line.before).padStart(4)}` +
+      `   ${String(line.restoredTo).padStart(4)}      ${String(want).padStart(9)}` +
+      `    ${String(line.cost).padStart(9)}` +
+      `${okCost && okByte ? '' : '   DIFFERS'}`);
+  });
+  const okTotal = out.repair.total === S.repairEnd.P;
+  if (!okTotal) bad('total');
+  const okDraws = out.repairUsed === repairIdx.length;
+  if (!okDraws) bad('draws');
+  console.log(`  the bill: ${out.repair.total} against the machine's ${S.repairEnd.P}` +
+    `${okTotal ? '' : '   DIFFERS'}`);
+  console.log(`  draws taken: ${out.repairUsed} against ${repairIdx.length} on the machine` +
+    `${okDraws ? '' : '   DIFFERS'}  - energy at 63 or better and missiles at 100 cost nothing`);
+
+  console.log('');
+  console.log("the weapon prices at 3060, and 2080's leftover C:");
+  const NAMES = ['FIGHTERS', 'TRANSPORTS', 'TANKS', 'MISSILES'];
+  NAMES.forEach((nm, n) => {
+    const want = S.weaponPrices[n] ? S.weaponPrices[n].C : null;
+    const ok = out.weapons[n] === want;
+    if (!ok) bad('weapon');
+    console.log(`  ${nm.padEnd(12)} disk ${String(want).padStart(5)}   port ` +
+      `${String(out.weapons[n]).padStart(5)}${ok ? '' : '   DIFFERS'}`);
+  });
+
+  const okLoot = out.loot === S.lootValue;
+  if (!okLoot) bad('loot');
+  console.log('');
+  console.log(`the loot sale at 2400: disk ${S.lootValue}, port ${out.loot}` +
+    `${okLoot ? '' : '   DIFFERS'}  - twelve fixed rates and one drawn, doubled at 2406`);
+
+  // 2110 prints INT(C) and then assigns it, so the machine's C is caught before the truncation.
+  const okBase = out.base === Math.trunc(S.baseCost);
+  if (!okBase) bad('base');
+  const exact = 20000 + (out.drawnBase[0] * 5000) * (out.drawnBase[1] * 10);
+  const okExact = Math.abs(exact - S.baseCost) <= 1e-4 * S.baseCost;
+  if (!okExact) bad('base exact');
+  console.log(`a base at 2170: disk ${S.baseCost} -> ${Math.trunc(S.baseCost)}, port ` +
+    `${out.base}${okBase ? '' : '   DIFFERS'}  - two draws, ${okExact ? 'and the untruncated ' +
+    'product agrees too' : 'BUT THE UNTRUNCATED PRODUCT DIFFERS'}`);
+
+  console.log('');
+  console.log(priceBad === 0
+    ? 'every price on all four screens predicted from the seed'
+    : `${priceBad} price check(s) differ`);
+}
+
+const total = bad + (combatBad ?? 0) + (lootBad ?? 0) + (groundBad ?? 0) + (priceBad ?? 0);
 console.log('');
 console.log(total === 0 ? 'replay: clean' : `replay: ${total} differ`);
 process.exit(total === 0 ? 0 : 1);
