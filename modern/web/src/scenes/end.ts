@@ -71,7 +71,15 @@ export async function endScene(ctx: SceneContext, scenes: SceneManager): Promise
     const k = await input.waitForKey();
     const c = String.fromCharCode(k & 0x7f);
 
-    // 70: anything outside 1-3 redraws from line 30.
+    // 70 is `GET C` - a **numeric** GET, so a digit outside 1-3 redraws from line 30 and a
+    // letter does not: Applesoft's number parser throws, line 0's `ONERR GOTO 63999` catches
+    // it, and 63999 is `PRINT "^DINT"`, which drops the machine to the BASIC prompt with the
+    // program stopped. Measured on the machine - pressing A leaves CURLIN at 63999 and the game
+    // is over (oracle/probe_endmenu.mjs).
+    //
+    // This is one of the few places the port cannot follow the disk: there is no interpreter
+    // prompt to fall to, and turning a mistyped key into a quit would be worse than the
+    // divergence. Every key loops here.
     if (c !== '1' && c !== '2' && c !== '3') continue;
 
     if (c === '1') {
@@ -82,7 +90,11 @@ export async function endScene(ctx: SceneContext, scenes: SceneManager): Promise
       continue;
     }
     if (c === '2') {
-      // 110-120
+      // 110-120: `POKE 38391,77: PRINT "^DRUNGALAXY MAP"`. It does not go to the map - the
+      // sentinel makes GALAXY MAP line 2 fire before line 5 draws anything, so the gauges are
+      // repainted and the simulator takes over. The port sets the same byte and lets the map
+      // scene do the same thing.
+      state.savedGameSentinel = 77;
       glog('end', 'continue');
       return scenes.run('galaxyMap');
     }

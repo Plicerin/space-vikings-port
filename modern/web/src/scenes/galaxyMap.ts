@@ -216,6 +216,21 @@ export async function galaxyMapScene(ctx: SceneContext, scenes: SceneManager): P
   }
   if (!shapes) return scenes.run('com');
 
+  // Line 2: `IF PEEK(38391) = 77 THEN POKE 38391,0: GOSUB 5000: POKE -16300,0: RUN STARSHIP
+  // SIMULATOR`. The saved-game sentinel is tested before line 5 draws anything, so on that path
+  // the map never appears at all - it paints the eight gauge bars and goes straight to flight.
+  // Measured: END's `2) CONTINUE PRESENT GAME` runs GALAXY MAP and comes out in the simulator
+  // without the map ever showing (oracle/probe_endmenu.mjs).
+  //
+  // Line 1 is the same test with 38388 also at 7, which goes to COM instead; that is the path
+  // out of the map's own key handler below, and it is taken there rather than here.
+  if (state.savedGameSentinel === 77) {
+    state.savedGameSentinel = 0;
+    drawGaugeBars(hires, gaugeStateFromGame(state), 'plot');   // GOSUB 5000
+    glog('galaxyMap', 'saved-game sentinel: straight to flight');
+    return scenes.run('starshipSimulator');
+  }
+
   const d = galaxyMapDataFrom(state);
   let px = 140;
   let py = 75;

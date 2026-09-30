@@ -5336,6 +5336,38 @@ the port had failed to draw: x 30-34, y 168-174, which is text row 21 column 4, 
 line 40's `VTAB 22: HTAB 5` puts it. Stepping in thousand-cycle pieces and stopping the instant
 CURLIN reads 40 gives the page as the loops left it.
 
+### END, and two lines the screen cannot show
+
+`end_parity.mjs` has END's menu exact at 0 of 53,760 pixels. Two of its lines do things a
+picture cannot show, and `oracle/probe_endmenu.mjs` put both to the machine.
+
+**`2) CONTINUE PRESENT GAME` does not go to the galaxy map.** Line 120 is
+`POKE 38391,77: PRINT "^DRUNGALAXY MAP"`, and 38391 is the saved-game sentinel, so GALAXY MAP
+line 2 fires before line 5 draws anything:
+
+    2 IF PEEK(38391) = 77 THEN POKE 38391,0: GOSUB 5000: POKE - 16300,0: PRINT "^DRUN STARSHIP SIMULATOR"
+
+Measured: `END -> GALAXY MAP -> STARSHIP SIMULATOR`, with the map never appearing. It paints the
+eight gauge bars through `GOSUB 5000` and hands straight back to flight. The port was showing the
+map. The fix is in GALAXY MAP rather than in END, because the same test catches the other way in
+- INSTRUMENTS 220 runs GALAXY MAP with the sentinel set on a resumed save, and that has to end in
+flight too. Line 1 is the same test with 38388 also at 7, which goes to COM instead; that is the
+path out of the map's own key handler and is taken there.
+
+**And line 70's `GET C` is a numeric GET.** A digit outside 1 to 3 redraws from line 30, as the
+listing says - but a letter does not. Applesoft's number parser throws, line 0's
+`ONERR GOTO 63999` catches it, and 63999 is `PRINT "^DINT"`, which drops the machine to the BASIC
+prompt with the program stopped. Measured: pressing A leaves CURLIN at 63999 and the game is
+over.
+
+This is one of the few places the port deliberately does not follow the disk. There is no
+interpreter prompt to fall to, and turning a mistyped key into a quit would be worse than the
+divergence, so every key loops. It is written down here rather than quietly smoothed over.
+
+A note on running two tests on one machine: they cannot share it. The letter test ends the
+program, so anything pressed afterwards goes to the BASIC prompt rather than to line 70's GET -
+the first run of this probe did exactly that and reported CONTINUE as going nowhere.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
