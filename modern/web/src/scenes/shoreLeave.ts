@@ -557,8 +557,10 @@ async function cryogenics(ctx: SceneContext, scenes: SceneManager): Promise<void
 
   drawShoreLeaveFrame(hires);
 
-  hires.hcolor(3);
-  hires.text('CRYOGENICS', 4, 2);
+  // 4000 prints no title - `R = 7: GOSUB 2080: VTAB 4: IF PEEK(38166) = 1 OR ...` goes straight
+  // to the message. The CRYOGENICS heading that stood here was the port's, and it was invisible
+  // to `shoreleave_parity.mjs` because that calls `drawShoreLeaveCryogenics`, which never had
+  // one - the scene was adding it on top.
   hires.hcolor(1);
 
   const loc = state.forces.troopLocation;

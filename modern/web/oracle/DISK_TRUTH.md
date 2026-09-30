@@ -5428,6 +5428,48 @@ Checked in play: R from flight now keeps the panel and blanks the two readouts, 
 brings up LIGHT CRUISER's identification, X from flight returns to flight, and COM's option 3
 returns to COM.
 
+### Driving the scenes, not the draw functions
+
+Two harnesses in this directory have now been green while the game was broken, for the same
+reason both times. `radar_parity.mjs` draws `drawInstruments` itself before calling
+`drawRadarScreen`, so it could not see that the scene began with `hires.hgr()`.
+`shoreleave_parity.mjs` calls `drawShoreLeaveCryogenics`, which has no title, so it could not see
+that the **scene** was printing a `CRYOGENICS` heading over it. A parity harness tells you a draw
+function is right. It does not tell you the scene calls it that way.
+
+`probe_transitions.mjs` was the one harness that walked the game instead, and it is the one that
+found the instrument panel and the computer submenu. So it has been extended from five steps to
+**twenty-six** - every menu screen the opening state can reach without a base, loot or damage:
+
+    flight, COM, the computer submenu, the galaxy directory, the galaxy map, STATUS's two pages,
+    SUPPLY's two pages, RADAR, the ship identification, GROUND FORCES, CRYOGENICS and END
+
+Everything is compared except the three screens that move: the flight view, the galaxy map with
+its cursor toggling, and the return to flight. Text row 23 is left out everywhere - it is line
+155's live position, and `probe_comreadouts.mjs` and the panel's own captures check what belongs
+there.
+
+**Twenty-one of the twenty-three compared screens are exact.** The two that are not are the same
+radar screen, 171 pixels, all of it in rows 0-123 - the star projection `radar_parity.mjs`
+measures separately at 98.7%. Its panel is exact.
+
+Four things the route found that nothing else could:
+
+- **The galaxy directory's `2) RETURN` never returns.** Line 969 is `R = 2: GOSUB 20: GOTO 810`,
+  and that GOSUB does not come back: 20 floods and clears, 29 blanks the column, and 35's
+  `IF R = 1 THEN R = 0: RETURN` does not fire because R is **2**. It falls straight through 40 to
+  120 and COM's main menu takes over, so the `GOTO 810` is dead and the navigation menu it names
+  is never shown. Leaving the directory gives COM's main screen - 11,698 lit, the same as
+  arriving from flight - whichever menu it was entered from.
+- **RADAR 2005 puts the whole instrument panel back.** `CALL 24576: CALL 37936` does more than
+  clear the view: the radar screen has the three needles at their flight positions - SX 73 from
+  `13 + S/2`, TX 140, EX 262 from `199 + E` - even though COM line 8 swept two of those tracks on
+  the way in, and its gauge bars are in $9602's store form rather than the one GALAXY MAP's 5500
+  plots. That difference then rides all the way to END, which is how it showed up as the same 81
+  pixels on six consecutive screens.
+- the `CRYOGENICS` heading the scene was adding, and
+- the `hires.hgr()` at the top of the radar scene.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

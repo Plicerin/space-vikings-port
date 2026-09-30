@@ -47,18 +47,20 @@ const shots = await page.evaluate(async (steps) => {
 
   const out = [];
   for (const s of steps) {
-    if (s.key !== null) await press(s.key, 600);
-    else await new Promise((r) => setTimeout(r, 600));
+    if (s.key !== null) await press(s.key, 800);
+    else await new Promise((r) => setTimeout(r, 800));
     // Settle on the drawing, not on a timer: a scene that is still painting gives a count that
     // looks like a missing screen. Wait for two equal snapshots in a row, up to four seconds.
     let last = -1;
     let stable = 0;
-    for (let n = 0; n < 40; n++) {
+    // Some of these scenes fetch a table before they draw - the radar and the ship
+    // identification both do - so the wait has to outlast a load, not just a paint.
+    for (let n = 0; n < 90; n++) {
       await new Promise((r) => setTimeout(r, 100));
       const lit = sv.hires.snapshot().on.reduce((a, b) => a + (b ? 1 : 0), 0);
       if (lit === last) stable++; else stable = 0;
       last = lit;
-      if (stable >= 4) break;
+      if (stable >= 5) break;
     }
     out.push({ label: s.label, scene: sceneNow(), on: grab() });
   }
@@ -80,17 +82,19 @@ const litIn = (on, from, to) => {
 
 // The flight view moves every frame, and the galaxy map's cursor toggles, so those two are
 // reported rather than required. The menus and reports are static and are compared outright.
-const COMPARE = new Set(['flight -> COM', 'COM -> computer', 'galaxy map -> COM',
-  'computer -> status', 'status -> on']);
+// Everything is compared except the three screens that move: the flight view, which never
+// repeats, and the galaxy map, whose cursor is toggling over it.
+const MOVES = new Set(['in flight', 'computer -> galaxy map', 'end -> flight']);
 
 // Text row 23, y 184 to 191, is STARSHIP SIMULATOR line 155's five numbers - INT(X/2),
 // INT(Y/2), INT(Z/2) and the two headings. They are the ship's live position, and the two
-// machines are not at the same point in the same flight, so the digits there are never going
-// to agree. The row is left out of the count on the steps that carry it, and what is left is
-// the drawing. The panel it sits in is compared in full.
+// machines are not at the same point in the same flight, so the digits there are never going to
+// agree. It is left out everywhere: on the screens reached through INSTRUMENTS, RE, ORBIT or
+// RADAR the row is blank on both sides anyway, so the only thing excluding it costs is the one
+// place it could never have passed. What is in that row is checked instead by
+// `probe_comreadouts.mjs` and by the panel's own captures.
 const LIVE_READOUT = { from: 184, to: 191 };
-const skipped = (label, y) => (label === 'flight -> COM' || label === 'COM -> computer')
-  && y >= LIVE_READOUT.from && y <= LIVE_READOUT.to;
+const skipped = (label, y) => y >= LIVE_READOUT.from && y <= LIVE_READOUT.to;
 
 console.log(`${golden.steps.length} steps along the same route`);
 console.log('');
@@ -107,7 +111,7 @@ golden.steps.forEach((g, i) => {
   }
   const panelWant = litIn(want, 124, HGR_H - 1);
   const panelGot = litIn(got, 124, HGR_H - 1);
-  const compared = COMPARE.has(g.label);
+  const compared = !MOVES.has(g.label);
   const ok = compared ? diff === 0 : true;
   if (!ok) failures++;
   results.push({ label: g.label, chain: g.chain, diskLit: g.lit, portLit: litIn(got, 0, HGR_H - 1),
@@ -125,7 +129,7 @@ const diffOf = new Map();
 console.log('');
 console.log('  where the difference is, by row band (disk / port / differing):');
 golden.steps.forEach((g, i) => {
-  if (!COMPARE.has(g.label)) return;
+  if (MOVES.has(g.label)) return;
   const want = diskOf(g);
   const got = Uint8Array.from(shots[i].on);
   const cells = BANDS.map(([name, a, b]) => {

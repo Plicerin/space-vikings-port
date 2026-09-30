@@ -1,6 +1,7 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { log as glog } from '../engine/gameLog';
-import { getPanelShapes } from './instruments';
+import { getPanelShapes, drawInstruments, drawGaugeBars, gaugeStateFromGame,
+  drawPanelNeedles } from './instruments';
 import { eraseComNeedleTracks } from './com';
 import { parseShipBytecode, projectShipWorld, drawShipWorld } from '../engine/shipBytecode';
 import type { ShipBytecodeOp } from '../engine/shipBytecode';
@@ -108,12 +109,25 @@ export async function radarScene(ctx: SceneContext, scenes: SceneManager): Promi
     /* no table: the reticle still draws, with nothing behind it */
   }
 
-  // No hgr(). 2005's `CALL 24576: CALL 37936` redraw the view, and nothing in RADAR touches
-  // rows 124-191 - the instrument panel is flight's and stays put. Clearing the page took it
-  // away, which is what playing it showed; the parity harness never saw it because it draws
-  // `drawInstruments` itself before calling in here.
+  // No hgr(). 2005 is `CALL 24576: CALL 37936`, and between them they clear the view and put
+  // the **whole instrument panel back** - which is not obvious from the listing and is plain in
+  // the capture: the radar screen has the three needles at their flight positions, SX 73 from
+  // `13 + S/2`, TX 140 and EX 262 from `199 + E`, even though COM line 8 swept two of those
+  // tracks on the way in, and its gauge bars are in $9602's store form rather than the one
+  // GALAXY MAP's 5500 plots. Nothing in RADAR touches rows 124-191 afterwards.
   hires.hcolor(0);
   for (let y = 0; y <= 123; y++) hires.hlin(0, 279, y);
+  const panelShapes = getPanelShapes();
+  drawInstruments(hires, { gauges: false });
+  drawGaugeBars(hires, gaugeStateFromGame(state), 'store');
+  if (panelShapes) {
+    drawPanelNeedles(hires, panelShapes, {
+      bank: state.bank,
+      pitch: state.pitch,
+      speed: Math.max(0, Math.min(120, Math.round(state.speed))),
+      energy: Math.round(state.energy),
+    });
+  }
   drawRadarScreen(hires, ops, radarCamera(state));
   // 2010: `VTAB 24: HTAB 1: PRINT <18 spaces>;: HTAB 26: PRINT <13 spaces>;` - the same two
   // blanks RE and ORBIT make, over line 155's readouts.
@@ -130,8 +144,7 @@ export async function radarScene(ctx: SceneContext, scenes: SceneManager): Promi
   }
 
   // 2057, on the X path only: the needle-track erase.
-  const shapes = getPanelShapes();
-  if (shapes) eraseComNeedleTracks(hires, shapes);
+  if (panelShapes) eraseComNeedleTracks(hires, panelShapes);
 
   // 2058 and 2059: back to COM only if COM sent us here, otherwise to flight.
   if (state.radarFromCom) {

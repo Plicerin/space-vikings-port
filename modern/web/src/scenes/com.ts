@@ -342,7 +342,13 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
           break;
         case 2:
           await galaxyDirectory(ctx);
-          continue computerMenu;
+          // 969's `R = 2: GOSUB 20: GOTO 810` - and that GOSUB never comes back. 20 floods and
+          // clears, 29 blanks the column, and 35's `IF R = 1 THEN R = 0: RETURN` does not fire
+          // because R is **2**, so it falls straight through 40 to 120 and COM's main menu takes
+          // over. The `GOTO 810` is never reached. Leaving the directory lands on the main menu
+          // whichever menu it was entered from - measured, 11,698 lit, the same screen as
+          // arriving from flight.
+          continue mainMenu;
         case 3:
           glog('com', 'galaxy map');
           return scenes.run('galaxyMap');
@@ -371,7 +377,7 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
 
         if (navChoice === 1) {
           await galaxyDirectory(ctx);
-          continue navMenu;
+          continue mainMenu;   // 969, the same abandoned GOSUB
         }
         if (navChoice === 3) {
           continue computerMenu;

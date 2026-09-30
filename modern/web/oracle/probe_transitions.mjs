@@ -25,7 +25,7 @@ const textOf = (name) => {
     .map((l) => `${l.num} ${l.text}`).join('\n');
 };
 const PROGRAMS = ['STARSHIP SIMULATOR', 'COM', 'GALAXY MAP', 'INSTRUMENTS', 'RADAR', 'STATUS',
-  'SUPPLY', 'GROUND FORCES', 'SHORE LEAVE'];
+  'SUPPLY', 'GROUND FORCES', 'SHORE LEAVE', 'END', 'RECALL', 'SHIP # 3 I.D.'];
 const TEXTS = Object.fromEntries(PROGRAMS.map((n) => [n, textOf(n)]));
 
 const a2 = await openOracle();
@@ -122,13 +122,47 @@ const steps = [];
 // The flight screen never repeats, so it gets a fixed settle rather than a stable one.
 for (let i = 0; i < 20; i++) await a2.frames(10);
 steps.push(await step('in flight', null, { settle: 1, tries: 2, settlePixels: false }));
+
+// The route. Every menu screen the opening state can reach without a base, loot or damage -
+// which is the point of this file: a draw function can be right while the scene that calls it
+// is not, and only walking the game finds that out.
+//
+// Two of these are worth knowing about before reading the results.
+//
+// The galaxy directory's own `2) RETURN` is line 969, `R = 2: GOSUB 20: GOTO 810` - and that
+// GOSUB never comes back. Line 20 floods and clears, 29 blanks the column, and 35's
+// `IF R = 1 THEN R = 0: RETURN` does not fire because R is **2**, so it falls straight through
+// 40 to 120 and COM's main menu takes over. The `GOTO 810` is never reached and the navigation
+// menu it names is never shown. Measured: leaving the directory gives COM's main screen, 11,698
+// lit, the same as arriving from flight.
+//
+// And RADAR's 2056 sends any key but X to the ship's identification screen, which is the only
+// way to reach it at all.
 steps.push(await step('flight -> COM', 'C'));
+steps.push(await step('COM -> computer', '1'));
+steps.push(await step('computer -> directory', '2'));
+steps.push(await step('directory -> return', '2'));
 steps.push(await step('COM -> computer', '1'));
 steps.push(await step('computer -> galaxy map', '3'));
 steps.push(await step('galaxy map -> COM', ' '));
 steps.push(await step('COM -> computer', '1'));
 steps.push(await step('computer -> status', '4'));
-steps.push(await step('status -> on', ' '));
+steps.push(await step('status -> troops', ' '));
+steps.push(await step('status -> COM', ' '));
+steps.push(await step('COM -> computer', '1'));
+steps.push(await step('computer -> supply', '5'));
+steps.push(await step('supply -> page 2', ' '));
+steps.push(await step('supply -> COM', ' '));
+steps.push(await step('COM -> radar', '3'));
+steps.push(await step('radar -> ship id', 'Z'));
+steps.push(await step('ship id -> radar', ' '));
+steps.push(await step('radar -> COM', 'X'));
+steps.push(await step('COM -> ground forces', '2'));
+steps.push(await step('ground -> cryogenics', '8'));
+steps.push(await step('cryogenics -> ground', null, { settle: 18 }));
+steps.push(await step('ground -> COM', '9'));
+steps.push(await step('COM -> end', '4'));
+steps.push(await step('end -> flight', '2', { settlePixels: false, settle: 30 }));
 await a2.close();
 
 fs.mkdirSync('captured/transitions', { recursive: true });
