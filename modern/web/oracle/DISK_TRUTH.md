@@ -3175,15 +3175,49 @@ nothing and avoids inventing a limit the routine does not have.
 
 The one that differs, `[68,96]` to `[82,110]`, needs `sx` of 82 and `sy` of 110. `$691E`
 clamps x to +/-69 and y to +/-62 before `$68A1` adds the offsets, so the renderer cannot
-produce it; the sweep generated it. Inside the reachable box, off the page or on it, the
-line routine is exact.
+produce it; the sweep generated it. Inside the reachable box the line routine is exact **on page
+2** - which, it turns out, is not the same as exact.
+
+#### The wrap leaves the page
+
+Everything above compares page 2. `oracle/probe_line6dd5wrap.mjs` asks whether `$6DD5` ever
+stores outside it, by diffing all of `$0800-$BFFF` rather than the page alone. It does.
+
+A row of 255 - which is what `95 - y` gives for `sy` 96 - indexes the row table at `$6B92` at
+entry 62, well past its 24 entries, and the two bytes it finds there (4 and 4) put the address
+at `$20xx`. That is hi-res **page 1**: the page being displayed while the renderer draws into
+page 2.
+
+| | |
+| --- | --- |
+| pairs in the 370 sweep that wrote into page 1 | **15** |
+| of those, pairs `$68A1` can produce | **11** |
+| bytes each one puts there | **2**, one at `$20xx` and one at `$3Bxx` |
+
+So this is not confined to contrived endpoints. `[0,34]` to `[-69,96]` is an ordinary long
+diagonal, and `sy` 96 is `y/z` of 1 - exactly what a clipped endpoint produces, which is to say
+the common case rather than a rare one. Every such line drops two bytes onto the displayed page.
+
+The port's `Hires` holds one page, so it drops those two stores, and that is why page 2 comes
+out exact for all 366 reachable pairs while this went unnoticed: **no harness was looking
+anywhere else.** The sweep is part of `line6dd5_parity.mjs`'s report now, so the number is
+tracked rather than rediscovered.
+
+What is not settled is whether the specks are ever seen. Line 147 alternates the pages through
+`$7315` and sets `$7317`/`$7319` to the other one, and line 150 calls `$9023`, so a page written
+by accident this frame is the page drawn into next. Whether anything clears it first has not
+been traced.
 
 ### What is still not done
 
-The renderer is done. Transform, scale, frustum, clipping, projection, the line routine, its
-address arithmetic and the display list are all read from the disk rather than fitted, and the
-ship, the starfield and the ground each agree with the machine on every pixel in every state
-that has been captured.
+The renderer is done on the page it draws into. Transform, scale, frustum, clipping,
+projection, the line routine, its address arithmetic and the display list are all read from the
+disk rather than fitted, and the ship, the starfield and the ground each agree with the machine
+on every pixel of page 2 in every state that has been captured.
+
+The one thing measured and not reproduced is `$6DD5` storing **outside** page 2: a line with an
+endpoint at `sy` 96 puts two bytes into page 1, and 11 of the 370 sweep pairs that `$68A1` can
+produce do it. The port models one page and drops them. See *The wrap leaves the page*.
 
 Five display-list opcodes - `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` - are read now, and
 none of the four models on the disk uses any of them: they are a page select, a draw-or-erase

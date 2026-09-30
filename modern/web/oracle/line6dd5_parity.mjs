@@ -93,3 +93,30 @@ for (const w of worst.slice(0, 8)) {
     `${String(w.disk).padStart(5)} ${String(w.port).padStart(5)} ${String(w.both).padStart(7)}` +
     (w.wrap ? '   (off the page)' : '') + (w.reach ? '' : '   ($68A1 cannot produce this)'));
 }
+
+// ---- and where the stores actually land ------------------------------------------------------
+//
+// Everything above compares page 2. probe_line6dd5wrap.mjs asks a different question: whether
+// $6DD5 ever stores outside it. It does. A line with an endpoint at sy 96 - row 255 once
+// `95 - y` has been applied, which is exactly what a clipped endpoint gives, since y/z of 1 is
+// sy 96 - puts two bytes into hi-res **page 1**, the page being displayed while the renderer
+// draws into page 2.
+const wrapFile = 'captured/line6dd5wrap/golden.json';
+if (fs.existsSync(wrapFile)) {
+  const w = JSON.parse(fs.readFileSync(wrapFile, 'utf8'));
+  const leaks = (w.sweep || []).filter((r) => r.leaked);
+  const inReach = (x, y) => x >= -69 && x <= 69 && y >= -28 && y <= 96;
+  const reachableLeaks = leaks.filter((r) => inReach(r.ax, r.ay) && inReach(r.bx, r.by));
+  console.log('');
+  console.log('  stores outside page 2:');
+  console.log(`    pairs that wrote into page 1        ${leaks.length} of ${(w.sweep || []).length}`);
+  console.log(`    ...of them, ones $68A1 can produce  ${reachableLeaks.length}`);
+  const detail = (w.pairs || []).filter((p) => p.label === 'reachable, leaks');
+  for (const d of detail) {
+    const out = (d.touched || []).filter(([a]) => a < 0x4000 || a >= 0x6000);
+    console.log(`    [${d.a}] -> [${d.b}]: ${out.length} byte(s) into page 1` +
+      (out.length ? ` at ${out.map(([a]) => '$' + a.toString(16).toUpperCase()).join(', ')}` : ''));
+  }
+  console.log('    the port models one page, so it drops those - which is why page 2 above is');
+  console.log('    exact for all 366 and this is reported rather than counted as a failure');
+}
