@@ -11,6 +11,7 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 
 const PORT_URL = process.env.PORT_URL || 'http://localhost:4545/';
+let failures = 0;
 const golden = JSON.parse(fs.readFileSync('captured/galaxymap/golden.json', 'utf8'));
 const tableJson = JSON.parse(fs.readFileSync('../public/data/shapes/shape-table.json', 'utf8'));
 
@@ -111,3 +112,67 @@ if (golden.cursor.points) {
   if (missing.length) console.log(`    missing: ${missing.join(' ')}`);
   if (extra.length) console.log(`    extra:   ${extra.join(' ')}`);
 }
+
+// ---- the cursor over something -----------------------------------------------------------
+//
+// The check above draws the cursor on a blank page, which tests its shape and nothing else: at
+// the paddles' resting position its thirteen pixels land on no lit map pixel, so a DRAW and an
+// XDRAW are indistinguishable there. probe_galaxycursor.mjs drives the paddles onto a star
+// instead and records what the machine did, so the two can finally be told apart.
+const cursorFile = 'captured/galaxycursor/golden.json';
+if (fs.existsSync(cursorFile)) {
+  const gc = JSON.parse(fs.readFileSync(cursorFile, 'utf8'));
+  const b3 = await chromium.launch({ headless: true });
+  const p3 = await b3.newPage();
+  await p3.goto(PORT_URL, { waitUntil: 'load' });
+  await p3.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.eraseGalaxyCursor3210),
+    null, { timeout: 30000 });
+  const out = await p3.evaluate(({ tj, without, px, py, w }) => {
+    const sv = window.__spaceVikings;
+    const shapes = sv.decodeShapeTableJson(tj);
+    const build = () => {
+      const c = document.createElement('canvas');
+      c.width = 560; c.height = 384;
+      const h = new sv.Hires(c);
+      h.hgr();
+      h.hcolor(3);
+      for (let i = 0; i < without.length; i++) if (without[i]) h.hplot(i % w, (i / w) | 0);
+      return h;
+    };
+    const a = build();
+    sv.drawGalaxyCursor(a, shapes, px, py);
+    const b = build();
+    sv.drawGalaxyCursor(b, shapes, px, py);
+    sv.eraseGalaxyCursor3210(b, shapes, px, py);
+    return { drawn: Array.from(a.snapshot().on), selected: Array.from(b.snapshot().on) };
+  }, { tj: tableJson, without: gc.without, px: gc.px, py: gc.py, w: HGR_W });
+  await b3.close();
+
+  const tally = (got) => {
+    let on = 0;
+    let off = 0;
+    for (let i = 0; i < gc.without.length; i++) {
+      if ((got[i] ? 1 : 0) === (gc.without[i] ? 1 : 0)) continue;
+      if (got[i]) on++; else off++;
+    }
+    return { on, off };
+  };
+  const drew = tally(out.drawn);
+  const sel = tally(out.selected);
+  console.log('');
+  console.log(`the cursor at PX ${gc.px}, PY ${gc.py}, sitting on a star:`);
+  console.log(`  3120's XDRAW   disk ${gc.draw.on} on / ${gc.draw.off} off` +
+    `   port ${drew.on} on / ${drew.off} off` +
+    `${drew.on === gc.draw.on && drew.off === gc.draw.off ? '' : '   DIFFERS'}`);
+  if (gc.select) {
+    console.log(`  3210's black DRAW   disk ${gc.select.on} on / ${gc.select.off} off` +
+      `   port ${sel.on} on / ${sel.off} off` +
+      `${sel.on === gc.select.on && sel.off === gc.select.off ? '' : '   DIFFERS'}`);
+  }
+  if (drew.on !== gc.draw.on || drew.off !== gc.draw.off) failures++;
+  if (gc.select && (sel.on !== gc.select.on || sel.off !== gc.select.off)) failures++;
+}
+
+console.log('');
+console.log(failures === 0 ? 'galaxy map parity: clean' : `galaxy map parity: ${failures} check(s) failed`);
+process.exit(failures === 0 ? 0 : 1);

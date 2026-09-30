@@ -4271,7 +4271,7 @@ them in three shapes, and only the first is now settled:
 | EX 6 | five shapes, once, over the flight view | measured and exact |
 | STARSHIP SIMULATOR 1100, 1200-1222 | the missile flashes | measured: they leave the page unchanged, see below |
 | STARSHIP SIMULATOR 1010/1060, 5090/5095, 5250 | draw, move, draw again to erase | harmless: the port re-renders each frame |
-| GALAXY MAP 3120/3200 | the cursor, toggled forever | the port draws it rather than inverting |
+| GALAXY MAP 3120/3200 | the cursor, toggled forever | measured on a star and exact, see below |
 
 ### The missile flashes leave nothing behind
 
@@ -4312,6 +4312,50 @@ Three things this took, none of them guessable from the listing:
   ship, and the hit needs a restart on top of that; both in one session left the second case
   never reaching its line.
 
+### The galaxy map cursor, on a star
+
+```
+3110 PX = PDL(0) * 1.19: PY = PDL(1) ... clamps ...
+3120 XDRAW 12 AT PX,PY
+3130 IF PEEK(-16287) > 127 THEN 3210
+3200 XDRAW 12 AT PX,PY: GOTO 3110
+3210 HCOLOR= 0: DRAW 12 AT PX,PY
+```
+
+The port drew the cursor, on the reasoning that over the map's black background a DRAW and an
+XDRAW come to the same thing. **At the paddles' resting position that is true** - the thirteen
+cursor pixels at PX 148.75, PY 125 land on no lit map pixel at all - which is exactly why the
+capture already in the tree could never have told the two apart. The cursor roams x 10-270 and
+y 10-145 though, and that is where the stars are.
+
+`oracle/probe_galaxycursor.mjs` drives the paddles onto one and measures:
+
+| | pixels on | pixels off |
+| --- | --- | --- |
+| 3120's XDRAW, cursor over a star | 11 | **2** |
+| 3210's black DRAW, against the clean map | 0 | **2** |
+
+Two pixels going dark under the cursor is something a DRAW cannot do. And **3210 is not an
+XDRAW**: 3130 jumps there with the cursor still on the screen and `HCOLOR= 0: DRAW 12` paints it
+black rather than toggling it off, so picking a star leaves a cursor-shaped hole wherever it
+overlapped. The hole stays until 3270's `GOTO 3000` repaints the map.
+
+`drawGalaxyCursor` now XDRAWs, `eraseGalaxyCursor3210` does 3210's black draw, and the scene
+paints the map **once** and toggles the cursor over it instead of repainting every pass - which
+is what had been hiding both effects. `galaxymap_parity.mjs` checks them against the machine:
+11 on / 2 off and 0 on / 2 off, both exact.
+
+Two things about aiming, neither guessable:
+
+- **A star is not drawn where 3230 looks for it.** The hit test is
+  `INT(PX / 10) <= X(P) + 1 ...`, but 3215 has already done `PX = PX + 35` by then, so reading
+  the star bytes and aiming at `(X * 10, Y * 5)` puts the cursor 35 pixels off and over nothing.
+  Aiming at a pixel that is actually lit on the captured page needs no mapping at all.
+- **Calibrate below the clamp.** The paddle-to-PX scale is solved from two samples, and 3110's
+  `IF PY > 145 THEN PY = 145` means a sample taken high reads back clamped. Calibrating from
+  0.5 and 0.8 gave a slope fitted to a flat line and sent the cursor to PY 0; 0.2 and 0.5 put it
+  where it was asked for.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -4327,9 +4371,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **GALAXY MAP 3120/3200's cursor** is XDRAWn on and XDRAWn off forever, so it inverts what it
-  sits on. The port draws it instead, which differs wherever it crosses a star. It is excluded
-  from `galaxymap_parity.mjs`, so nothing measures it either way.
 - **COLLECT's tech 1 path.** Lines 840-900, including the line 880 silver bug, have never
   been run - every assault reached so far has been tech 3.
 - **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read

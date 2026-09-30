@@ -112,7 +112,14 @@ export function drawGalaxyMap(hires: H, shapes: ShapeTable, d: GalaxyMapData): v
 }
 
 /**
- * Line 3120's XDRAW 12. Over the map's black background that is a plain draw.
+ * Line 3120's XDRAW 12, and 3200 XDRAWs it away again.
+ *
+ * This used to be a plain draw, on the reasoning that the map's background is black. It is
+ * black at the paddles' resting position - the thirteen cursor pixels land on nothing there,
+ * which is why the existing capture could never tell a DRAW from an XDRAW - but the cursor
+ * roams x 10-270 and y 10-145, which is where the stars are. Driven onto one
+ * (`oracle/probe_galaxycursor.mjs`): **11 pixels on and 2 off**, and a DRAW cannot turn a
+ * pixel off.
  *
  * PX is a float - line 3110 is `PX = PDL(0) * 1.19` - and Applesoft truncates the AT
  * coordinates to integers before drawing. Passing the float through and letting each plotted
@@ -123,6 +130,22 @@ export function drawGalaxyCursor(hires: H, shapes: ShapeTable, px: number, py: n
   r.rot = 0;
   r.scale = 1;
   hires.hcolor(3);
+  r.xdraw(shapes, 11, Math.trunc(px), Math.trunc(py));
+}
+
+/**
+ * Line 3210, which is **not** an XDRAW: `HCOLOR= 0: DRAW 12 AT PX,PY`.
+ *
+ * 3130 jumps here with the cursor still on the screen, and painting it black forces those
+ * pixels dark rather than restoring what was under them. So selecting a star leaves a small
+ * cursor-shaped hole wherever it overlapped the map - measured against the clean map: 0 pixels
+ * on, **2 off**, and they stay gone until 3270's `GOTO 3000` redraws the whole thing.
+ */
+export function eraseGalaxyCursor3210(hires: H, shapes: ShapeTable, px: number, py: number): void {
+  const r = new ShapeRenderer(hires);
+  r.rot = 0;
+  r.scale = 1;
+  hires.hcolor(0);
   r.draw(shapes, 11, Math.trunc(px), Math.trunc(py));
 }
 
@@ -196,44 +219,61 @@ export async function galaxyMapScene(ctx: SceneContext, scenes: SceneManager): P
   let px = 140;
   let py = 75;
 
+  // The map is drawn once and the cursor is toggled over it, the way 3000-3100 and then
+  // 3110-3200 do it. Redrawing the map on every pass - which is what this used to do - hides
+  // both of the cursor's effects: the star pixels it inverts while it sits on one, and the hole
+  // 3210 leaves when a star is picked. 3270's `GOTO 3000` is the only thing that repaints.
   for (;;) {
     drawGalaxyMap(hires, shapes, d);
-    drawGalaxyCursor(hires, shapes, px, py);
-    const k = await input.waitForKey();
-    const ch = String.fromCharCode(k & 0x7f).toUpperCase();
 
-    if (ch === ' ') {
-      glog('galaxyMap', 'return');
-      return scenes.run('com');
-    }
+    for (;;) {
+      drawGalaxyCursor(hires, shapes, px, py);           // 3120
+      const k = await input.waitForKey();
+      const ch = String.fromCharCode(k & 0x7f).toUpperCase();
 
-    if (ch === 'I') py -= 5;
-    else if (ch === 'M') py += 5;
-    else if (ch === 'J') px -= 5;
-    else if (ch === 'K') px += 5;
-    else if (k === 13) {
-      const p = starUnderCursor(d.stars, px, py);
-      hires.hcolor(5);
-      if (p === 0) {
-        // 3240
-        hires.text('THERE IS NO STAR SYSTEM THERE, SIR.', 2, 22);
-        await new Promise((res) => setTimeout(res, 1200));
-        continue;
-      }
-      const s = d.stars[p - 1];
-      // 3250, 3320
-      hires.text(`STAR SYSTEM : ${STAR_NAMES[p - 1]}`, 2, 22);
-      hires.text(`LOC. : ${s.x} ${s.y} ${s.z} : DISTANCE = ${lightYears(d.stars, d.here, p)} L/Y`, 2, 23);
-      // 3260
-      hires.text('DO YOU WISH FURTHER INFORMATION?', 2, 24);
-      const a = await input.waitForKey();
-      if (String.fromCharCode(a & 0x7f).toUpperCase() === 'Y') {
-        state.commanderMapTarget = p - 1;
-        glog('galaxyMap', `info on ${STAR_NAMES[p - 1]}`);
+      if (ch === ' ') {
+        glog('galaxyMap', 'return');
         return scenes.run('com');
       }
-      continue;
+
+      if (ch === 'I' || ch === 'M' || ch === 'J' || ch === 'K') {
+        drawGalaxyCursor(hires, shapes, px, py);         // 3200, the same XDRAW taking it off
+        if (ch === 'I') py -= 5;
+        else if (ch === 'M') py += 5;
+        else if (ch === 'J') px -= 5;
+        else px += 5;
+        const c = clampCursor(px, py);
+        px = c.px;
+        py = c.py;
+        continue;
+      }
+
+      if (k === 13) {
+        eraseGalaxyCursor3210(hires, shapes, px, py);   // 3210
+        const p = starUnderCursor(d.stars, px, py);
+        hires.hcolor(5);
+        if (p === 0) {
+          // 3240, which goes back to 3110 without repainting
+          hires.text('THERE IS NO STAR SYSTEM THERE, SIR.', 2, 22);
+          await new Promise((res) => setTimeout(res, 1200));
+          continue;
+        }
+        const s = d.stars[p - 1];
+        // 3250, 3320
+        hires.text(`STAR SYSTEM : ${STAR_NAMES[p - 1]}`, 2, 22);
+        hires.text(`LOC. : ${s.x} ${s.y} ${s.z} : DISTANCE = ${lightYears(d.stars, d.here, p)} L/Y`, 2, 23);
+        // 3260
+        hires.text('DO YOU WISH FURTHER INFORMATION?', 2, 24);
+        const a = await input.waitForKey();
+        if (String.fromCharCode(a & 0x7f).toUpperCase() === 'Y') {
+          state.commanderMapTarget = p - 1;
+          glog('galaxyMap', `info on ${STAR_NAMES[p - 1]}`);
+          return scenes.run('com');
+        }
+        // 3270: `VTAB 21: PRINT ...: GOTO 3000` - answering anything but Y repaints the whole
+        // map, which is what takes 3210's hole away again.
+        break;
+      }
     }
-    ({ px, py } = clampCursor(px, py));
   }
 }
