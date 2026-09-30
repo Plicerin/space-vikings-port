@@ -676,7 +676,15 @@ const enemy = spawnEnemy(state);
 
       hires.hgr();
 
-      if (state.atmosphere) {
+      // In atmosphere the original draws the planet's ground wireframe - the same display
+      // list `ground_parity.mjs` checks at 100% - through the same renderer as the starfield.
+      // `renderStarfield` already picks `groundOps` over `starOps` when atmosphere is set, and
+      // it was unreachable: this branch sent every atmospheric frame to drawBombardmentView
+      // instead, which draws an invented dotted frame and a point cloud from a bitmap that is
+      // null in normal play. Flying in air showed an empty box. Found by playing it.
+      if (state.atmosphere && groundOps) {
+        renderStarfield(cam);
+      } else if (state.atmosphere) {
         drawBombardmentView(
           hires,
           state,
