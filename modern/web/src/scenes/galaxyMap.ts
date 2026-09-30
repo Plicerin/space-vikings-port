@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { drawInstruments } from './instruments';
 import { setScene, log as glog } from '../engine/gameLog';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import type { ShapeTable } from '../engine/shapeTable';
@@ -232,7 +233,19 @@ export async function galaxyMapScene(ctx: SceneContext, scenes: SceneManager): P
       const ch = String.fromCharCode(k & 0x7f).toUpperCase();
 
       if (ch === ' ') {
+        // 3125 is `IF PEEK(-16384) > 127 THEN POKE 38391,77: POKE 38388,7: RUN INSTRUMENTS`,
+        // so a key press does not go to COM: it runs INSTRUMENTS, which repaints the panel;
+        // 210 finds 38391 at 77 and falls through to 220's `RUN GALAXY MAP`; and line 1 finds
+        // 38391 = 77 with 38388 = 7 and runs COM. Three programs, and the middle one redraws
+        // the bottom of the screen.
+        //
+        // Measured on the machine (oracle/probe_comband.mjs): the map's caption band is 703
+        // lit pixels in rows 152-191 and COM shows 1808 there with only 203 in common, so the
+        // panel really is painted over it. Going straight to COM left the map's "PRESS SPACE
+        // TO RETURN" sitting under COM's menu, which is what playing it showed.
         glog('galaxyMap', 'return');
+        hires.hgr();
+        drawInstruments(hires);
         return scenes.run('com');
       }
 

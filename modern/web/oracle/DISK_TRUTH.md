@@ -4662,6 +4662,41 @@ This was found by playing rather than by a harness, and it is the sort of thing 
 would have found: every capture is a single screen, and a clock that never ticks looks exactly
 like a clock in a screenshot.
 
+### Leaving the galaxy map goes through INSTRUMENTS
+
+Playing the port, leaving the map left its bottom band - "GALAXY MAP" and "--PRESS SPACE TO
+RETURN--" and the rule above them - sitting under COM's menu. COM line 20 floods only rows
+0-123, so nothing it draws would cover rows 152-191, and the residue looked as though it might
+be what the disk does too.
+
+The disk does not go straight there. GALAXY MAP 3125 is
+
+```
+IF PEEK(-16384) > 127 THEN POKE -16368,0: POKE 38391,77: POKE 38388,7: RUN INSTRUMENTS
+```
+
+so a key press runs **INSTRUMENTS**, which repaints the panel; INSTRUMENTS 210 finds 38391 at 77
+and so does not run the simulator, falling through to 220's `RUN GALAXY MAP`; and GALAXY MAP
+line 1 finds 38391 = 77 with 38388 = 7 and runs COM. Three programs to get from the map to the
+menu, and the middle one draws the whole bottom of the screen.
+
+`oracle/probe_comband.mjs` watches it happen and counts the rows the band occupies:
+
+| | |
+| --- | --- |
+| programs on the way | GALAXY MAP -> **INSTRUMENTS** -> GALAXY MAP -> COM |
+| rows 152-191 on the map | 703 pixels lit |
+| rows 152-191 in COM | 1808 pixels lit |
+| of the map's band, still lit in COM | 203 |
+
+So the bottom is repainted and what is there in COM is the instrument panel, not the caption.
+The port now draws the panel on the way out, and the COM screen that follows is the full one -
+command menu, damage control and panel - rather than a menu over the map's leftovers.
+
+This is the third thing in a row that only playing found. A screen capture of COM matches the
+disk perfectly either way, because the capture is of COM reached from *flight*; it is the
+transition that was wrong, and nothing here captures transitions.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
