@@ -960,7 +960,14 @@ const enemy = spawnEnemy(state);
     }
 
   function onMissileHit(isHit: boolean) {
-  // STARSHIP_SIM:1085-1088, 1200
+  // STARSHIP_SIM:1085-1088, 1200-1222.
+  //
+  // The original's flash leaves nothing behind. 1200 and 1100 are both wrapped in
+  // `FOR X0 = 1 TO 2`, so every shape at every scale and rotation is XDRAWn an even number of
+  // times, and XDRAW is its own inverse. Measured on the machine at entry and at the RETURN
+  // (`oracle/probe_destructionflash.mjs`): 0 pixels on and 0 off, both for a hit and a miss.
+  // So a transient flash that restores the page is the faithful thing, which is what the
+  // `flashes` entry below is - not a shape that has to be drawn and then undrawn.
   if (isHit) {
     glog('hit', `missile shipVit=${state.shipVitality}`);
     flashes.push({ timer: 0.3, type: 'explosion' });

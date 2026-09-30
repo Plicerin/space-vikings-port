@@ -4269,9 +4269,48 @@ them in three shapes, and only the first is now settled:
 | where | what | how it stands |
 | --- | --- | --- |
 | EX 6 | five shapes, once, over the flight view | measured and exact |
-| STARSHIP SIMULATOR 1100, 1200, 1220, 1222 | the same shapes when a ship is destroyed | the port does not draw them at all |
+| STARSHIP SIMULATOR 1100, 1200-1222 | the missile flashes | measured: they leave the page unchanged, see below |
 | STARSHIP SIMULATOR 1010/1060, 5090/5095, 5250 | draw, move, draw again to erase | harmless: the port re-renders each frame |
 | GALAXY MAP 3120/3200 | the cursor, toggled forever | the port draws it rather than inverting |
+
+### The missile flashes leave nothing behind
+
+```
+1085 IF HIT = 1 THEN GOSUB 1200: J1 = 10: J2 = 120: GOSUB 1535: GOTO 1090
+1088 GOSUB 1100
+```
+
+so a missile that connects flashes at 1200-1222 and one that misses flashes at 1100. 5250 calls
+1100 as well, when the ship's return fire kills a ground battery. Both are wrapped in
+`FOR X0 = 1 TO 2`, so every shape at every scale and rotation is XDRAWn an **even** number of
+times - and XDRAW is its own inverse.
+
+That reading predicts the page comes back exactly as it was. `oracle/probe_destructionflash.mjs`
+captures it at the moment the subroutine is entered and again at the moment it returns:
+
+| | steps | pixels on | pixels off |
+| --- | --- | --- | --- |
+| 1100, a miss | 277,121 | **0** | **0** |
+| 1200-1222, a hit | 564,005 | **0** | **0** |
+
+So these are pure flicker, and the port having no shapes for them is right in every way a pixel
+comparison can see. What it owes the original is a **transient** flash that restores the page,
+which is what `cockpit.ts`'s `flashes` entry already is.
+
+Three things this took, none of them guessable from the listing:
+
+- **The boundary is the RETURN, not a change of line number.** Both subroutines `GOSUB 4100`
+  partway through, so watching for a line outside their own numbers stops after 1,477
+  instructions and measures nothing. Run to the caller's line instead - 1085 for the hit, 1088
+  for the miss - and the same flash takes 277,121 and 564,005.
+- **`X`, `Y` and `Z` are frozen.** Line 8 reads the ship position out of 29467/29469/29471 once,
+  and **nothing on the disk jumps back to line 8**. So 1050's box test and 192's damage box both
+  compare against wherever the ship was when STARSHIP SIMULATOR last started, and poking the
+  position bytes mid-flight changes nothing. Arranging a hit means poking them and restarting
+  the simulator through COM's RETURN so line 8 reads them again.
+- **One case per machine.** Firing twenty missiles to find a miss empties the rack and moves the
+  ship, and the hit needs a restart on top of that; both in one session left the second case
+  never reaching its line.
 
 ### What this leaves the predicates for
 
@@ -4288,11 +4327,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **The other XDRAWs.** EX line 6 is done, below. STARSHIP SIMULATOR 1100/1200/1220/1222 flash
-  the same shapes over the flight view when a ship is destroyed and the port does not draw them
-  at all; 1010/1060 and 5090/5095 are draw-then-erase pairs, where collapsing XDRAW to DRAW is
-  harmless because the port re-renders each frame; and GALAXY MAP 3120/3200 toggle the cursor,
-  which the port draws rather than inverts.
+- **GALAXY MAP 3120/3200's cursor** is XDRAWn on and XDRAWn off forever, so it inverts what it
+  sits on. The port draws it instead, which differs wherever it crosses a star. It is excluded
+  from `galaxymap_parity.mjs`, so nothing measures it either way.
 - **COLLECT's tech 1 path.** Lines 840-900, including the line 880 silver bug, have never
   been run - every assault reached so far has been tech 3.
 - **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read
