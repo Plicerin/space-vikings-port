@@ -4697,6 +4697,59 @@ This is the third thing in a row that only playing found. A screen capture of CO
 disk perfectly either way, because the capture is of COM reached from *flight*; it is the
 transition that was wrong, and nothing here captures transitions.
 
+### Transitions, which nothing here was capturing
+
+Every capture in this directory is of **one screen reached one way**. Three bugs in a row turned
+out to live in the getting there instead:
+
+- the ground wireframe was never drawn, because the atmosphere branch called something else
+- the stardate never advanced, because only a jump moves it and nothing did
+- the galaxy map's caption sat under COM, because the disk goes through INSTRUMENTS
+
+`com_parity.mjs` matches the disk on every one of 34,720 pixels and could not have caught the
+last of those: its capture is of COM reached from **flight**.
+
+So `oracle/probe_transitions.mjs` walks a route on the machine and captures the page after each
+step, with the programs each step ran, and `oracle/transition_parity.mjs` drives the port along
+the same route and compares. Two things about driving it are worth keeping:
+
+- **A key must be held longer than a pass.** STARSHIP SIMULATOR samples the keyboard once at
+  line 200 and a pass is about half a second, so `a2.key`'s four-frame default is a race. The
+  first run lost every press to it. Forty frames is reliable.
+- **Settling has to be on a program this file recognises.** "(other)" is DOS part way through a
+  load; treating that as settled sends the next key into a program that is not listening, and
+  the route went to RADAR instead of the galaxy map. And the settle has to outlast an
+  intermediate program - INSTRUMENTS runs for about a second between the map and COM.
+
+The route, and what the disk runs along it:
+
+| step | programs |
+| --- | --- |
+| flight -> COM | STARSHIP SIMULATOR -> COM |
+| COM -> computer | COM |
+| computer -> galaxy map | COM -> GALAXY MAP |
+| galaxy map -> COM | **INSTRUMENTS -> GALAXY MAP -> COM** |
+| computer -> status | COM -> STATUS |
+
+**The harness does not pass, and that is the result.** It reports three distinct gaps:
+
+| step | disk lit | port lit | differing | |
+| --- | --- | --- | --- | --- |
+| computer -> galaxy map | 1514 | 1520 | 20 | the cursor, not compared |
+| computer -> status | 32991 | 32954 | **63** | a few characters |
+| flight -> COM | 11698 | 10664 | **2690** | the panel: 3241 against 2207 |
+| COM -> computer | 11862 | 3853 | **11893** | most of the screen |
+
+- **The central computer submenu is nearly empty in the port** - 3,853 lit against 11,862. It is
+  a screen no capture here covers, so nothing was measuring it.
+- **The panel drawn on entering COM from flight is short by about a thousand pixels** (2207
+  against 3241). After the galaxy map round trip the port draws 2993 against 3030, so the panel
+  it puts up through `drawInstruments` is close and the one it puts up coming from flight is not.
+- **STATUS is 63 pixels out**, which is a handful of characters somewhere.
+
+None of those is fixed here. The point of this entry is that they are now measured and named
+rather than waiting for someone to notice them while playing.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

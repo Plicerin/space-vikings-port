@@ -1,0 +1,121 @@
+// The port's screens across scene changes, against the disk's.
+//
+// `probe_transitions.mjs` walks a route on the machine and captures the page after each step.
+// This drives the port along the same route and compares. It is the check the rest of this
+// directory does not make: every other harness captures one screen reached one way, and the last
+// three bugs found were all in the getting there - the ground wireframe with nothing calling it,
+// a stardate nothing advanced, and the galaxy map's caption left under COM because the disk goes
+// through INSTRUMENTS and the port went straight across.
+//
+// The flight view is not compared pixel for pixel. It moves every frame and the two machines are
+// not in step; what is compared there is the panel, which is static.
+import { chromium } from 'playwright';
+import { HGR_W, HGR_H, toPng } from './hgr.mjs';
+import fs from 'fs';
+
+const PORT_URL = process.env.PORT_URL || 'http://localhost:4545/';
+const golden = JSON.parse(fs.readFileSync('captured/transitions/golden.json', 'utf8'));
+
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage();
+const errors = [];
+page.on('pageerror', (e) => errors.push(e.message));
+await page.goto(PORT_URL, { waitUntil: 'load' });
+await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.hires),
+  null, { timeout: 30000 });
+
+// Drive it the way a player would: synthetic key events, and read the page out of the Hires the
+// game is actually drawing into.
+const shots = await page.evaluate(async (steps) => {
+  const sv = window.__spaceVikings;
+  const press = (key, ms) => new Promise((res) => {
+    const code = /^[0-9]$/.test(key) ? 'Digit' + key
+      : key === ' ' ? 'Space' : 'Key' + key.toUpperCase();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key, code, bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key, code, bubbles: true }));
+    setTimeout(res, ms);
+  });
+  const sceneNow = () => {
+    const l = window.__gameLog.getLog();
+    return l.length ? l[l.length - 1].scene : '?';
+  };
+  const grab = () => Array.from(sv.hires.snapshot().on);
+
+  // through the title screens to the cockpit
+  for (let i = 0; i < 7; i++) await press('N', 700);
+  await new Promise((r) => setTimeout(r, 1500));
+
+  const out = [];
+  for (const s of steps) {
+    if (s.key !== null) await press(s.key, 600);
+    else await new Promise((r) => setTimeout(r, 600));
+    // Settle on the drawing, not on a timer: a scene that is still painting gives a count that
+    // looks like a missing screen. Wait for two equal snapshots in a row, up to four seconds.
+    let last = -1;
+    let stable = 0;
+    for (let n = 0; n < 40; n++) {
+      await new Promise((r) => setTimeout(r, 100));
+      const lit = sv.hires.snapshot().on.reduce((a, b) => a + (b ? 1 : 0), 0);
+      if (lit === last) stable++; else stable = 0;
+      last = lit;
+      if (stable >= 4) break;
+    }
+    out.push({ label: s.label, scene: sceneNow(), on: grab() });
+  }
+  return out;
+}, golden.steps.map((s) => ({ label: s.label, key: s.key })));
+await browser.close();
+for (const e of errors.slice(0, 3)) console.log('page error:', e);
+
+const diskOf = (step) => {
+  const on = new Uint8Array(HGR_W * HGR_H);
+  for (const [x, y] of step.points) on[y * HGR_W + x] = 1;
+  return on;
+};
+const litIn = (on, from, to) => {
+  let n = 0;
+  for (let y = from; y <= to; y++) for (let x = 0; x < HGR_W; x++) if (on[y * HGR_W + x]) n++;
+  return n;
+};
+
+// The flight view moves every frame, and the galaxy map's cursor toggles, so those two are
+// reported rather than required. The menus and reports are static and are compared outright.
+const COMPARE = new Set(['flight -> COM', 'COM -> computer', 'galaxy map -> COM',
+  'computer -> status', 'status -> on']);
+
+console.log(`${golden.steps.length} steps along the same route`);
+console.log('');
+console.log('  step                        disk lit   port lit   differing   verdict');
+let failures = 0;
+const results = [];
+golden.steps.forEach((g, i) => {
+  const want = diskOf(g);
+  const got = Uint8Array.from(shots[i].on);
+  let diff = 0;
+  for (let k = 0; k < want.length; k++) if ((want[k] ? 1 : 0) !== (got[k] ? 1 : 0)) diff++;
+  const panelWant = litIn(want, 124, HGR_H - 1);
+  const panelGot = litIn(got, 124, HGR_H - 1);
+  const compared = COMPARE.has(g.label);
+  const ok = compared ? diff === 0 : true;
+  if (!ok) failures++;
+  results.push({ label: g.label, chain: g.chain, diskLit: g.lit, portLit: litIn(got, 0, HGR_H - 1),
+    diff, panelWant, panelGot, compared });
+  console.log(`  ${g.label.padEnd(26)} ${String(g.lit).padStart(8)} ` +
+    `${String(litIn(got, 0, HGR_H - 1)).padStart(10)} ${String(diff).padStart(11)}   ` +
+    (compared ? (ok ? 'exact' : 'DIFFERS') : 'not compared - it moves'));
+});
+
+console.log('');
+console.log('  the programs the disk ran at each step:');
+for (const g of golden.steps) console.log(`    ${g.label.padEnd(26)} ${g.chain.join(' -> ')}`);
+
+fs.mkdirSync('captured/transitions', { recursive: true });
+shots.forEach((s, i) => {
+  const name = 'port-' + golden.steps[i].label.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  fs.writeFileSync(`captured/transitions/${name}.png`, toPng(Uint8Array.from(s.on)));
+});
+fs.writeFileSync('captured/transitions/parity.json', JSON.stringify({ results }) + String.fromCharCode(10));
+console.log('');
+console.log(failures === 0 ? 'transition parity: clean'
+  : `transition parity: ${failures} step(s) differ`);
+process.exit(failures === 0 ? 0 : 1);
