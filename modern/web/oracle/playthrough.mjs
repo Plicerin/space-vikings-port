@@ -202,6 +202,56 @@ await press('X');
 check('X from a radar opened in flight returns to flight', await until('cockpit', 20000),
   `scene ${await scene()}`);
 
+// --- the enemy ship, the one path nothing had ever flown ---------------------------------------
+// 1000-1090 is the only weapon that can destroy it: the laser's J2 is 1, which divided by
+// TE + 1 truncates to nothing on every shot, while the missile's is 120. The shot is decided
+// inside the pass it was fired in - sixteen steps of 160 along the ship's own forward vector -
+// so being 800 short of the target at X9 400, Y9 -100, Z9 -3500 is enough, and the machine
+// agreed from that exact place in `probe_missilebox.mjs`.
+{
+  // The cockpit owns its own heading while it is running and writes it back on the way out,
+  // so the way to aim is to set the state from outside the scene and come back in.
+  await press('C');
+  await until('com', 20000);
+  await page.evaluate(() => {
+    Object.assign(window.__spaceVikingsState, {
+      x: 400, y: -100, z: -4300, heading: 0, pitch: 0, speed: 0,
+      atmosphere: 0, inOrbit: false, autopilot: false, commanderMode: false,
+      shipKind: 3, shipVitality: 0, shipDestructionLimit: 150,
+      missilesRemaining: 60, weaponMode: 'missile', missileMode: true,
+    });
+  });
+  await press('5');
+  check('back into flight, lined up on the enemy', await until('cockpit', 20000),
+    `scene ${await scene()}`);
+
+  const vit = () => page.evaluate(() => window.__spaceVikingsState.shipVitality);
+  const missiles = () => page.evaluate(() => window.__spaceVikingsState.missilesRemaining);
+  // TE is the planet's own tech - line 8's `PEEK(38282 + PEEK(38209))`, a getter here - so the
+  // step is whatever that planet gives, not a number chosen for the test.
+  const te = await page.evaluate(() => window.__spaceVikingsState.defenseTech);
+  const limit = await page.evaluate(() => window.__spaceVikingsState.shipDestructionLimit);
+  // 1540's store: `DP = PEEK(38152) + J2 / (TE + 1): IF DP < 255 THEN POKE 38152,DP`, so each
+  // shot truncates and the fraction is gone. 1560 then tests the un-truncated DP.
+  let want = 0, shots = 0;
+  while (want + 120 / (te + 1) <= limit) { want = Math.trunc(want + 120 / (te + 1)); shots++; }
+  const before = await missiles();
+  await press(' ');
+  await new Promise((r) => setTimeout(r, 500));
+  const afterOne = await vit();
+  const firstStep = Math.trunc(120 / (te + 1));
+  check('one missile does 120 / (TE + 1), truncated', afterOne === firstStep,
+    `TE ${te}, shipVitality ${afterOne}, expected ${firstStep}`);
+  check('and costs two, whatever it hit', (await missiles()) === before - 2,
+    `${before} -> ${await missiles()}`);
+
+  // 1560 is `DP > PEEK(38204)`, so it takes one more shot than gets there exactly.
+  for (let i = 1; i <= shots; i++) { await press(' '); await new Promise((r) => setTimeout(r, 500)); }
+  const ended = await until('ex', 20000);
+  check(`${shots + 1} hits destroy the ship and 1560 runs EX`, ended,
+    `limit ${limit}, shipVitality ${await vit()}, scene ${await scene()}`);
+}
+
 await browser.close();
 for (const e of errors.slice(0, 5)) console.log('page error:', e);
 

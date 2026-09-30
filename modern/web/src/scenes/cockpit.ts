@@ -1,5 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
-import { fireLaser1500 } from '../engine/diskWeapons';
+import { fireLaser1500, fireMissile1000, missileHit1000 } from '../engine/diskWeapons';
 import { damageTick3000, spawnGroundBolt5000, stepGroundBolt5095, groundBoltSpent5095,
   groundBoltStep5090, damageTickRuns190 } from '../engine/diskDamage';
 import { GameState } from '../engine/gameState';
@@ -569,16 +569,10 @@ const enemy = spawnEnemy(state);
         // ship's own return fire at 5200 - nothing in the original tests a projectile
         // against a bolt, so the collision test the port had here is gone.
 
-        if (!state.atmosphere && enemy.alive) {
-          const dx = p.x - enemy.pos.x;
-          const dy = p.y - enemy.pos.y;
-          const dz = p.z - enemy.pos.z;
-          if (Math.abs(dx) < 150 && Math.abs(dy) < 60 && Math.abs(dz) < 100) {
-            onMissileHit(true);
-            projectiles.splice(i, 1);
-            continue;
-          }
-        }
+        // No hit test here. 1050 is walked at the moment of firing, sixteen steps inside the
+        // one pass, so by the time this is drawn the shot has already been scored - and the
+        // box it used is 1050's, which is 60 above the enemy and only 20 below, not the
+        // symmetric 60 that used to be tested here.
         if (p.age > 2) { projectiles.splice(i, 1); }
       }
     }
@@ -945,23 +939,28 @@ const enemy = spawnEnemy(state);
   }
   // No energy cost. The one write to 38199 anywhere on the disk is H/D line 15, so firing
   // does not spend fuel - the 15 and 3 that used to be charged here were invented.
-  if (state.missilesRemaining < 2) return;
+  // 1000's `IF PEEK(38187) = 0 THEN 1090`: only an empty rack skips the flight, and one
+  // missile left still flies. 1090 charges two either way and 3380 stops the count at 0.
   glog('fire', `missile missiles=${state.missilesRemaining}`);
   const fwd = forwardVector(pitchRad, headingRad);
-      const startPos = v3add(v3(state.x, state.y, state.z), v3scale(fwd, 100));
-      projectiles.push({
-        x: startPos.x, y: startPos.y, z: startPos.z,
-        vx: fwd.x * 160, vy: fwd.y * 160, vz: fwd.z * 160,
-        age: 0,
-      });
-      state.missilesRemaining -= 2;
-      state.missilesRemaining = Math.max(0, state.missilesRemaining);
-      audio.beep(440, 60);
-      if (state.autopilot && !state.atmosphere && enemy.alive) {
-        const dist = v3len(v3sub(enemy.pos, v3(state.x, state.y, state.z)));
-        if (dist < 1600) onMissileHit(true);
-      }
-    }
+
+  // The whole shot is decided here, not over the next two seconds: 1010's loop is sixteen
+  // steps of 160 along this vector, all inside one pass. The projectile pushed below is only
+  // what is drawn - it carries no hit test of its own.
+  const pitchByte = Math.round(((pitchRad / (2 * Math.PI)) * 256 + 256) % 256);
+  const hit = state.missilesRemaining > 0 && missileHit1000(
+    { x: state.x, y: state.y, z: state.z }, fwd, pitchByte,
+    { atmosphere: !!state.atmosphere });
+
+  const startPos = v3add(v3(state.x, state.y, state.z), v3scale(fwd, 100));
+  projectiles.push({
+    x: startPos.x, y: startPos.y, z: startPos.z,
+    vx: fwd.x * 160, vy: fwd.y * 160, vz: fwd.z * 160,
+    age: 0,
+  });
+  audio.beep(440, 60);
+  onMissileHit(hit);
+}
 
   function fireLaser() {
   // STARSHIP_SIM:1500-1530
@@ -1012,44 +1011,53 @@ const enemy = spawnEnemy(state);
     }
 
   function onMissileHit(isHit: boolean) {
-  // STARSHIP_SIM:1085-1088, 1200-1222.
+  // 1085 and 1090, through the same 1535-1560 the laser goes through. The only difference is
+  // J2 - 120 against the laser's 1 - which is the whole reason the missile is the only thing
+  // that can destroy the enemy ship.
   //
-  // The original's flash leaves nothing behind. 1200 and 1100 are both wrapped in
-  // `FOR X0 = 1 TO 2`, so every shape at every scale and rotation is XDRAWn an even number of
-  // times, and XDRAW is its own inverse. Measured on the machine at entry and at the RETURN
-  // (`oracle/probe_destructionflash.mjs`): 0 pixels on and 0 off, both for a hit and a miss.
-  // So a transient flash that restores the page is the faithful thing, which is what the
-  // `flashes` entry below is - not a shape that has to be drawn and then undrawn.
+  // The arithmetic this used to do by hand got three things wrong that the shared routine
+  // gets right: the stores truncate into a byte, `IF DP < HL` is a test and not a clamp, and
+  // TE is line 8's byte with no `Math.max(1, ...)` under it. The flash is faithful either
+  // way - 1200 and 1100 both XDRAW an even number of times, so nothing is left behind.
   if (isHit) {
     glog('hit', `missile shipVit=${state.shipVitality}`);
     flashes.push({ timer: 0.3, type: 'explosion' });
-        audio.beep(220, 120);
+    audio.beep(220, 120);
+  } else {
+    // 1088's GOSUB 1100, the miss.
+    flashes.push({ timer: 0.15, type: 'hit' });
+    audio.beep(660, 40);
+  }
 
-    const j1 = 10;
-    const j2 = 120;
-    const te = Math.max(1, state.defenseTech);
-    state.planetVitality = Math.min(255, state.planetVitality + j1 / (te + 1));
-    if (!state.atmosphere) {
-      state.shipVitality = Math.min(255, state.shipVitality + j2 / (te + 1));
-        }
-
-        if (state.planetVitality >= state.planetVitalityLimit && state.planetVitalityLimit > 0 && !state.planetSurrendered) {
-          surrenderMsgTimer = 3;
-          markPlanetConquered(state);
-        }
-
-        // Check ship destruction
-        if (state.shipVitality > state.shipDestructionLimit
-            && state.shipKind !== 0 && !destructionPending) {
-          destructionPending = true;
-          next = 'ex';
-        }
-      } else {
-        // Miss — brief sparkle (STARSHIP_SIM:1100)
-        flashes.push({ timer: 0.15, type: 'hit' });
-        audio.beep(660, 40);
-      }
-    }
+  const r = fireMissile1000({
+    planetVitality: state.planetVitality,
+    enemyDamage: state.shipVitality,
+    missiles: state.missilesRemaining,
+    surrendered: state.planetSurrendered,
+    surrenderAt: state.planetVitalityLimit,
+  }, {
+    tech: state.commanderMode ? 0 : state.defenseTech,
+    atmosphere: state.atmosphere,
+    laserPct: state.damage.laserPct,
+    enemyLimit: state.shipDestructionLimit,
+    enemyPresent: state.shipKind !== 0,
+  }, isHit);
+  if (!r.fired) return;
+  state.planetVitality = r.planetVitality;
+  state.shipVitality = r.enemyDamage;
+  state.missilesRemaining = r.missiles;
+  state.planetVitalityLimit = r.surrenderAt;
+  if (r.planetSurrendered) {
+    glog('surrender', `planetVit=${state.planetVitality}`);
+    surrenderMsgTimer = 3;
+    markPlanetConquered(state);
+  }
+  if (r.enemyDestroyed && !destructionPending) {
+    glog('destroy', `enemy shipVit=${state.shipVitality} limit=${state.shipDestructionLimit}`);
+    destructionPending = true;
+    next = 'ex';
+  }
+}
 
 function onLaserHit() {
   // 1535-1560. There is no aiming: the original tests nothing about where the ship points or

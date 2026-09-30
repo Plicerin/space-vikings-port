@@ -15,6 +15,7 @@ import { damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS,
   groundBoltStep5090, damageTickRuns190, GROUND_FIRE_CHANCE, GROUND_BOLT_HIT_CHANCE,
   GROUND_BATTERY_KILL_CHANCE, RETURN_FIRE_GUN, GROUND_BOLT_BOX } from '../engine/diskDamage';
 import { fireLaser1500, fireMissile1000, storeIfUnder255, missileHits1050,
+  missileFlight1000, missileHit1000, MISSILE_FLIGHT, MISSILE_BOX,
   groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE } from '../engine/diskWeapons';
 import { rndEFAE, rndSequence, facValue, RND_MULTIPLIER, RND_ADDEND } from '../engine/diskRnd';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
@@ -131,6 +132,7 @@ function boot(): void {
     damageTickRuns190, GROUND_FIRE_CHANCE, GROUND_BOLT_HIT_CHANCE,
     GROUND_BATTERY_KILL_CHANCE, RETURN_FIRE_GUN, GROUND_BOLT_BOX,
     fireLaser1500, fireMissile1000, storeIfUnder255, missileHits1050,
+    missileFlight1000, missileHit1000, MISSILE_FLIGHT, MISSILE_BOX,
     groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE,
     rndEFAE, rndSequence, facValue, RND_MULTIPLIER, RND_ADDEND };
 

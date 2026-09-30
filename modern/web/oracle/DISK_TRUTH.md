@@ -3631,6 +3631,92 @@ One caution about the measurement: the main loop reads `$C061` once a pass and a
 so a 500-frame hold gets one shot away, not many. What that pins down is the **step**, not
 where a run of shots ends up, and the harness compares it that way.
 
+### The missile's flight, and a box that is not symmetric
+
+The line above says `diskWeapons.ts` holds the transcription and `weapons_parity.mjs` checks
+it, box included. Both were true, and the game still fired the wrong missile, because
+`cockpit.ts` never called either of them. It had its own.
+
+The missile is not a projectile that lives for a while. It is sixteen steps taken inside one
+pass of the main loop:
+
+```
+1000 M8 = M1: M9 = M2: M3 = 3: M1 = 140: M2 = 40: X0 = X: Y0 = Y: Z0 = Z: S2 = 160
+     X2 = S2 * (ZP * XH): Z2 = S2 * ZP * ZH: Y2 = S2 * YP: IF PEEK(38187) = 0 THEN 1090
+1010 CALL SG: FOR M = 124 TO 62 STEP -4: XDRAW M3 AT M1 + M2,M: XDRAW M3 AT M1 - M2,M:
+     IF PEEK(38210) = 1 AND Y0 < VV THEN HIT = 1: GOTO 1060
+1050 IF X0 < X9 + 150 AND X0 > X9 - 150 AND Y0 < Y9 + 60 AND Y0 > Y9 - 20
+     AND Z0 < Z9 + 100 AND Z0 > Z9 - 100 THEN HIT = 1
+1060 XDRAW M3 AT M1 + M2,M: XDRAW M3 AT M1 - M2,M: M3 = M3 + .32: M2 = M2 - 2:
+     X0 = X0 + X2: Z0 = Z0 + Z2: Y0 = Y0 + Y2:
+     IF P > 190 OR P < 64 THEN Y0 = Y0 - 2 * Y2: NEXT
+1085 IF HIT = 1 THEN GOSUB 1200: J1 = 10: J2 = 120: GOSUB 1535: GOTO 1090
+1088 GOSUB 1100
+```
+
+`M` runs 124, 120 ... 64 - sixteen values, because the next would be 60 and the limit is 62 -
+and the whole loop finishes inside the pass it started in. So a shot is decided before the
+frame it was fired in has finished drawing. `X0 = X` at 1000 means the first test is made at
+the ship itself, so the tested positions are the ship and fifteen more at 160 apart: as far as
+**2400 ahead**, and with 1050's 100 of slack in Z the furthest a shot can reach is 2500.
+
+Neither test leaves the loop. 1010's `GOTO 1060` lands on the step-and-`NEXT` line, and 1050
+falls through to it, so `HIT` is only ever set and the rest of the flight cannot take it back.
+
+**1050 is not symmetric in Y.** `Y0 < Y9 + 60 AND Y0 > Y9 - 20` is sixty above the enemy and
+twenty below - a box 300 by 80 by 200, sitting high on the target.
+
+`probe_missilebox.mjs` fired nine missiles on the machine from nine places around it. Line 8
+runs once, not every pass - the main loop is 15 to 210 - so `XI`, `YI` and `ZI` are an output,
+written by 140; the ship is moved by writing the Applesoft variables `X`, `Y`, `Z` and `S`
+themselves, at line 150, after 129 has moved it and before 185 tests the button. Firing is the
+paddle button, not a key.
+
+| shot | from | machine |
+| --- | --- | --- |
+| dead on, 800 short | 400, -100, -4300 | hit, 38152 went 0 -> 30 in one pass |
+| 50 below the box | 400, -150, -4300 | **miss** |
+| just inside the top | 400, -45, -4300 | hit |
+| just above the box | 400, -30, -4300 | miss |
+| out of reach in Z | 400, -100, -8000 | miss |
+| already past it | 400, -100, -3400 | miss |
+| 300 off in X | 700, -100, -4300 | miss |
+| 2400 short, the last step | 400, -100, -5900 | hit |
+| 2600 short, one too far | 400, -100, -6100 | miss |
+
+All nine come out as 1050 reads, including the one that matters: fifty below the enemy is a
+miss, and a symmetric reading of the box calls it a hit.
+
+What `cockpit.ts` had instead, and what it now does:
+
+- **A missile that flew for two seconds of wall clock** and was tested against the enemy once
+  a frame as it went. Replaced by the sixteen-step walk at the moment of firing. The
+  projectile that is pushed onto the display list is now only what is drawn - it carries no
+  test of its own.
+- **`Math.abs(dy) < 60`**, which is 1050's box mirrored onto the low side. Replaced by
+  `missileHit1000`, which walks 1050 as written.
+- **The damage done by hand**: `Math.min(255, vitality + j2 / (te + 1))`, with
+  `Math.max(1, defenseTech)` under the tech. 1535 and 1540 truncate into a byte, `IF DP < HL`
+  is a test and not a clamp so at 255 the old value simply stays, and `TE` has no floor under
+  it. All three are what `applyHit` already did for the laser; the missile goes through the
+  same routine now.
+- **An autopilot special case** - a hit granted within 1600 units, which nothing on the disk
+  has.
+- **`if (missilesRemaining < 2) return`**, where 1000 only skips the flight on an empty rack.
+  With one missile left the shot still flies; 1090 charges two either way and 3380 stops the
+  count at zero.
+
+`missile_box_parity.mjs` asks the port for the same nine shots, using the `ZP`, `XH`, `ZH` and
+`YP` the machine had at the moment it fired so that a rounding difference cannot be read as a
+difference in the test: all nine agree, sixteen steps, the last tested 2400 ahead.
+
+`playthrough.mjs` now flies the leg as well, which is the part no harness had ever done. Lined
+up 800 short, one missile moves the ship's damage by `INT(120 / (TE + 1))` and costs two, and
+the shot that carries the total past `38204` runs EX and comes back to a sky with no ship in
+it.
+
+---
+
 ---
 
 ## RECALL, all five branches

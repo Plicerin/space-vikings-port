@@ -160,6 +160,67 @@ export function fireMissile1000(s: FireState, ctx: FireContext, hit: boolean): F
 /** 1050's box in space, and 1010's rule in atmosphere. */
 export const MISSILE_BOX = { x: 150, yUp: 60, yDown: 20, z: 100 } as const;
 
+/**
+ * 1000 and 1060: the missile is not a projectile that lives for a while.
+ *
+ * ```
+ * 1000 ... X0 = X: Y0 = Y: Z0 = Z: S2 = 160
+ *      X2 = S2 * (ZP * XH): Z2 = S2 * ZP * ZH: Y2 = S2 * YP
+ * 1010 FOR M = 124 TO 62 STEP -4 ...
+ * 1060 ... X0 = X0 + X2: Z0 = Z0 + Z2: Y0 = Y0 + Y2
+ *      IF P > 190 OR P < 64 THEN Y0 = Y0 - 2 * Y2: NEXT
+ * ```
+ *
+ * `M` runs 124, 120 ... 64 - sixteen values, because 60 is past 62 - and the whole loop is one
+ * pass of the main program, so a shot is decided before the frame it was fired in has
+ * finished. The missile starts **at the ship**, and the first test is made there, so the
+ * positions tested are the ship and fifteen more at 160 apart: as far as 2400 ahead, and with
+ * 1050's 100 of slack in Z the furthest a shot can reach is 2500.
+ *
+ * Measured on the machine, `oracle/probe_missilebox.mjs`, firing from nine places around the
+ * fixed target: 2500 short lands and 2600 short does not, 50 below the box misses where a
+ * symmetric reading of 1050 would have it hit, and a hit moves 38152 inside a single pass.
+ */
+export const MISSILE_FLIGHT = { step: 160, steps: 16 } as const;
+
+export interface Vec3 { x: number; y: number; z: number }
+
+/** The sixteen places 1050 is tested at, in order. */
+export function missileFlight1000(from: Vec3, forward: Vec3, pitchByte: number): Vec3[] {
+  const s2 = MISSILE_FLIGHT.step;
+  const x2 = s2 * forward.x, y2 = s2 * forward.y, z2 = s2 * forward.z;
+  // 1060's last clause, the same one line 129 applies to the ship itself.
+  const dy = (pitchByte > 190 || pitchByte < 64) ? -y2 : y2;
+  const out: Vec3[] = [];
+  let p = { x: from.x, y: from.y, z: from.z };
+  for (let i = 0; i < MISSILE_FLIGHT.steps; i++) {
+    out.push({ ...p });
+    p = { x: p.x + x2, y: p.y + dy, z: p.z + z2 };
+  }
+  return out;
+}
+
+/**
+ * Whether a shot lands: 1010 in the atmosphere, 1050 in space, over the sixteen steps.
+ *
+ * `HIT` is only ever set, never cleared, and neither test leaves the loop - 1010's `GOTO 1060`
+ * lands on the step-and-`NEXT` line - so one step inside the box is enough and the rest of the
+ * flight cannot take it back.
+ */
+export function missileHit1000(
+  from: Vec3, forward: Vec3, pitchByte: number,
+  ctx: { atmosphere: boolean; horizon?: number },
+  enemy = ENEMY_POSITION,
+): boolean {
+  // Line 2, `VV = 160`. 1010 compares the missile's world height against it as it stands.
+  const vv = ctx.horizon ?? 160;
+  for (const p of missileFlight1000(from, forward, pitchByte)) {
+    if (ctx.atmosphere) { if (p.y < vv) return true; }
+    else if (missileHits1050(p, enemy)) return true;
+  }
+  return false;
+}
+
 export function missileHits1050(
   p: { x: number; y: number; z: number },
   enemy = ENEMY_POSITION,
