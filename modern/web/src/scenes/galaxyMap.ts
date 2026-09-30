@@ -190,6 +190,39 @@ export function lightYears(stars: GalaxyStar[], from: number, to: number): numbe
   return Math.floor(Math.sqrt(dx * dx + dy * dy + dz * dz));
 }
 
+/**
+ * Lines 3240, 3250, 3255 and 3260 - what a pick puts in the text band.
+ *
+ * Where these land is decided by 3000 and 3100. 3000 sets the window to rows 19-23 with
+ * `POKE 34,19: POKE 35,23` and leaves the cursor on row 19; 3100's two PRINTs take rows 19 and
+ * 20 and leave it on row 21. So a miss prints on row 21, and a hit's `VTAB 21` goes back **up**
+ * to row 20, over "--PRESS SPACE TO RETURN--", which its 39 spaces blank first.
+ *
+ * 3250 ends `LOC. : ";X(P);" ";Y(P);" ";Z(P);` with a semicolon, so 3320's
+ * `" : DISTANCE = "; INT(D1);" L/Y"` continues the same row.
+ */
+export function drawStarPickMiss(hires: H): void {
+  hires.hcolor(5);
+  hires.text('THERE IS NO STAR SYSTEM THERE, SIR.', 2, 22);
+}
+
+/** 3240's own `VTAB 22: PRINT <38 spaces>` after the pause. */
+export function clearStarPickMiss(hires: H): void {
+  hires.hcolor(0);
+  hires.text(' '.repeat(38), 2, 22);
+}
+
+export function drawStarPick(hires: H, d: GalaxyMapData, p: number): void {
+  const s = d.stars[p - 1];
+  hires.hcolor(0);
+  hires.text(' '.repeat(38), 2, 21);
+  hires.hcolor(5);
+  hires.text(`STAR SYSTEM : ${STAR_NAMES[p - 1]}`, 2, 21);
+  hires.text(`LOC. : ${s.x} ${s.y} ${s.z} : DISTANCE = ${lightYears(d.stars, d.here, p)} L/Y`, 2, 22);
+  // 3260
+  hires.text('DO YOU WISH FURTHER INFORMATION?', 2, 23);
+}
+
 export function galaxyMapDataFrom(state: import('../engine/gameState').GameState): GalaxyMapData {
   return {
     stars: state.planets.map((p) => ({
@@ -291,18 +324,18 @@ export async function galaxyMapScene(ctx: SceneContext, scenes: SceneManager): P
         eraseGalaxyCursor3210(hires, shapes, px, py);   // 3210
         const p = starUnderCursor(d.stars, px, py);
         hires.hcolor(5);
+        // Where these land is decided by 3000 and 3100. 3000 sets the window to rows 19-23
+        // with `POKE 34,19: POKE 35,23` and leaves the cursor on row 19; 3100's two PRINTs use
+        // rows 19 and 20 and leave it on row 21. So a miss prints on row 21, and a hit's
+        // `VTAB 21` goes back up to row 20 - **over "--PRESS SPACE TO RETURN--"**, which it
+        // blanks first with 39 spaces.
         if (p === 0) {
-          // 3240, which goes back to 3110 without repainting
-          hires.text('THERE IS NO STAR SYSTEM THERE, SIR.', 2, 22);
+          drawStarPickMiss(hires);
           await new Promise((res) => setTimeout(res, 1200));
+          clearStarPickMiss(hires);
           continue;
         }
-        const s = d.stars[p - 1];
-        // 3250, 3320
-        hires.text(`STAR SYSTEM : ${STAR_NAMES[p - 1]}`, 2, 22);
-        hires.text(`LOC. : ${s.x} ${s.y} ${s.z} : DISTANCE = ${lightYears(d.stars, d.here, p)} L/Y`, 2, 23);
-        // 3260
-        hires.text('DO YOU WISH FURTHER INFORMATION?', 2, 24);
+        drawStarPick(hires, d, p);
         const a = await input.waitForKey();
         if (String.fromCharCode(a & 0x7f).toUpperCase() === 'Y') {
           state.commanderMapTarget = p - 1;

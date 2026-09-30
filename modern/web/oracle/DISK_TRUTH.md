@@ -5368,6 +5368,37 @@ A note on running two tests on one machine: they cannot share it. The letter tes
 program, so anything pressed afterwards goes to the BASIC prompt rather than to line 70's GET -
 the first run of this probe did exactly that and reported CONTINUE as going nowhere.
 
+### The galaxy map's cursor page
+
+`galaxymap_parity.mjs` had the map itself exact - 1,514 lit, 0 of 53,760 differing - and the
+cursor's two draws at two positions. What nothing reached was the other half of the page: what
+happens when the button goes down. 3210 to 3260 is the only state-dependent part of it.
+
+`oracle/probe_mappick.mjs` puts the paddle cursor on a star and presses the paddle button, and
+`oracle/map_pick_parity.mjs` redraws the result from the same twenty stars: **2,362 lit on both
+sides, 0 of 53,760 differing.**
+
+Where the readout lands took tracing, and the capture confirms it. 3000 sets the window to rows
+19-23 with `POKE 34,19: POKE 35,23` and leaves the cursor on row 19; 3100's two PRINTs take rows
+19 and 20 and leave it on row 21. So:
+
+- a **miss** prints "THERE IS NO STAR SYSTEM THERE, SIR." on row 21, and 3240 blanks that same
+  row again before going back to the cursor
+- a **hit** at 3250 does `VTAB 21`, which is row 20 - **back up over "--PRESS SPACE TO RETURN--"**,
+  which its 39 spaces blank first. So picking a star replaces that line rather than adding to it.
+- 3250 ends `";Z(P);` with a semicolon, so 3320's `" : DISTANCE = "; INT(D1);" L/Y"` finishes the
+  same row: `LOC. : 13 13 12 : DISTANCE = 4 L/Y`
+- and 3260's question goes on row 22
+
+The port had all three a row too low, so the "PRESS SPACE" line survived under them.
+
+**The paddles do not read back what they are set to.** The probe aimed the cursor at PX 95, PY 65
+- the exact position 3060 and 3065 draw star 2 at - and the machine used **PX 92.82, PY 63**. A
+PDL read is timing based, `PX = PDL(0) * 1.19` is fractional on top of that, and the first run of
+this harness took the asked-for values as the drawn ones and left two pixels of 3210's hole in
+the wrong place. Reading PX and PY back off the variable table afterwards - less the 35 that 3215
+has already added - is what makes the comparison mean anything.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

@@ -31,7 +31,7 @@ import { initCopyButton } from '../engine/gameLog';
 import { startScene } from '../scenes/start';
 import { cockpitScene } from '../scenes/cockpit';
 import { instrumentsScene, drawInstruments, drawPanelNeedles, drawPanelLamps } from '../scenes/instruments';
-import { galaxyMapScene, drawGalaxyMap, drawGalaxyCursor, eraseGalaxyCursor3210 } from '../scenes/galaxyMap';
+import { galaxyMapScene, drawGalaxyMap, drawGalaxyCursor, eraseGalaxyCursor3210, drawStarPick, drawStarPickMiss, galaxyMapDataFrom, starUnderCursor } from '../scenes/galaxyMap';
 import { comScene, drawComMainScreen, eraseComNeedleTracks } from '../scenes/com';
 import { statusScene, drawStatusReport, drawTroopReport } from '../scenes/status';
 import { supplyScene, drawSupplyPage1, drawSupplyPage2 } from '../scenes/supply';
@@ -118,7 +118,7 @@ function boot(): void {
   (window as any).__spaceVikings = { state, scenes, hires, input, Hires, drawInstruments, drawPanelLamps,
     ShapeRenderer, decodeShapeTableJson,
     parseShipBytecode, projectShipBytecode, drawShipWireframe, COCKPIT_SHIP_WIREFRAME_VIEW,
-    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, eraseGalaxyCursor3210, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu, drawShipId, project68A1, project68A1ToScreen,
+    projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, eraseGalaxyCursor3210, drawStarPick, drawStarPickMiss, galaxyMapDataFrom, starUnderCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu, drawShipId, project68A1, project68A1ToScreen,
     cos64FB, sin64F8, mul635C, buildMatrix654E, toCameraSpace6730, applyObjectScale,
     viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, projectCameraSpaceBytes,
     projectWorldPointFixed, outcode67EF, clipFrustum61B7, clipEnd6979,
