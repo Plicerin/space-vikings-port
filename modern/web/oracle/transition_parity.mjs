@@ -105,6 +105,35 @@ golden.steps.forEach((g, i) => {
     (compared ? (ok ? 'exact' : 'DIFFERS') : 'not compared - it moves'));
 });
 
+// Where the difference lives. A count that matches while the pixels do not says the ink has
+// moved, not that it is missing, and the row bands say which part of the screen moved it: the
+// caption and the top of the menu, the menu body and the damage grid, and the panel.
+const BANDS = [['rows 0-40', 0, 40], ['rows 41-123', 41, 123], ['rows 124-191', 124, HGR_H - 1]];
+console.log('');
+console.log('  where the difference is, by row band (disk / port / differing):');
+golden.steps.forEach((g, i) => {
+  if (!COMPARE.has(g.label)) return;
+  const want = diskOf(g);
+  const got = Uint8Array.from(shots[i].on);
+  const cells = BANDS.map(([name, a, b]) => {
+    let d = 0;
+    for (let y = a; y <= b; y++) for (let x = 0; x < HGR_W; x++) {
+      const k = y * HGR_W + x;
+      if ((want[k] ? 1 : 0) !== (got[k] ? 1 : 0)) d++;
+    }
+    return `${name}: ${litIn(want, a, b)} / ${litIn(got, a, b)} / ${d}`;
+  });
+  console.log(`    ${g.label}`);
+  for (const c of cells) console.log(`      ${c}`);
+  // and a picture of exactly which pixels differ, which is quicker to read than any count
+  const mask = new Uint8Array(want.length);
+  for (let k = 0; k < want.length; k++) mask[k] = (want[k] ? 1 : 0) !== (got[k] ? 1 : 0) ? 1 : 0;
+  // the route visits `COM -> computer` twice, so the step number keeps the two apart
+  const name = `diff-${i}-` + g.label.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  fs.mkdirSync('captured/transitions', { recursive: true });
+  fs.writeFileSync(`captured/transitions/${name}.png`, toPng(mask));
+});
+
 console.log('');
 console.log('  the programs the disk ran at each step:');
 for (const g of golden.steps) console.log(`    ${g.label.padEnd(26)} ${g.chain.join(' -> ')}`);

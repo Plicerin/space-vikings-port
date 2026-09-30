@@ -4750,6 +4750,55 @@ The route, and what the disk runs along it:
 None of those is fixed here. The point of this entry is that they are now measured and named
 rather than waiting for someone to notice them while playing.
 
+### The computer submenu
+
+The submenu was the largest of those, and it is the one screen in COM that no other capture
+reaches. Reading it off the disk:
+
+    200 POKE 974,32: R = 1: GOSUB 21: HOME
+    210 PRINT TAB( 1);"CENTRAL COMPUTER": PRINT
+    220 PRINT "1) NAVIGATION COMP.": ... : PRINT "6) RETURN": PRINT
+    260 PRINT "READY ";: GET C$
+
+**The submenu inherits the screen; it does not rebuild it.** `GOSUB 21` falls through 21 and 25
+into 29 -
+
+    29 HOME: PRINT "<20 spaces>": HOME: VTAB 2: FOR X = 1 TO 12: PRINT "<20 spaces>": NEXT:
+       PRINT "<20 spaces>";: HOME: POKE 32,1
+
+which blanks **twenty columns over rows 0 to 13** and nothing else - and then 35, `IF R = 1 THEN
+R = 0: RETURN`, takes it straight back out before 40 to 90 draw the damage-control grid on the
+right and the `1,1 TO 139,1 TO 139,110 TO 1,110` box. The port was clearing forty columns over
+sixteen rows and wiping both: 3,853 pixels lit against the disk's 11,862.
+
+**TAB counts from the screen, not from the window.** Applesoft's `TAB(n)` stores n-1 into CH, and
+the monitor takes CH as an absolute column; `WNDLFT` only comes back into it on a carriage
+return. So `TAB(1)` is column 0, and the title sits one cell **left** of the menu beneath it,
+which the disk's screen shows plainly. 210's trailing `PRINT` then puts the six options on rows
+2 to 7 and 260's `READY ` - not `COMMAND?` - on row 9.
+
+800 to 830 are the same shape for the navigation submenu: no TAB, so its title lines up with its
+menu, two blank PRINTs before three options on rows 3 to 5, and `READY ` on row 7.
+
+860 differs from both in one detail worth writing down: it is `R = 1: GOSUB 21: PRINT
+"NAVIGATION COMPUTER"` with **no HOME**, so it prints where 29's own HOME left the cursor -
+row 0, column 0, taken before 29's `POKE 32,1` moved the window edge. Its two digits are typed
+on row 5 at columns 1 and 2 by `VTAB 6: HTAB 1 + J`, and 890 is `PRINT S$(C): PRINT "COURSE
+SET."` with nothing above it cleared and no distance line; the port had invented one.
+
+With those four screens corrected, `transition_parity.mjs` reports `COM -> computer` as exact
+everywhere above the instrument panel:
+
+| band | disk | port | differing |
+| --- | --- | --- | --- |
+| rows 0-40 | 3035 | 3035 | 0 |
+| rows 41-123 | 5586 | 5586 | 0 |
+| rows 124-191 | 3030 | 2993 | 63 |
+
+The 63 are the panel, and they are the same 63 that STATUS and the return from it report - one
+fault, in `drawInstruments`, counted four times. The panel entered from flight is a second,
+larger one: 2205 against 3241, and on that step it is now the **only** difference.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

@@ -229,10 +229,16 @@ export function drawComMainScreen(
   hires.text('  COMPUTER DISPLAY      DAMAGE CONTROL  ', 1, 15);
 }
 
-async function showError(hires: import('../engine/hires').Hires, lines: string[], durationMs = 2500): Promise<void> {
-  writeLines(hires, 1, 21, lines, 5);
+async function showError(
+  hires: import('../engine/hires').Hires,
+  lines: string[],
+  durationMs = 2500,
+  col = 1,
+  row = 21,
+): Promise<void> {
+  writeLines(hires, col, row, lines, 5);
   await wait(durationMs);
-  clearLines(hires, 1, 21, 40, 2);
+  clearLines(hires, col, row, Math.max(0, ...lines.map((l) => l.length)), lines.length);
 }
 
 const SHIP_NAMES: Record<number, string> = {
@@ -282,6 +288,8 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
     computerMenu: for (;;) {
       if (!enterComputerMenu(hires)) continue mainMenu;
 
+      // 220: six PRINTs from row 2, each landing at CH = WNDLFT = 1, and a seventh PRINT
+      // that leaves the cursor on row 8.
       drawOptions(hires, [
         { key: '1', label: 'NAVIGATION COMP.' },
         { key: '2', label: 'GALAXY DIRECTORY' },
@@ -289,9 +297,10 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
         { key: '4', label: 'SHIP STATUS' },
         { key: '5', label: 'SUPPLIES REPORT' },
         { key: '6', label: 'RETURN' },
-      ], 4, 2);
+      ], 3, 2);
 
-      drawPrompt(hires, 14, 2);
+      // 260 is `PRINT "READY ";: GET C$` - not COMMAND?, and on row 9.
+      drawPrompt(hires, 10, 2, 'READY ');
 
       const compChoice = await getChoice(input, hires, 1, 6);
 
@@ -315,13 +324,15 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
       navMenu: for (;;) {
         if (!enterNavComputer(hires)) continue computerMenu;
 
+        // 810: title, two blank PRINTs, three options from row 3, a fourth blank PRINT.
         drawOptions(hires, [
           { key: '1', label: 'DIRECTORY' },
           { key: '2', label: 'SET COURSE' },
           { key: '3', label: 'RETURN' },
-        ], 6, 2);
+        ], 4, 2);
 
-        drawPrompt(hires, 12, 2);
+        // 830, like 260, prompts with READY - here on row 7.
+        drawPrompt(hires, 8, 2, 'READY ');
 
         const navChoice = await getChoice(input, hires, 1, 3);
 
@@ -340,17 +351,43 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
   }
 };
 
+/**
+ * Line 200's `R = 1: GOSUB 21`, which clears **the left column only**.
+ *
+ * 21 falls into 29, and 29 is
+ *
+ *   HOME: PRINT "<20 spaces>": HOME: VTAB 2: FOR X = 1 TO 12: PRINT "<20 spaces>": NEXT:
+ *   PRINT "<20 spaces>";: HOME: POKE 32,1
+ *
+ * so twenty columns over rows 0 to 13, and then line 35 - `IF R = 1 THEN R = 0: RETURN` - takes
+ * it straight back out before lines 40 to 90 run. The damage-control grid on the right and the
+ * box around the menu are drawn once when COM starts and are **inherited** by every submenu.
+ *
+ * This used to clear 40 columns over 16 rows, which wiped the grid and the box: the disk's
+ * screen here has 11,862 pixels lit and the port's had 3,853.
+ * `oracle/transition_parity.mjs` is what noticed - no capture in the suite covers this screen,
+ * because every other one is of a screen reached from flight.
+ */
+function clearComTextColumn(hires: import('../engine/hires').Hires): void {
+  clearLines(hires, 1, 1, 20, 14);
+}
+
 function enterComputerMenu(hires: import('../engine/hires').Hires): boolean {
-  clearLines(hires, 1, 1, 40, 16);
+  clearComTextColumn(hires);
   hires.hcolor(1);
-  hires.text('CENTRAL COMPUTER', 3, 2);
+  // 210 is `PRINT TAB( 1);"CENTRAL COMPUTER"`, and Applesoft's TAB sets CH, which the monitor
+  // counts from the left of the **screen**, not from WNDLFT. TAB(1) is CH = 0, so the title
+  // starts one cell left of the menu under it - which is what the disk's screen shows.
+  hires.text('CENTRAL COMPUTER', 1, 1);
   return true;
 }
 
 function enterNavComputer(hires: import('../engine/hires').Hires): boolean {
-  clearLines(hires, 1, 1, 40, 16);
+  clearComTextColumn(hires);
   hires.hcolor(1);
-  hires.text('NAVIGATION COMPUTER', 3, 2);
+  // 810 has no TAB, so this one prints at the cursor 800's HOME left at CH = WNDLFT = 1 and
+  // lines up with the menu under it.
+  hires.text('NAVIGATION COMPUTER', 2, 1);
   return true;
 }
 
@@ -477,25 +514,33 @@ async function galaxyDirectory(ctx: SceneContext): Promise<void> {
 async function setCourse(ctx: SceneContext): Promise<void> {
   const { hires, state, input } = ctx;
 
-  clearLines(hires, 1, 1, 40, 16);
+  // COM line 860 is `R = 1: GOSUB 21: PRINT "NAVIGATION COMPUTER": PRINT: PRINT` - and unlike
+  // 200 and 800 it has **no HOME** after the GOSUB, so it prints where line 29's own HOME left
+  // the cursor: row 0, CH 0, before 29's `POKE 32,1` moved the window's left edge. The two
+  // blank PRINTs then land at CH = WNDLFT = 1 and leave the cursor on row 3.
+  clearComTextColumn(hires);
   hires.hcolor(1);
-  hires.text('NAVIGATION COMPUTER', 3, 2);
-  hires.text('DESIRED DESTINATION', 3, 4);
+  hires.text('NAVIGATION COMPUTER', 1, 1);
+  // 870: two lines, the second without a CR, then VTAB 6 and HTAB 1 + J for the two digits -
+  // so the number is typed on row 5 at columns 1 and 2, not beside the word.
+  hires.text('ENTER DESIRED', 2, 4);
+  hires.text('DESTINATION', 2, 5);
 
-  const planetIdx = await readTwoDigitNumber(input, hires, 5, 14, 1, 20);
+  const planetIdx = await readTwoDigitNumber(input, hires, 6, 2, 1, 20);
 
+  // 877's PRINT puts the cursor on row 6, and every message from here down starts there.
   if (planetIdx === null) {
-    await showError(hires, ['INVALID INPUT.']);
+    await showError(hires, ['INVALID INPUT.'], 2500, 2, 7);
     return;
   }
 
   if (planetIdx < 1 || planetIdx > 20) {
-    await showError(hires, ['<ERROR>']);
+    await showError(hires, ['<ERROR>'], 2500, 2, 7);
     return;
   }
 
   if (planetIdx - 1 === state.planetIndex) {
-    await showError(hires, ["THAT'S WHERE WE", 'ARE NOW, SIR!']);
+    await showError(hires, ["THAT'S WHERE WE", 'ARE NOW, SIR!'], 3000, 2, 7);
     return;
   }
 
@@ -508,12 +553,11 @@ async function setCourse(ctx: SceneContext): Promise<void> {
   ));
   glog('nav', `course set to ${name} dist=${dist}`);
 
-  clearLines(hires, 1, 3, 40, 8);
-  hires.hcolor(3);
-  hires.text(name.slice(0, 38), 3, 5);
-  hires.text('COURSE SET.', 3, 7);
+  // 890 is `PRINT S$(C): PRINT "COURSE SET."` and nothing else: no clear above it, so the
+  // prompt and the typed number stay on screen, and no distance line - that was invented.
   hires.hcolor(1);
-  hires.text(`DISTANCE: ${dist} L/Y`, 3, 8);
+  hires.text(name.slice(0, 38), 2, 7);
+  hires.text('COURSE SET.', 2, 8);
 
   await wait(2500);
 }

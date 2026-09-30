@@ -60,6 +60,20 @@ for (let i = 0; i < 80; i++) {
   last = h;
 }
 
+// The Apple's text window: WNDLFT, WNDWDTH, WNDTOP, WNDBTM at $20-$23, and the cursor at
+// $24/$25. COM moves these about with POKE 32/33/34/35 and calls HOME, and through the
+// hi-res character generator each HOME writes blank cells over the background.
+const w = JSON.parse(await a2.ev(`JSON.stringify({
+  left: window.M.rd(0x20), width: window.M.rd(0x21),
+  top: window.M.rd(0x22), bottom: window.M.rd(0x23),
+  ch: window.M.rd(0x24), cv: window.M.rd(0x25),
+  chargenFlag: window.M.rd(0x3CD), invFlag: window.M.rd(0x3CE)
+})`));
+console.log(`
+text window when COM settles: left ${w.left}, width ${w.width}, top ${w.top}, ` +
+  `bottom ${w.bottom}; cursor (${w.ch}, ${w.cv})`);
+console.log(`  $3CD = ${w.chargenFlag}, $3CE = ${w.invFlag}`);
+
 const stats = (on) => {
   let n = 0, minX = HGR_W, maxX = -1, minY = HGR_H, maxY = -1;
   for (let y = 0; y < HGR_H; y++) for (let x = 0; x < HGR_W; x++) {
