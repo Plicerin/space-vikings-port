@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { windowColumns } from '../engine/hires';
 import { setScene, log as glog } from '../engine/gameLog';
 
 /**
@@ -88,7 +89,7 @@ function background(hires: H): void {
   for (let y = 0; y <= 123; y++) hires.hlin(0, 279, y);
   // Line 1230's FOR C = 1 TO 15: VTAB C: HTAB 2: PRINT <38 spaces>. In inverse those are
   // solid blocks over the flood, not blanked cells.
-  for (let r = 1; r <= 15; r++) hires.text(' '.repeat(38), 2, r, INVERSE);
+  for (let r = 1; r <= 15; r++) hires.text(' '.repeat(windowColumns(1, 39)), 2, r, INVERSE);
 }
 
 /** Lines 1240-1310 and the GOSUB at 5100. */

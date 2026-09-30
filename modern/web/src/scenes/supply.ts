@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { windowColumns } from '../engine/hires';
 import { setScene, log as glog } from '../engine/gameLog';
 
 /**
@@ -52,10 +53,11 @@ type H = import('../engine/hires').Hires;
 function frame(hires: H): void {
   hires.hcolor(1);
   for (let y = 0; y <= 123; y++) hires.hlin(0, 279, y);
-  // Line 1400 prints 39 spaces into a 39-wide window from its left margin, and only 38
-  // columns come out blanked - measured: column 39 (x 273-279) still shows the HCOLOR 1
+  // Line 1400 prints 39 spaces into `POKE 32,1: POKE 33,39`, and only 38 columns come out
+  // blanked, because that window holds WNDWDTH - WNDLFT = 38: see windowColumns(). The
+  // thirty-ninth space wraps onto the next row, so column 39 (x 273-279) keeps the HCOLOR 1
   // flood underneath, odd pixels only. The last character wraps instead of printing.
-  for (let r = 1; r <= 15; r++) hires.text(' '.repeat(38), 2, r, INVERSE);
+  for (let r = 1; r <= 15; r++) hires.text(' '.repeat(windowColumns(1, 39)), 2, r, INVERSE);
   // VTAB 1: HTAB 11 - and HTAB is absolute, so 0-based column 10.
   hires.text('- SUPPLY REPORT -', 11, 1, INVERSE);
 }

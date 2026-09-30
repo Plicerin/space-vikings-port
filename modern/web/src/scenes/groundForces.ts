@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { windowColumns } from '../engine/hires';
 import { combatRound550, truncate4000, type CombatState } from '../engine/diskCombat';
 import { drawOptions, drawPrompt, getChoice, writeLines, clearLines } from '../engine/menu';
 import { drawComMainScreen, comStatusBytes } from './com';
@@ -33,7 +34,7 @@ async function commanderWait(state: GameState, ms: number): Promise<void> {
 export function drawGroundForcesBattle(hires: import('../engine/hires').Hires): void {
   // 100
   hires.hcolor(1);
-  for (let r = 1; r <= 16; r++) hires.text(' '.repeat(40), 1, r);
+  for (let r = 1; r <= 16; r++) hires.text(' '.repeat(windowColumns(0, 40)), 1, r);
   // 110
   hires.hcolor(5);
   hires.line(7, 12, 271, 12);

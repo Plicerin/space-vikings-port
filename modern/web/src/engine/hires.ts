@@ -139,6 +139,38 @@ const ADDR_TO_CELL = (() => {
   return m;
 })();
 
+/**
+ * How many columns a PRINT of the "full width" actually fills.
+ *
+ * `WNDWDTH` at `$21` is not a width. The hi-res character generator START BLOADs to `$9300`
+ * keeps the cursor column in `CH` at `$24` as an **absolute** screen column, and its wrap is
+ *
+ * ```
+ * $93D6  INC CH
+ * $93D8  LDA CH
+ * $93DA  CMP WNDWDTH
+ * $93DC  BCC ...            ; still inside
+ * $93DE  LDA WNDLFT
+ * $93E0  STA CH             ; otherwise back to the left margin, on the next line
+ * ```
+ *
+ * so the window is columns `WNDLFT .. WNDWDTH - 1` and holds `WNDWDTH - WNDLFT` of them. (The
+ * Apple II monitor's own `COUT1` does the same thing with the same two bytes; the generator
+ * reproduces its geometry rather than inventing one.)
+ *
+ * That is the whole of the "full-width PRINT behaves differently at left margin 0 and 1"
+ * puzzle. GROUND FORCES line 100 sets `POKE 32,0: POKE 33,40`, so the window really does hold
+ * forty columns and its forty spaces blank all of them. SUPPLY line 10 sets
+ * `POKE 32,1: POKE 33,39`, which holds **38**, so the thirty-ninth space wraps to the next row
+ * and column 39 is never written - it keeps whatever was under it.
+ *
+ * Measured over sixteen window settings in `oracle/probe_printmargin.mjs`, every one of which
+ * lands where this predicts.
+ */
+export function windowColumns(wndLeft: number, wndWidth: number): number {
+  return Math.max(0, wndWidth - wndLeft);
+}
+
 export class Hires {
   private displayCtx: CanvasRenderingContext2D;
   private offscreen: HTMLCanvasElement;

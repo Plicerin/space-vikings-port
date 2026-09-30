@@ -1944,10 +1944,10 @@ GROUND FORCES menu has x 274, 276, 278 lit at row 0 and the battle screen that r
 does not.
 
 So a `PRINT` of exactly the window width loses its last character in one case and not the
-other, and the difference is the left margin. The rule is recorded from the measurements;
-the mechanism is not derived. Every other clear on this disk is narrower than its window -
-STATUS prints 38 into 39, GROUND FORCES line 12 and SHORE LEAVE 2080 print 18 into 21, COM
-line 29 prints 20 into 40 - so this only ever shows up in these two places.
+other. **The mechanism is `WNDWDTH` not being a width** - see *The print margin, derived*
+below. Every other clear on this disk is narrower than its window - STATUS prints 38 into 39,
+GROUND FORCES line 12 and SHORE LEAVE 2080 print 18 into 21, COM line 29 prints 20 into 40 -
+so this only ever shows up in these two places.
 
 ---
 
@@ -4078,6 +4078,50 @@ Three things worth keeping from how this was measured.
   put back either. The menu views are measured on a second machine booted fresh for them, which
   is cheaper than guessing which byte to restore.
 
+### The print margin, derived
+
+`WNDWDTH` at `$21` is not a width. `oracle/probe_printmargin.mjs` collects the addresses the
+hi-res character generator at `$9300` actually executes while COM prints its menu - 80 of its
+256 bytes, entered at `$933C` 615 times - disassembles only those, and the wrap comes out as:
+
+```
+$93D6  INC CH
+$93D8  LDA CH
+$93DA  CMP WNDWDTH
+$93DC  BCC ...            ; still inside the window
+$93DE  LDA WNDLFT
+$93E0  STA CH             ; otherwise back to the left margin, on the next line
+```
+
+`CH` is an **absolute screen column**, not an offset into the window. So the window is columns
+`WNDLFT .. WNDWDTH - 1` and it holds `WNDWDTH - WNDLFT` of them. The Apple II monitor's own
+`COUT1` does exactly this with the same two bytes, so the generator is reproducing the ROM's
+geometry rather than inventing one.
+
+That is the whole puzzle:
+
+| | window | holds | prints | result |
+| --- | --- | --- | --- | --- |
+| GROUND FORCES 100 | `POKE 32,0: POKE 33,40` | 40 | 40 | all forty columns blanked |
+| SUPPLY 10 | `POKE 32,1: POKE 33,39` | **38** | 39 | columns 1-38 blanked; the 39th space wraps to the next row, and column 39 keeps what was under it |
+
+Measured over sixteen window settings, every one landing where the rule predicts:
+
+| left | width | printed | columns written |
+| --- | --- | --- | --- |
+| 0 | 40 | 40 | 0..39 |
+| 1 | 39 | 39 | 1..38 |
+| 2 | 38 | 38 | 2..37 |
+| 5 | 30 | 30 | 5..29 |
+
+The first attempt at this grid set `CH` to 0 rather than to the left margin, which made every
+window start at column 0 and hid the rule completely. `HOME` leaves `CH` at `WNDLFT`, and
+starting there is what makes the numbers mean anything.
+
+`windowColumns(wndLeft, wndWidth)` in `hires.ts` is the rule, with the disassembly in its
+comment; `supply.ts`, `status.ts` and `groundForces.ts` call it instead of carrying a hard 38
+or 40 that nobody could account for.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -4102,8 +4146,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read
   0. The read was taken after the simulator had resumed and may simply be too late, but that
   is not established.
-- **Why a full-width PRINT behaves differently at left margin 0 and 1.** SUPPLY loses its
-  last character and GROUND FORCES does not; both are measured, neither is explained.
 - **Two of SHORE LEAVE's six sub-screens.** ENLIST TROOPS and REPAIR/RESTOCK are not
   captured; REPAIR needs the ship in atmosphere. SELL LOOT and ESTABLISH BASE came out of
   `probe_economy.mjs`.
