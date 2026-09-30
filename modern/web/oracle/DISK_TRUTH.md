@@ -3068,7 +3068,11 @@ and the renders:
 | 11 | `$630B` | set `$9B/$9C`: chain to another list |
 | 13 | `$6319` | `LDA #$FF / STA $7D` - record coordinates instead of drawing |
 | 14, 15 | `$68EA`, `$690F` | patch the projection operands and the object scale |
-| 8, 9, 12, 16, 17 | `$6D44`, `$7148`, `$718A`, `$632A`, `$6338` | not read |
+| 8 | `$6D44` | page-select for the table at `$6CE0`, and a flag at `$6CDD` |
+| 9 | `$7148` | which hi-res page the line routine draws into |
+| 12 | `$718A` | draw mode: `ORA` to draw, `EOR` to erase |
+| 16 | `$632A` | the display soft switches, then falls into 17 |
+| 17 | `$6338` | a one-byte opcode: advance by 1 and carry on |
 
 Three of those contradicted what the port was doing, and together they were the whole of the
 ship's remaining error.
@@ -3181,8 +3185,10 @@ address arithmetic and the display list are all read from the disk rather than f
 ship, the starfield and the ground each agree with the machine on every pixel in every state
 that has been captured.
 
-Five display-list opcodes - `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` - have not been
-read. None of the four models on the disk uses them.
+Five display-list opcodes - `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` - are read now, and
+none of the four models on the disk uses any of them: they are a page select, a draw-or-erase
+mode and the display switches, for double buffering the shipped game never asks for. See
+**The five display-list opcodes nothing uses**.
 
 Away from the renderer: the game logic this file quotes for combat and the economy is quoted
 from the BASIC rather than checked against a running machine.
@@ -4487,6 +4493,48 @@ destination's record first, the way line 25 does it, so a tech 1 arrival gets th
 number rather than keeping the last one; `PlanetState` carries `destructionLimit` for it, which
 `DISK_PLANETS` already had.
 
+### The five display-list opcodes nothing uses
+
+`$6162` reads an opcode, ends the list on anything with bit 7 set or at or above `$12`, and
+otherwise jumps through the 18-entry table at `$6076`. Thirteen entries had been read because a
+list on the disk uses them. These five had not, and they are all inside LO-HI A2-3D1, so they
+can be read without an emulator - and then run with one.
+
+The loop's tail explains the lengths first: `$62C3 LDA #$02` falls into `$62C5 JSR $6184`, and
+`$6184` adds A to the list pointer. So a handler ending `JMP $62C3` is a **two-byte** opcode and
+one ending `JMP $62C5` advances by whatever it put in A.
+
+| op | handler | bytes | what it does |
+| --- | --- | --- | --- |
+| 8 | `$6D44` | 2 | fills the 32-entry table at `$6CE0` (stride 3) with `$20..` or `$40..` and sets `$6CDD`; the parameter's bit 0 picks the page and bit 1 the flag, and it skips the fill when the table is already there, then `JSR $6CDA` |
+| 9 | `$7148` | 2 | **which page the line routine draws into**: the high nibbles of the row table at `$6B93`, and eight self-modified bytes - `$6FF0`/`$7063` the page, `$6FF7`/`$709E` page − 4, `$701B`/`$70E5` page + `$20`, `$7023`/`$7120` three past that |
+| 12 | `$718A` | 2 | **draw mode**: thirteen sites in the line routine between `$11` `ORA (zp),Y` and `$51` `EOR (zp),Y` - draw or erase - and closes an open recording |
+| 16 | `$632A` | 1 | `$C053`, `$C057`, `$C050`, `$C054`: mixed, hi-res, graphics, page 1 - then falls into 17 |
+| 17 | `$6338` | 1 | `LDA #$01 / JMP $62C5`, the no-parameter tail |
+
+Reading a handler is not the same as knowing what it does, so each was **executed** on the
+machine with a list of its own - `[op, param, $FF]`, the `$FF` stopping `$6162` - and the bytes
+it patches read either side:
+
+| | |
+| --- | --- |
+| op 12, parameter 1 | 13 of 13 sites `$11` -> `$51` |
+| op 12, parameter 0 | 13 of 13 back to `$11` |
+| op 9, parameter 0 | 8 of 8: `$40` -> `$20`, `$3C` -> `$1C`, `$60` -> `$40`, `$63` -> `$43` |
+| op 8, parameter 0 then 1 | `$6CE0` onward `$40 $41 $42` <-> `$20 $21 $22` |
+| op 17 | 17 instructions, list pointer on by **1** |
+| op 16 | 22 instructions, pointer on by 1 - the five extra being `LDA #$00` and four `STA $C0xx` |
+
+**A one-byte opcode must not be given a parameter byte.** The first attempt handed 16 and 17 the
+same `[op, param, $FF]` as the others, and `$6162` read the parameter as the next opcode - a 0,
+which is op 0, which plotted a point and ran on for 9,400 instructions. With `[op, $FF]` both
+come out at 17 and 22.
+
+So op 12 is the renderer's own XDRAW, op 9 its page select, and 16 the display mode - a
+double-buffered, erasable drawing system the shipped game never asks for. Nothing on the disk
+emits any of the five, and the port's parser stops at anything outside 0-4, which comes to the
+same thing for every list it is given.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -4515,33 +4563,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **What feeds the ENV. CONTROL readout, if anything.** 38194 is MEM TRANSFER A's loop counter
   and COM shows it as a system percentage. Whether the game was ever meant to have an env.
   control system, or the address was simply reused, is not knowable from the disk.
-- **Five display-list opcodes.** `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` are in the
-  table at `$6076` and no model on the disk reaches them.
-
-### Rendering
-
-Nothing left. Transform, object scale, frustum, clipping, projection, the line routine, its
-address arithmetic and the display list are all read from the disk rather than fitted, and the
-ship, the starfield and the ground each agree with the machine on every pixel in every state
-captured. What used to be here - fitted focal lengths, a float `projectCameraSpace()`, opcode 3
-chosen on a 1% margin, ships at 71.9% - is superseded.
-
-One thing remains unanswered rather than wrong: **what state `$6000` needs before it will
-draw.** Snapshot and replay sidesteps the question instead of answering it.
-
-### Things in the port with no counterpart on the disk
-
-Both of the ones that were here are gone: `renderPlanet()`'s procedural disc, and the
-fabricated `ship-N.json` / `planet-N.json` shape tables, which have been deleted along with
-the code that read them. Everything drawn in flight now comes from the disk.
-
-One thing in that area is left, and it is not fabricated - `enemySourceBitmap` comes from an
-AppleWin state dump (`data/debug/applewin-space-vikings-state.json`), a real capture of
-unverified provenance. It is only reached when the bytecode path produces nothing, which it
-no longer does.
-
-### Smaller
-
 - **Names for the flags.** `38164`, `38207`, `38208`, `38210` and the rest are used
   correctly because their use sites are known, but what the original's author called them
   is not.

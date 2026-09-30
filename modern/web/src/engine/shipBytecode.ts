@@ -116,6 +116,11 @@ export function parseShipBytecode(bytes: number[]): ShipBytecodeOp[] {
       continue;
     }
 
+    // $6162 ends a list only on an opcode with bit 7 set or one at or above $12; 5 to 17 it
+    // dispatches through the table at $6076. This stops at anything outside 0-4, which comes
+    // to the same thing for every list the port is given - the ship, star and ground models
+    // use nothing above 4 - and is why those three agree with the machine on every pixel.
+    // The five handlers nobody's list reaches are read in oracle/probe_opcodes.mjs.
     ops.push({
       kind: 'unknown',
       opcode,
