@@ -5281,6 +5281,36 @@ same five columns.** `HCOLOR= 1` and `HCOLOR= 5` differ only in the palette bit,
 changing state is invisible to a lit-or-not comparison - which is exactly why the byte needed
 checking rather than the picture.
 
+### EX's burst, predicted from one seed
+
+`ex_parity.mjs` had EX's flash exact - line 6's five XDRAWs, 1,036 pixels on and 98 off - and
+checked lines 7 to 30 only by their extent, because the burst is 240 segments drawn from 480 RND
+draws and nothing was replaying them. An extent proves very little: the disk's run spanned
+x 16-259 and the port's x 19-248, and both are inside what line 20 allows.
+
+The port's RND is bit-exact, so the whole thing follows from one seed.
+`oracle/probe_exburst.mjs` captures the five bytes at `$00C9` the moment EX reaches line 7, the
+page as it stands then, and the page again once the loops are done;
+`oracle/ex_burst_parity.mjs` draws the burst over the first with that seed and compares.
+
+**6,775 pixels on both sides, 0 of 53,760 differing.** Two draws per segment, 480 of them in
+order, through line 20's two subtractions, 21 and 22's clamps and HPLOT's truncation.
+
+Three things had to be got right to take the capture at all, and each was wrong the first time.
+
+- **1501 is `IF PEEK(38202) = 1 THEN 1000`, and 1000 is the missile routine** - 1090 spends
+  38187 there. So 38202 = 1 selects missiles, and only the laser path from 1502 on reaches
+  1560's `RUNEX`. A new game starts at 1, so holding the button just fired missiles.
+  That settles the panel gauge too: GALAXY MAP 5030 paints (7,161), under MISSILE, **white**
+  when 38202 is not 1 - so **white marks the gauge that is not selected**, which is the same
+  way round as MANUAL and AUTO on the resting screen.
+- **1540 only computes DP while `PEEK(38210) = 0`**, so the enemy can only be blown up from
+  space, not from the atmosphere.
+- **Line 30 is the outer `NEXT`,** so it comes round once per X1 step, sixteen times. Stopping
+  at the first of them caught fifteen segments of the two hundred and forty - 852 pixels - and
+  the replay then looked as though the port were drawing eight times too much. Line 40 is the
+  first thing past the loops.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
