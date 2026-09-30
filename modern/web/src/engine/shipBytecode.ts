@@ -1,5 +1,5 @@
 import type { Hires } from './hires';
-import { type Vec3 as ProjVec3 } from './diskProjection';
+import { type Vec3 as ProjVec3 } from './math3d';
 import {
   viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, outcode67EF, clipFrustum61B7,
   SNAPSHOT_VIEW, type ObjectView,

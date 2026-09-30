@@ -1,9 +1,10 @@
 /**
  * The renderer's rotation matrix, transcribed from $6000.
  *
- * `toCameraSpace()` in `diskProjection.ts` builds its matrix from a pair of Q15 tables read
- * back as floats, and rotates by heading and pitch only. The machine rotates by three angles
- * and never leaves fixed point. The
+ * The fitted `toCameraSpace()` that used to live in `diskProjection.ts` built its matrix from a
+ * pair of Q15 tables read back as floats and rotated by heading and pitch only. The machine
+ * rotates by three angles and never leaves fixed point, which is why this replaced it and why
+ * that file is gone. The
  * nine Q15 entries at $7E-$8F come from a 65-entry quarter-cosine table at $609A, and both
  * that table and the code that reads it are lossy in ways that move pixels - so a float
  * rotation cannot reproduce the disk even in principle. Over a sweep of 357 angle triples a

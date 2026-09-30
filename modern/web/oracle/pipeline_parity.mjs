@@ -91,39 +91,10 @@ for (const k of ['unscaled', 'scaled', 'cam', 'bytes']) {
   if (firsts[k]) console.log(`      first: ${firsts[k]}`);
 }
 
-// And what the generated float path makes of the same points, for the record.
-const floatOut = await (async () => {
-  const b = await chromium.launch({ headless: true });
-  const p = await b.newPage();
-  await p.goto(PORT_URL, { waitUntil: 'load' });
-  await p.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.projectWorldPointFloat), null, { timeout: 10000 })
-    .catch(() => null);
-  const r = await p.evaluate((objects) => {
-    const sv = window.__spaceVikings;
-    if (!sv.projectWorldPointFloat) return null;
-    return objects.map((o) => o.points.map((pt) => sv.projectWorldPointFloat(
-      { x: pt.d[0] + o.origin[0], y: pt.d[1] + o.origin[1], z: pt.d[2] + o.origin[2] },
-      { x: o.origin[0], y: o.origin[1], z: o.origin[2] }, o.angles[2], o.angles[0],
-    )));
-  }, golden.objects);
-  await b.close();
-  return r;
-})();
-if (floatOut) {
-  let worst = 0, sum = 0, n = 0;
-  golden.objects.forEach((o, i) => o.points.forEach((p, j) => {
-    const f = floatOut[i][j];
-    const want = got[i].points[j].px;
-    if (!f || !want) return;
-    const e = Math.hypot(f.x - want.x, f.y - want.y);
-    worst = Math.max(worst, e); sum += e; n++;
-  }));
-  if (n) {
-    console.log('');
-    console.log(`the generated float path lands ${(sum / n).toFixed(2)} px from the fixed one on ` +
-      `average over ${n} vertices, worst ${worst.toFixed(2)} px`);
-  }
-}
+// The generated float path used to be run here too, for the record. It landed 0.81 px from the
+// fixed one on average over these 269 vertices and 2.41 px at worst - close enough to have
+// looked right for a long time, and wrong everywhere it mattered. `src/engine/diskProjection.ts`
+// has been deleted, so there is nothing left to compare against.
 
 console.log('');
 console.log(failures === 0 ? 'pipeline parity: clean' : `pipeline parity: ${failures} stage(s) failed`);

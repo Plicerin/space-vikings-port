@@ -370,5 +370,11 @@ export function projectWorldPoint(p: Vec3, camera: Vec3, heading: number, pitch:
   return projectCameraSpace(toCameraSpace(p, camera, heading, pitch));
 }
 ${clipTs}`;
-fs.writeFileSync('../src/engine/diskProjection.ts', ts);
-console.log('\nwrote ../src/engine/diskProjection.ts');
+// It used to write this straight out to ../src/engine/diskProjection.ts. It no longer does.
+// Every stage of the fit has since been read off the disk instead - the trig in diskRotation.ts,
+// the multiply and divide in diskProjectionFixed.ts, the frustum and the clipping in
+// diskPipeline.ts - and the generated file was deleted once nothing but a report line still
+// called it. The fit is kept because it is how the constants were first found and because
+// captured/projection_fit.json records what it measured, but its output is no longer source.
+fs.writeFileSync('captured/projection_source.ts.txt', ts);
+console.log('\nwrote captured/projection_source.ts.txt (no longer emitted into src/)');

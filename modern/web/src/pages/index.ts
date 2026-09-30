@@ -6,7 +6,6 @@ import { project68A1, project68A1ToScreen } from '../engine/diskProjectionFixed'
 import { cos64FB, sin64F8, mul635C, buildMatrix654E, toCameraSpace6730, applyObjectScale } from '../engine/diskRotation';
 import { viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, projectCameraSpaceBytes,
   projectWorldPointFixed, outcode67EF, clipFrustum61B7, clipEnd6979 } from '../engine/diskPipeline';
-import { projectWorldPoint as projectWorldPointFloat } from '../engine/diskProjection';
 import { soundGen9276, laser92D1, expl9276 } from '../engine/diskSound';
 import { lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS, rollArtRate,
   repairBill2500, repairAvailable2505, repairPayment2560, REPAIR_SYSTEMS } from '../engine/diskEconomy';
@@ -122,7 +121,7 @@ function boot(): void {
     projectShipWorld, drawShipWorld, drawComMainScreen, drawPanelNeedles, drawStatusReport, drawTroopReport, eraseComNeedleTracks, drawGalaxyMap, drawGalaxyCursor, drawRadarOverlay, drawRadarScreen, radarCamera, drawGroundForcesMenu, drawGroundForcesBattle, drawShoreLeavePay, drawShoreLeaveCryogenics, drawSupplyPage1, drawSupplyPage2, drawOrbitScreen, drawCollectMessage, drawCollectSuccess, awardLoot, drawRecall, recallMessage, drawExBurst, drawExFlash, drawPlayerDeathBackground, drawPlayerDeathMessage, drawDamageLamp, drawEndMenu, drawShipId, project68A1, project68A1ToScreen,
     cos64FB, sin64F8, mul635C, buildMatrix654E, toCameraSpace6730, applyObjectScale,
     viewMatrix, toCameraSpaceFixed, projectCameraSpaceFixed, projectCameraSpaceBytes,
-    projectWorldPointFixed, projectWorldPointFloat, outcode67EF, clipFrustum61B7, clipEnd6979,
+    projectWorldPointFixed, outcode67EF, clipFrustum61B7, clipEnd6979,
     soundGen9276, laser92D1, expl9276,
     lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS, rollArtRate,
     repairBill2500, repairAvailable2505, repairPayment2560, REPAIR_SYSTEMS,
