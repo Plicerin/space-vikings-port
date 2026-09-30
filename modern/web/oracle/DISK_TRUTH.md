@@ -3957,10 +3957,59 @@ to 100 instead of 63, and left nav. comp. out. `shoreLeave.ts` now calls `repair
 back at 100 with energy at 63, the bill is charged, and the four weapon prices appear after
 enlisting.
 
-Left alone as gates rather than prices: **2210's once-per-trip flag on enlisting** (38389, which
-2285 clears again when the troop count is refused) has no equivalent in the port's state, and
-neither does 2106's 38149 on building a base, which `baseRefusal2100` already takes as an
-argument but nothing supplies.
+### The two "one time per trip" gates
+
+Both print the same sort of thing and only one of them means it.
+
+```
+SHORE LEAVE  2106  IF PEEK(38149) = 1 THEN "ONLY ONE TIME PER TRIP, SIR."    a base
+             2107  POKE 38149,1
+             2210  IF PEEK(38389) = 1 THEN "ONE TIME PER TRIP."              troops
+             2220  POKE 38389,1
+             2285  IF TR + EN > 20000 THEN ... POKE 38389,0: GOTO 2200
+H/D           105  POKE 38206,0: POKE 38389,0: POKE 38149,0
+```
+
+H/D line 105 is the deliberate reset: a hyperdrive jump is what makes a trip a trip. But
+**38149 is not only the base flag** - three other lines use the same byte to pass a message:
+
+```
+STARSHIP SIMULATOR    9  POKE 38149,7
+                    182  IF PEEK(38149) = 7 THEN POKE 38149,0: GOTO 200
+GALAXY MAP         3260  POKE 38149,8 ... RUN COM
+COM                1007  IF PEEK(38149) = 8 THEN POKE 38149,0
+```
+
+Line 9 runs every time STARSHIP SIMULATOR starts and pokes 7 **unconditionally**, so returning
+to flight destroys whatever the base flag held, and 182 then clears it to 0 on the first pass.
+`oracle/probe_tripgates.mjs` measures it rather than arguing it, reading both bytes at each step
+of COM -> GROUND FORCES -> COM -> flight:
+
+| where | 38149 | 38389 |
+| --- | --- | --- |
+| set in COM | 1 | 1 |
+| after `RUN GROUND FORCES` | 1 | 1 |
+| back in COM | 1 | 1 |
+| **after returning to flight** | **0** | **1** |
+
+So a base is **one per landing** and troops are **one per jump**, although both lines say
+"trip". Nothing writes 38389 but SHORE LEAVE and H/D, which is why it survives.
+
+Two smaller things in the same corner. 2107 sets the flag **before the price is even shown**, so
+being turned away at 2130 for want of credits still spends the attempt - and answering N at 2140
+spends it too. And 2285 hands the trip back when the troop count asked for would take the total
+over 20000, while 2280's "you don't have the credits" does not; so an impossible number is free
+and an unaffordable one is not.
+
+The port had neither gate: `baseRefusal2100` already took `alreadyTriedThisTrip` as an argument
+but nothing supplied it, and ENLIST TROOPS had no check at all. `gameState` now carries
+`baseTriedThisLanding` and `enlistedThisTrip` - named for what they actually do - cleared by the
+cockpit's own init and by the hyperdrive respectively. ESTABLISH BASE also now calls
+`baseRefusal2100` and `baseCost2170` instead of re-implementing both inline.
+
+Driven through the running game: a second base attempt in one landing gives "ONLY ONE TIME PER
+TRIP, SIR.", a second enlistment gives "ONE TIME PER TRIP.", and after COM's RETURN to flight the
+base flag is clear while the enlist flag is still set.
 
 ### What this leaves the predicates for
 

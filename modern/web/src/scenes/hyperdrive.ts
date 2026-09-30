@@ -137,6 +137,10 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   state.energy = Math.max(0, state.energy - jumpCost);
   // Line 5's POKE 301,0 - COLLECT's loot rates go back to full for the new trip.
   state.collectedThisTrip = false;
+  // H/D line 105 `POKE 38206,0: POKE 38389,0: POKE 38149,0` - the jump is what makes a trip a
+  // trip, so both of SHORE LEAVE's once-per-trip flags go with it.
+  state.enlistedThisTrip = false;
+  state.baseTriedThisLanding = false;
 
   // Lines 90-93. TECH is the destination's, because line 26 has already moved 38209.
   const tech = state.planets[state.planetIndex]?.defense ?? 0;

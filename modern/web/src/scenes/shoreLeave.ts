@@ -1,5 +1,6 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
-import { lootValue2400, rollArtRate, repairBill2500 } from '../engine/diskEconomy';
+import { lootValue2400, rollArtRate, repairBill2500, baseRefusal2100,
+  baseCost2170 } from '../engine/diskEconomy';
 import { setScene, log as glog } from '../engine/gameLog';
 import { clearPendingConquestCollection } from '../engine/commander';
 import { writeLines } from '../engine/menu';
@@ -448,6 +449,17 @@ async function enlistTroops(ctx: SceneContext, scenes: SceneManager): Promise<vo
   hires.text('ENLIST TROOPS', 3, 2);
   hires.hcolor(1);
 
+  // 2210 is tested before 2240, so a second visit is turned away whether or not the planet
+  // has surrendered - and 2220 sets the flag before any of the rest of the screen runs.
+  if (state.enlistedThisTrip) {
+    hires.text('ONE TIME PER TRIP.', 2, 4);
+    hires.hcolor(5);
+    hires.text('PRESS ANY KEY...', 2, 20);
+    await input.waitForKey();
+    return scenes.run('groundForces');
+  }
+  state.enlistedThisTrip = true;                    // 2220
+
   if (!state.planetSurrendered) {
     writeLines(hires, 2, 4, ["THE PLANET HAS NOT", 'SURRENDERED YET!!']);
     hires.hcolor(5);
@@ -477,6 +489,9 @@ async function enlistTroops(ctx: SceneContext, scenes: SceneManager): Promise<vo
     await wait(2000);
   } else if (state.forces.troops + en > 20000) {
     hires.text('TOO MANY TROOPS.', 2, 15);
+    // 2285 `POKE 38389,0: GOTO 2200` - asking for an impossible number costs nothing, so the
+    // trip's one enlistment is handed back. 2280's "you don't have the credits" does not.
+    state.enlistedThisTrip = false;
     await wait(2000);
   } else {
     state.forces.troops = Math.min(20000, state.forces.troops + en);
@@ -507,14 +522,24 @@ async function establishBase(ctx: SceneContext, scenes: SceneManager): Promise<v
   hires.text('ESTABLISH BASE', 3, 2);
   hires.hcolor(1);
 
-  if (state.planets[state.planetIndex].hasBase) {
+  // 2100-2106, in the order the BASIC tests them. 2107 then sets the flag *before* the price
+  // is even shown, so a refusal at 2130 for want of credits still spends the attempt.
+  const refusal = baseRefusal2100({
+    alreadyThere: state.planets[state.planetIndex].hasBase,
+    tooBackward: state.planets[state.planetIndex].defender < 2,
+    alreadyTriedThisTrip: state.baseTriedThisLanding,
+  });
+  if (refusal === 'THERE IS ALREADY A BASE ON THIS PLANET, SIR!') {
     hires.text('THERE IS ALREADY', 2, 4);
     hires.text('A BASE ON THIS', 2, 5);
     hires.text('PLANET, SIR!', 2, 6);
-  } else if (state.planets[state.planetIndex].defender < 2) {
+  } else if (refusal === 'THIS PLANET IS TOO BACKWARD TO BUILD A BASE, SIR!') {
     writeLines(hires, 2, 4, ['THIS PLANET IS TOO', 'BACKWARD TO BUILD', 'A BASE, SIR!']);
+  } else if (refusal !== null) {
+    writeLines(hires, 2, 4, ['ONLY ONE TIME PER', 'TRIP, SIR.']);
   } else {
-    const cost = Math.floor(20000 + (Math.random() * 5000) * (Math.random() * 10));
+    state.baseTriedThisLanding = true;              // 2107
+    const cost = baseCost2170();                    // 2170, and 2110's INT
 
     writeLines(hires, 2, 4, [
       'SIR! IT WILL COST',

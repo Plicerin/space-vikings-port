@@ -166,6 +166,11 @@ export async function cockpitScene(
   const { hires, state, input, audio, loader } = ctx;
   applyCockpitDebugOverrides(state);
   setScene('cockpit');
+  // STARSHIP SIMULATOR line 9 is `POKE 38149,7` and runs on every start, and 182 clears it
+  // to 0 on the first pass - so coming back to flight wipes ESTABLISH BASE's flag whatever it
+  // held. Confirmed on the machine in oracle/probe_tripgates.mjs. It is why a base is one per
+  // landing while enlisting, whose flag nothing else touches, is one per jump.
+  state.baseTriedThisLanding = false;
   glog('init', `pos=(${state.x},${state.y},${state.z}) atm=${state.atmosphere} orbit=${state.inOrbit}`);
 
   let pitchRad = pitchByteToRad(state.pitch);

@@ -323,6 +323,27 @@ export class GameState {
    * one and every later haul on the same trip is worth 60%.
    */
   collectedThisTrip = false;
+  /**
+   * 38149 - SHORE LEAVE 2107 sets it and 2106 refuses a second base with "ONLY ONE TIME PER
+   * TRIP, SIR."
+   *
+   * It is not a trip flag though, whatever 2106 prints. STARSHIP SIMULATOR line 9 is
+   * `POKE 38149,7` and runs every time the program starts, and 182 is
+   * `IF PEEK(38149) = 7 THEN POKE 38149,0`, so simply **returning to flight wipes it**.
+   * Measured on the machine in `oracle/probe_tripgates.mjs`: it survives COM and GROUND
+   * FORCES and comes back 0 after COM's RETURN. So a base is one per landing, not one per
+   * jump - hence the name. GALAXY MAP 3260 and COM 1007 use the same byte again, as an 8, to
+   * pass a "show me this planet" message.
+   */
+  baseTriedThisLanding = false;
+  /**
+   * 38389 - SHORE LEAVE 2220 sets it and 2210 refuses a second enlistment.
+   *
+   * This one really is per trip: nothing writes it but SHORE LEAVE and H/D line 105, so it
+   * survives the return to flight that clears [[baseTriedThisLanding]]. 2285 clears it again
+   * when the troop count asked for would go over 20000, so a refused count costs nothing.
+   */
+  enlistedThisTrip = false;
 
   /**
    * Byte 38393, the ship-damaged lamp. START line 2030 clears it, STARSHIP SIMULATOR line
