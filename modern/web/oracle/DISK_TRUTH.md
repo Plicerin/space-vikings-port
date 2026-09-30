@@ -4875,16 +4875,52 @@ every step of the route**, and five of the six compared screens exact in full:
 | galaxy map -> COM | 11487 | 11487 | **0** |
 | COM -> computer | 11651 | 11651 | **0** |
 | status -> on | 34369 | 34369 | **0** |
-| computer -> status | 35020 | 32991 | 2029 |
+| computer -> status | 32991 | 32991 | **0** |
 
-Two notes on that table. Text row 23 - line 155's five numbers - is left out of the count on the
-two steps that carry it: they are the ship's live position and the two machines are not at the
-same point in the same flight. And the `galaxy map -> COM` capture was wrong before this: the
-probe settled on the **program** and caught COM between line 70 and line 90, with the damage
-grid up and no menu, and that went into the golden as a finished screen. It now waits for the
-lit-pixel count to stop changing as well, which is also what turned `computer -> status` from
-32,991 into 35,020 - so **STATUS's first page is short by 2,029 pixels in rows 41 to 123**, and
-that is the one thing on this route still outstanding. Its second page is exact.
+Text row 23 - line 155's five numbers - is left out of the count on the two steps that carry it:
+they are the ship's live position and the two machines are not at the same point in the same
+flight.
+
+### Settling on a screen that is nearly all ink
+
+The capture, not the port, was wrong twice here, and the second way is worth writing down.
+
+The first was settling on the **program**: `probe_transitions.mjs` waited until the loaded
+program stopped changing, which caught COM between line 70 and line 90 - damage grid up, no
+menu - and stored that as a finished screen. That is what the `galaxy map -> COM` step's 2,822
+differing pixels were.
+
+So it grew a second wait, for the drawing to stop. The first version of that **counted the
+non-zero bytes** of hi-res page 1, and that measure is blind on exactly the screen that needed
+it. STATUS floods rows 0 to 123 and then prints in inverse: nearly every byte in the region is
+non-zero before a word is written, and knocking a glyph out of an inverse cell barely moves the
+count. It settled on a page that had got as far as `CON` of `CONDITION:`, recorded 35,020 lit
+against the port's 32,991, and I reported STATUS's first page as short by 2,029 pixels. It is
+not. Hashing the page instead of counting anything about it gives 32,991 on both sides and
+`transition parity: clean`.
+
+The lesson is narrow and worth keeping: **a settle has to compare the thing itself, not a
+statistic of it.** Any count can be stationary while the picture moves, and an inverse screen
+makes that the normal case rather than the unlucky one.
+
+### STATUS, with the numbers made awkward
+
+`status_parity.mjs` reported both pages exact, but against one capture of one state - a fresh
+ship, every system at 100%, condition RED, morale EXCELLENT!, troops in cryogenic sleep. A
+screen full of the same three-digit number proves very little about the columns:
+`PRINT "ENERGY  :";EN;"%"; TAB( 22);"CREDITS  :"` only puts the second field where TAB( 22) says
+while the cursor has not already passed column 21, and the same goes for the `HTAB 22` in
+5100-5120 and the `HTAB 24` on the troop page.
+
+`status_values_parity.mjs` pokes the eighteen bytes the report reads to a mixture of widths -
+a zero for missiles, one digit for shields, 250 for tanks, energy at 31 so line 1255's
+`INT((31 / 62) * 100)` gives 50 - takes the branches the route's own capture never takes
+(condition GREEN, morale FAIR, troops PLANETSIDE), and enters STATUS from COM the way a player
+does. SD, TR and CR are not bytes, so they come off the machine's variable table: SD arrives as
+100.30000001192093, which is the Applesoft float, and printing it as `100.3` is itself a check
+of the nine-significant-digit rule.
+
+Both pages: **30,093 lit against 30,093 and 31,466 against 31,466, nothing differing.**
 
 ### What this leaves the predicates for
 

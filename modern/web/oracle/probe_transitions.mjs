@@ -82,12 +82,17 @@ const step = async (label, key, { settle = 22, tries = 800, settlePixels = true 
   // the finished screen. So count the lit pixels until they stop changing. The flight view
   // never repeats, so it passes `settlePixels: false` and keeps the fixed wait.
   if (settlePixels) {
-    let prev = -1, still = 0;
-    for (let i = 0; i < 200; i++) {
+    // Hash the page, do not count anything about it. Counting non-zero **bytes** was the first
+    // try and it is blind on exactly the screen that needed it: STATUS floods rows 0-123 and
+    // then prints in inverse, so nearly every byte in the region is non-zero from the start and
+    // the count barely moves while the text goes down. It settled on a screen that had got as
+    // far as "CON" of "CONDITION:" and put that in the golden as the finished page.
+    let prev = '', still = 0;
+    for (let i = 0; i < 300; i++) {
       await a2.frames(10);
-      const lit = (await a2.readRange(0x2000, 0x4000)).reduce((a, b) => a + (b ? 1 : 0), 0);
-      if (lit === prev) still++; else still = 0;
-      prev = lit;
+      const h = await a2.ev(`window.M.hash(0x2000, 0x4000)`);
+      if (h === prev) still++; else still = 0;
+      prev = h;
       if (still >= 12) break;
     }
   } else {
