@@ -3539,6 +3539,69 @@ where a run of shots ends up, and the harness compares it that way.
 
 ---
 
+## RECALL, all five branches
+
+RECALL is five ordered tests and nothing else. Only one had ever been run, because a new game
+always has the troops asleep.
+
+```
+2000  IF PEEK(38209) <> PEEK(38158) AND PEEK(38166) > 0 AND PEEK(38166) < 3
+      -> "TROOPS ARE NOT ON" / "" / "THIS PLANET, SIR!"
+2005  IF TR = 0          -> "WE HAVE NO TROOPS" / "LEFT, SIR!"        and POKE 38166,0
+2010  IF PEEK(38166) = 1 OR PEEK(38166) = 2
+                         -> "TROOPS ARE BEING" / "RECALLED, SIR!"     and POKE 38166,0
+2020  IF PEEK(38166) = 3 -> "TROOPS ARE IN" / "CRYOGENIC SLEEP!"
+2030  IF PEEK(38166) = 0 -> "TROOPS ARE ALREADY" / "ON BOARD, SIR!"
+```
+
+38166 is where the troops are - 0 on board, 1 or 2 being recalled, 3 asleep - and 38158 is the
+planet they are on. Only 2005 and 2010 poke it; the other three leave it alone. Line 2000's
+message carries a blank line between its two, and the `PRINT:` at the head of 2000 puts one
+above all five.
+
+Four of the five are a matter of setting 38158 and 38166 before pressing 2.
+
+### The fifth needed taking the CPU over
+
+`TR` is not a PEEK. It is read off the MISC FILE at line 11, and there is no poking a DOS file.
+So `oracle/probe_recallbranches.mjs` presses 2 and then steps the machine by hand until `TR`
+appears in Applesoft's variable table, writes a zero into its exponent byte - which is how a
+five-byte Applesoft float says zero - and lets it run on into 2005.
+
+Two things had to be got right for that to mean anything.
+
+**Zero the right TR.** GROUND FORCES has a `TR` of its own, read from the same file at its own
+line 11, and pressing 2 does not clear it until DOS actually runs RECALL. Zeroing the one that
+is there when the key goes down changes nothing, because the `RUN` wipes the variable table and
+RECALL reads `TR` back off the file. So wait for that wipe first - `VARTAB == ARYTAB` is what an
+empty table looks like.
+
+**Wait for a non-zero TR.** Applesoft creates the slot at zero when `INPUT` names it and fills
+it a moment later, so accepting zero means zeroing something that is about to be overwritten.
+That is exactly what happened on the first two attempts, and the tell was that 2005's page came
+out identical to 2030's - which it cannot be, since TR is the only thing separating them. The
+probe now checks that pair explicitly rather than trusting that the poke landed.
+
+### Checked
+
+| line | what it says | 38166 | pixels differing |
+| --- | --- | --- | --- |
+| 2000 | troops are not on this planet | left at 1 | 0 |
+| 2005 | we have no troops left | poked to 0 | 0 |
+| 2010 | troops are being recalled | poked to 0 | 0 |
+| 2020 | troops are in cryogenic sleep | left at 3 | 0 |
+| 2030 | troops are already on board | left at 0 | 0 |
+
+All five take the branch the port picks, poke what the port pokes, and match pixel for pixel.
+
+One exclusion, stated because it is an exclusion: rows 184-190 hold the DOS command line the
+previous program echoed when it ran RECALL - GROUND FORCES' own `PRINT D$;"RUN RECALL"`. It is
+on the page before RECALL draws anything, RECALL never touches it, and the port's replay chain
+starts from a synthetic panel and COM composite that never had a DOS prompt on it. 231 pixels,
+identically in all five captures, and the comparison is over rows 0-183.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -3550,8 +3613,6 @@ is what is genuinely not known, roughly in order of how much it matters.
   mechanism in the character generator is not derived.
 - **EX line 6's XDRAW.** The port draws the five flash shapes rather than XORing them, which
   differs wherever the flight view already has a pixel.
-- **Four of RECALL's five branches.** Only line 2020 has been run; a new game always has the
-  troops in cryogenic sleep.
 - **COLLECT's tech 1 path.** Lines 840-900, including the line 880 silver bug, have never
   been run - every assault reached so far has been tech 3.
 - **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read
@@ -3569,8 +3630,10 @@ is what is genuinely not known, roughly in order of how much it matters.
   it no `RND`-driven routine can be reproduced exactly - which is why the combat is checked
   by predicate rather than by replay, and why EXPL's noise can only be matched given the same
   floating-bus reads. Transcribing it means transcribing Applesoft's floating point.
-- **Four of RECALL's five branches.** The economy, GROUND FORCES' combat, the damage model and
-  the weapons are done; there is no enemy AI to do. RECALL is what is left of the game logic.
+- **The game logic is done.** The economy, GROUND FORCES' combat, the damage model, the
+  weapons and all five of RECALL's branches have been run against the disk, and there is no
+  enemy AI to do. What is left of the BASIC is COLLECT's tech-1 path and two of SHORE LEAVE's
+  sub-screens, both listed above as reachable-state gaps rather than unread code.
 - **What feeds the ENV. CONTROL readout, if anything.** 38194 is MEM TRANSFER A's loop counter
   and COM shows it as a system percentage. Whether the game was ever meant to have an env.
   control system, or the address was simply reused, is not knowable from the disk.
