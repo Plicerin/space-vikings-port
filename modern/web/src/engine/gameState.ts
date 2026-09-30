@@ -214,9 +214,17 @@ export class GameState {
   // ---------------------------------------------------------------------
 
   forces = {
-    /** Manual: max 20,000 troops. STATUS displays as PEEK(38167)*256 + PEEK(38159),
-     *  and SHIP'S DATA-M holds 3 and 20 there - so a new game has **788**. */
-    troops: 788,
+    /**
+     * Max 20,000 (SHORE LEAVE 2285). **2000 to start, and it comes from MISC FILE.**
+     *
+     * The troop count is the Applesoft variable TR, and five programs read it the same way -
+     * `OPEN MISC FILE: READ MISC FILE: INPUT SD: INPUT TR: INPUT CR` at SHORE LEAVE 11,
+     * GROUND FORCES 11, SUPPLY 5000, STATUS 5000 and H/D 6. The file on the disk holds
+     * `100.3`, `2000`, `10000`. STATUS 1330 prints `TR` itself - not the PEEKs a note here
+     * used to claim - so 38167 and 38159 are not the troop count and their 3 and 20 are
+     * something else.
+     */
+    troops: 2000,
     /** Max 255 each. Assault transports carry 1000 troops apiece. */
     transports: 6, // PEEK(38155)
     fighters: 75, // PEEK(38156)

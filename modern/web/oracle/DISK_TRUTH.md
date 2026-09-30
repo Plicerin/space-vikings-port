@@ -4492,15 +4492,29 @@ The opening ship, then:
 | shields | 100, and **off** |
 | condition | **red** |
 | weapon | **missiles**, 60 aboard |
-| troops | **788** - 38167 is 3 and 38159 is 20, and STATUS reads them as 3 x 256 + 20 |
+| troops | **2000**, and not from this file at all - see below |
 | troops' state | **3, cryogenic sleep**, on planet 1 |
 | transports / fighters / tanks / ground missiles | **6 / 75 / 0 / 0** |
 | morale | 6, excellent |
 | everything else | 100, and the whole cargo hold empty |
 
-The port had eight of those wrong - speed 60, condition green, env 100, troops 1000, transports
-4, fighters 8, tanks 8, ground missiles 8, and the troops on board rather than frozen. It starts
+The port had eight of those wrong - speed 60, condition green, env 100, troops, transports 4,
+fighters 8, tanks 8, ground missiles 8, and the troops on board rather than frozen. It starts
 where the disk starts now, checked in the running game.
+
+**The troop count is not in this file.** A note here claimed STATUS displays it as
+`PEEK(38167) * 256 + PEEK(38159)`, and 3 and 20 sit at those addresses, which gives a tidy 788.
+STATUS 1330 is `PRINT "NO. OF TROOPS"; TAB(18);"-"; TAB(24);TR` - the Applesoft variable - and
+five programs fill it the same way:
+
+```
+OPEN MISC FILE: READ MISC FILE: INPUT SD: INPUT TR: INPUT CR: CLOSE
+```
+
+at SHORE LEAVE 11, GROUND FORCES 11, SUPPLY 5000, STATUS 5000 and H/D 6. **MISC FILE**, a text
+file on the disk, holds `100.3`, `2000`, `10000` - the stardate, the troops and the credits. So
+a new game has **2000** troops, and whatever 38167 and 38159 are, they are not that. 788 was a
+plausible number from a wrong reading, which is the kind that survives longest.
 
 ### COLLECT at tech 1, run at last
 
@@ -4624,6 +4638,29 @@ So op 12 is the renderer's own XDRAW, op 9 its page select, and 16 the display m
 double-buffered, erasable drawing system the shipped game never asks for. Nothing on the disk
 emits any of the five, and the port's parser stops at anything outside 0-4, which comes to the
 same thing for every list it is given.
+
+### The stardate, and the only thing that moves it
+
+STATUS prints `STARDATE :` and the port's never changed: 100.3 from the first frame to the last,
+because nothing advanced it. **H/D line 6 is the whole calendar:**
+
+```
+6 OPEN MISC FILE: READ MISC FILE: INPUT SD: INPUT TR: INPUT CR: CLOSE
+  SD = SD + D1 + .3
+  OPEN MISC FILE: WRITE MISC FILE: PRINT SD: PRINT TR: PRINT CR: CLOSE
+```
+
+Nothing else on the disk assigns SD - every other program reads it and writes it back unchanged
+- so time passes only when you jump, and by the same `D1` the jump charges to energy. `D1` is
+`INT(SQR(X1^2 + Y1^2 + Z1^2) + .6)` where lines 10010's three variables are all the **same**
+expression, so it is `|dX| * sqrt(3)` rounded.
+
+Played: Sol to Sirius costs 4, energy goes 63 to 59, and the stardate goes 100.3 to **104.6** -
+`100.3 + 4 + 0.3`. STATUS shows it.
+
+This was found by playing rather than by a harness, and it is the sort of thing no harness here
+would have found: every capture is a single screen, and a clock that never ticks looks exactly
+like a clock in a screenshot.
 
 ### What this leaves the predicates for
 

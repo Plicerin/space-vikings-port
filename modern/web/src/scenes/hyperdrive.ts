@@ -68,7 +68,19 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   const dxByte = dst.x - src.x;
   const jumpCost = Math.floor(Math.sqrt(3 * dxByte * dxByte) + 0.6);
   state.jumpDistance = distance;
-  glog('hyperdrive', `jumping to ${dst.name} dist=${distance.toFixed(1)}`);
+
+  // Line 6, the only thing on the disk that moves the clock:
+  //
+  //   OPEN MISC FILE: READ MISC FILE: INPUT SD: INPUT TR: INPUT CR: CLOSE
+  //   SD = SD + D1 + .3
+  //   OPEN MISC FILE: WRITE MISC FILE: PRINT SD: PRINT TR: PRINT CR: CLOSE
+  //
+  // Nothing else on the disk assigns SD, so a jump is the whole calendar - and the same D1
+  // the energy is charged. This was missing, so the stardate sat at the 100.3 MISC FILE
+  // starts it at for the entire game. Found by playing it and watching STATUS not move.
+  state.stardate = Math.round((state.stardate + jumpCost + 0.3) * 10) / 10;
+  glog('hyperdrive', `jumping to ${dst.name} dist=${distance.toFixed(1)}` +
+    ` cost=${jumpCost} stardate=${state.stardate}`);
 
   // Lines 17-20 and 76-80, the jump itself.
   //
