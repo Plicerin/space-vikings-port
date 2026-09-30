@@ -79,8 +79,9 @@ export class GameState {
   // ---------------------------------------------------------------------
 
   /** Speed S = PEEK(38157)=$950D. Range 0..120 (clamped in
-   *  STARSHIP SIMULATOR.bas:207-208). 1/2 keys = ±3, 3/4 keys = ±15. */
-  speed = 60;
+   *  STARSHIP SIMULATOR.bas:207-208). 1/2 keys = ±3, 3/4 keys = ±15.
+   *  A new game starts at **120**, flat out: it is byte 7 of SHIP'S DATA-M. */
+  speed = 120;
 
   /** Hyperdrive engaged ($953A == 1?). H key when nav destination set. */
   hyperdriveActive = false;
@@ -99,7 +100,9 @@ export class GameState {
   shieldsOn = false;
   /** Battle-station condition. B key advances green→blue→red→green.
    *  Anti-fighter turrets only fire at red. */
-  condition: Condition = 'green';
+  // A new game starts at RED, not green: SHIP'S DATA-M holds 2 and INSTRUMENTS 210's
+  // `CALL 38402` writes 3 over it before the first frame.
+  condition: Condition = 'red';
   /** Number of missiles remaining. PEEK(38187)=$954B. Decremented by 2
    * per missile salvo (STARSHIP_SIM:1090). Initial 0 until restocked. */
   missilesRemaining = 60;
@@ -192,7 +195,9 @@ export class GameState {
     engine2Pct: 100,
     computerPct: 100,
     radarPct: 100,
-    envPct: 100,
+    // 128, not 100 - that is what byte 44 of SHIP'S DATA-M holds, and nothing writes it
+    // before the first frame. STATUS prints it as a percentage regardless.
+    envPct: 128,
     hullPct: 100,
     shieldsPct: 100,
     hyperdrivePct: 100,
@@ -209,23 +214,26 @@ export class GameState {
   // ---------------------------------------------------------------------
 
   forces = {
-    /** Manual: max 20,000 troops. STATUS displays as PEEK(38167)*256 + PEEK(38159). */
-    troops: 1000,
+    /** Manual: max 20,000 troops. STATUS displays as PEEK(38167)*256 + PEEK(38159),
+     *  and SHIP'S DATA-M holds 3 and 20 there - so a new game has **788**. */
+    troops: 788,
     /** Max 255 each. Assault transports carry 1000 troops apiece. */
-    transports: 4, // PEEK(38155)
-    fighters: 8, // PEEK(38156)
-    tanks: 8, // PEEK(38154)
-    groundMissiles: 8, // PEEK(38153)
+    transports: 6, // PEEK(38155)
+    fighters: 75, // PEEK(38156)
+    tanks: 0, // PEEK(38154)
+    groundMissiles: 0, // PEEK(38153)
     /** Troop location: PEEK(38166).
-     * 0 = ON BOARD, 1 = PLANETSIDE, 2 = SHORE LEAVE, 3 = CRYOGENIC SLEEP. */
-    troopLocation: 0 as 0 | 1 | 2 | 3,
+     * 0 = ON BOARD, 1 = PLANETSIDE, 2 = SHORE LEAVE, 3 = CRYOGENIC SLEEP.
+     * A new game starts at **3**, with the troops frozen. */
+    troopLocation: 3 as 0 | 1 | 2 | 3,
     /** Morale 1..6: AWFUL, POOR, SO-SO, FAIR, GOOD, EXCELLENT! (PEEK 38203).
      * Initial 6 (EXCELLENT) per START.bas:2030. */
     morale: 6 as 1 | 2 | 3 | 4 | 5 | 6,
     /** Currently engaged in surface battle. */
     inGroundBattle: false,
-    /** Which planet the troops are deployed on (-1 = on board ship). */
-    troopPlanetIndex: -1,
+    /** Which planet the troops are deployed on (-1 = on board ship).
+     *  START 2030 pokes 38158 to 1, so a new game has them at planet 1. */
+    troopPlanetIndex: 1,
   };
 
   /** Loot quantities, each at the unit/multiplier the manual lists. The

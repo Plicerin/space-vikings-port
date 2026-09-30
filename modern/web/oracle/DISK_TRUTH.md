@@ -4356,6 +4356,56 @@ Two things about aiming, neither guessable:
   0.5 and 0.8 gave a slope fitted to a flat line and sent the cursor to PY 0; 0.2 and 0.5 put it
   where it was asked for.
 
+### Where a new game's ship comes from
+
+38199 reads 63 on a fresh ship and no BASIC program pokes it, so the value had to arrive with a
+BLOAD. It does, and it does not arrive alone:
+
+```
+START 2020  BLOAD SHIP'S DATA-M,A$9506
+```
+
+54 bytes at `$9506`, which is **38150 to 38203** - the whole ship. Every weapon count, every
+system's health, the loot, the morale and the mode flags are that one file. (START 3020 loads
+`SHIP'S DATA` instead for a saved game; there is no such file on this disk, so a fresh image
+always starts from the master.)
+
+Read back from a freshly booted game, **49 of the 54 bytes are still exactly what the file
+holds**. The five that are not have two writers, both found by watching the bytes and recording
+the PC and the current line rather than by reading the listings:
+
+| byte | | file | first frame | who |
+| --- | --- | --- | --- | --- |
+| 38187 | missiles aboard | 100 | 60 | START 2030's `POKE 38187,60` |
+| 38158 | the troops' planet | 50 | 1 | START 2030's `POKE 38158,1` |
+| 38201 | shields on | 1 | **0** | INSTRUMENTS 210's `CALL 38402` |
+| 38202 | missile mode | 0 | **1** | INSTRUMENTS 210's `CALL 38402` |
+| 38165 | condition | 2 | **3** | INSTRUMENTS 210's `CALL 38402` |
+
+`CALL 38402` is `$9602`, inside TRANLIT.OBJ0, and the three writes come from `$9669`, `$968D`
+and `$96DE`. So the game opens with the **shields off, in missile mode, at red alert** - none of
+which any BASIC line says.
+
+The opening ship, then:
+
+| | |
+| --- | --- |
+| speed | **120**, flat out |
+| energy | **63**, not 100 - and SHORE LEAVE 2525 refills it to 63 too |
+| env. control | **128**, which is over the 100 everything else sits at |
+| shields | 100, and **off** |
+| condition | **red** |
+| weapon | **missiles**, 60 aboard |
+| troops | **788** - 38167 is 3 and 38159 is 20, and STATUS reads them as 3 x 256 + 20 |
+| troops' state | **3, cryogenic sleep**, on planet 1 |
+| transports / fighters / tanks / ground missiles | **6 / 75 / 0 / 0** |
+| morale | 6, excellent |
+| everything else | 100, and the whole cargo hold empty |
+
+The port had eight of those wrong - speed 60, condition green, env 100, troops 1000, transports
+4, fighters 8, tanks 8, ground missiles 8, and the troops on board rather than frozen. It starts
+where the disk starts now, checked in the running game.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -4379,9 +4429,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Two of SHORE LEAVE's six sub-screens.** ENLIST TROOPS and REPAIR/RESTOCK are not
   captured; REPAIR needs the ship in atmosphere. SELL LOOT and ESTABLISH BASE came out of
   `probe_economy.mjs`.
-- **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
-  program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
-  rides along in it, has not been traced.
 - **Replaying is done.** The damage tick, the combat, COLLECT's thirteen loot draws, line
   5000's ground fire and all four of SHORE LEAVE's price screens are replayed and exact.
   Nothing RND-driven is still checked by range alone.
