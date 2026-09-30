@@ -295,6 +295,28 @@ export class Hires {
     this.dirty = true;
   }
 
+  /**
+   * XDRAW's plot: the pixel is toggled, not set.
+   *
+   * Applesoft's XDRAW EORs a shape's bits into the screen instead of storing them, so a shape
+   * drawn over something already lit takes those pixels away. EX line 6 XDRAWs five shapes over
+   * the live flight view and `oracle/probe_exflash.mjs` measured the result on the machine:
+   * 1,036 pixels came on and **98 went off**, which a DRAW cannot do.
+   *
+   * The buffer holds a colour per pixel rather than the machine's packed bits, so the toggle is
+   * lit-to-dark and dark-to-lit. Under a phased HCOLOR `argbAt` returns 0 for the columns the
+   * colour does not paint, and this keeps that behaviour rather than inventing one: the only
+   * XDRAW on this disk runs under `HCOLOR= 3`, which paints every column.
+   */
+  hplotXor(x: number, y: number): void {
+    const ix = Math.round(x);
+    const iy = Math.round(y);
+    if (ix < 0 || ix >= W || iy < 0 || iy >= H) return;
+    const i = iy * W + ix;
+    this.buf[i] = this.buf[i] !== 0 ? 0 : this.argbAt(ix);
+    this.dirty = true;
+  }
+
   hplotTo(x: number, y: number): void {
     this.line(this.penX, this.penY, x, y);
     this.penX = x;

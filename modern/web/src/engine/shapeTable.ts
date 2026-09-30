@@ -248,12 +248,18 @@ export class ShapeRenderer {
     }
   }
 
-  /** XDRAW — Apple II's XOR variant. Modern port: same as draw. The original
-   *  uses XOR for sprite movement (draw, move, draw to erase). For the modern
-   *  port we'll re-render frames whole rather than XOR-blitting, so XDRAW
-   *  collapses to DRAW. */
+  /**
+   * XDRAW - the XOR variant, which toggles the pixels a shape would plot.
+   *
+   * This used to collapse to `draw()`, on the reasoning that the port re-renders whole frames
+   * rather than XOR-blitting sprites. That is true of the uses where a shape is drawn and drawn
+   * again to erase it, and wrong for EX line 6, which XDRAWs five shapes once, over a flight
+   * view it never clears. Measured there: 1,036 pixels came on and 98 went off.
+   */
   xdraw(table: ShapeTable, index: number, x: number, y: number): void {
-    this.draw(table, index, x, y);
+    for (const [px, py] of shapePixels(table, index, x, y, { rot: this.rot, scale: this.scale })) {
+      this.hires.hplotXor(px, py);
+    }
   }
 
   /** Draw a wireframe outline by plotting every discrete point along each plot

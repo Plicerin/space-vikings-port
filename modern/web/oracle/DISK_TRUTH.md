@@ -4218,6 +4218,61 @@ Line 3000 also ends with `HTAB 1: VTAB 20`, so Applesoft's current line sits at 
 *after* the PRINT has gone - which is the second way to start watching too late and see only the
 carriage return that follows.
 
+### EX line 6's XDRAW
+
+```
+5 HCOLOR= 3: Y1 = 20: EN = 30841: EX = 37494
+6 SCALE= 2: XDRAW 2 AT 140,65: XDRAW 15 AT 140,65: XDRAW 16 AT 140,65:
+  XDRAW 17 AT 140,65: XDRAW 18 AT 140,65: ... SCALE= 1
+```
+
+`XDRAW` EORs a shape's bits into the screen instead of storing them, and EX never clears: the
+flash goes straight over the live flight view. The port drew these, which is the same thing over
+empty space and not the same over a star, and that was recorded as a known simplification rather
+than something measured.
+
+Nothing about it can be settled from a finished screen, so `oracle/probe_exflash.mjs` captures
+the hi-res page **immediately before and immediately after line 6**. The difference is exactly
+the five shapes XORed onto whatever was underneath:
+
+| | |
+| --- | --- |
+| pixels the five XDRAWs turned **on** | 1,036 |
+| pixels they turned **off** | **98** |
+| where the flash lands | x 112-168, y 37-93, at SCALE 2 |
+
+The 98 settle it: a DRAW cannot take a pixel away. They are also exactly what the port used to
+get wrong - the pixels it left lit because it painted where the machine inverted.
+
+`Hires.hplotXor` toggles instead of storing, `ShapeRenderer.xdraw` uses it rather than being an
+alias for `draw`, and `ex_parity.mjs` now replays the machine's own "before" page through the
+port's `drawExFlash` and diffs it against the machine's "after":
+
+| | |
+| --- | --- |
+| the disk turned on / off | 1,036 / 98 |
+| the port turned on / off | 1,036 / 98 |
+| pixels differing after line 6 | **0** |
+
+Catching line 6 needed stepping rather than frame polling - lines 0 to 6 go past in a moment -
+and the slack came from line 4's `BLOAD SOUND GEN`, whose disk access lasts long enough that the
+program is detected and the stepper is watching well before the XDRAWs arrive.
+
+The buffer holds a colour per pixel rather than the machine's packed bits, so the toggle is
+lit-to-dark and dark-to-lit. Under a phased `HCOLOR` the port's `argbAt` returns 0 for the
+columns the colour does not paint, and `hplotXor` keeps that rather than inventing a rule: the
+only XDRAW measured here runs under `HCOLOR= 3`, which paints every column.
+
+**EX line 6 is not the only XDRAW on the disk.** A sweep of all twenty-three programs finds
+them in three shapes, and only the first is now settled:
+
+| where | what | how it stands |
+| --- | --- | --- |
+| EX 6 | five shapes, once, over the flight view | measured and exact |
+| STARSHIP SIMULATOR 1100, 1200, 1220, 1222 | the same shapes when a ship is destroyed | the port does not draw them at all |
+| STARSHIP SIMULATOR 1010/1060, 5090/5095, 5250 | draw, move, draw again to erase | harmless: the port re-renders each frame |
+| GALAXY MAP 3120/3200 | the cursor, toggled forever | the port draws it rather than inverting |
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -4233,8 +4288,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **EX line 6's XDRAW.** The port draws the five flash shapes rather than XORing them, which
-  differs wherever the flight view already has a pixel.
+- **The other XDRAWs.** EX line 6 is done, below. STARSHIP SIMULATOR 1100/1200/1220/1222 flash
+  the same shapes over the flight view when a ship is destroyed and the port does not draw them
+  at all; 1010/1060 and 5090/5095 are draw-then-erase pairs, where collapsing XDRAW to DRAW is
+  harmless because the port re-renders each frame; and GALAXY MAP 3120/3200 toggle the cursor,
+  which the port draws rather than inverts.
 - **COLLECT's tech 1 path.** Lines 840-900, including the line 880 silver bug, have never
   been run - every assault reached so far has been tech 3.
 - **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read

@@ -14,6 +14,7 @@ const stars = JSON.parse(fs.readFileSync('../public/data/shapes/starfield-byteco
 const snap = JSON.parse(fs.readFileSync('captured/snapshot/flight.json', 'utf8'));
 void snap;
 
+let failures = 0;
 const diskOn = new Uint8Array(HGR_W * HGR_H);
 for (const [x, y] of golden.screen.points) diskOn[y * HGR_W + x] = 1;
 
@@ -92,7 +93,61 @@ console.log(`    expected ${halved}: ${halved === golden.after['38207'] ? 'match
 console.log(`  30841 reads ${golden.model} - line 30 pokes 127 there, but line 40's BLOAD DEBRIS`);
 console.log('    lands on the same address, so the 127 never survives to be read.');
 
+// ---- line 6's flash, replayed over the page it actually ran on -------------------------------
+//
+// The burst is random and can only be checked by count and extent, but the flash is five fixed
+// shapes at a fixed place and so can be checked pixel for pixel - provided it starts from the
+// same page. probe_exflash.mjs captured the hi-res page immediately before and immediately
+// after line 6, so the port's drawExFlash can be run over the same "before" and diffed against
+// the machine's "after". That is what tells DRAW and XDRAW apart: over an empty page they agree.
+const flashFile = 'captured/exflash/golden.json';
+if (fs.existsSync(flashFile)) {
+  const f = JSON.parse(fs.readFileSync(flashFile, 'utf8'));
+  const b2 = await chromium.launch({ headless: true });
+  const p2 = await b2.newPage();
+  const errs2 = [];
+  p2.on('pageerror', (e) => errs2.push(e.message));
+  await p2.goto(PORT_URL, { waitUntil: 'load' });
+  await p2.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.drawExFlash),
+    null, { timeout: 30000 });
+  const got = await p2.evaluate(({ tj, before, w }) => {
+    const sv = window.__spaceVikings;
+    const shapes = sv.decodeShapeTableJson(tj);
+    const c = document.createElement('canvas');
+    c.width = 560; c.height = 384;
+    const h = new sv.Hires(c);
+    h.hgr();
+    // Lay the machine's page down as lit-or-not. Colour is not being compared, and the XOR
+    // only asks whether a pixel is on.
+    h.hcolor(3);
+    for (let i = 0; i < before.length; i++) if (before[i]) h.hplot(i % w, (i / w) | 0);
+    sv.drawExFlash(h, shapes);
+    return Array.from(h.snapshot().on);
+  }, { tj: tableJson, before: f.before, w: HGR_W });
+  await b2.close();
+  for (const e of errs2.slice(0, 3)) console.log('page error:', e);
+
+  let diff = 0;
+  let portOn = 0;
+  let portOff = 0;
+  for (let i = 0; i < f.after.length; i++) {
+    if ((got[i] ? 1 : 0) !== (f.after[i] ? 1 : 0)) diff++;
+    if ((got[i] ? 1 : 0) !== (f.before[i] ? 1 : 0)) { if (got[i]) portOn++; else portOff++; }
+  }
+  console.log('');
+  console.log("line 6's flash, replayed over the machine's own page:");
+  console.log(`  the disk turned ${f.turnedOn} pixels on and ${f.turnedOff} off`);
+  console.log(`  the port turned ${portOn} on and ${portOff} off`);
+  console.log(`  pixels differing from the machine's page after line 6: ${diff}` +
+    `${diff === 0 ? '  - exact' : '  DIFFERS'}`);
+  if (diff !== 0) failures = (failures || 0) + 1;
+}
+
 fs.mkdirSync('captured/ex', { recursive: true });
 fs.writeFileSync('captured/ex/port.png', toPng(Uint8Array.from(runs[0].on)));
 console.log('');
 console.log('wrote captured/ex/port.png');
+
+console.log('');
+console.log(failures === 0 ? 'EX parity: clean' : `EX parity: ${failures} check(s) failed`);
+process.exit(failures === 0 ? 0 : 1);

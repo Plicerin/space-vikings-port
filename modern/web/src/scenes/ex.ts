@@ -25,16 +25,18 @@ type H = import('../engine/hires').Hires;
 /**
  * Line 6's flash.
  *
- * The original XDRAWs these, so over the flight view they invert rather than paint. The port
- * draws them, which is the same thing over empty space and not the same over a star - a
- * known simplification, not something measured.
+ * The original XDRAWs these, so over the flight view they invert rather than paint, and the
+ * port does the same now. `oracle/probe_exflash.mjs` captured the page either side of line 6
+ * on the machine: 1,036 pixels came on and **98 went off**, the flash spanning x 112-168,
+ * y 37-93 at SCALE 2. Drawing them, which is what this did before, is right only on the pixels
+ * that were already dark.
  */
 export function drawExFlash(hires: H, shapes: ShapeTable): void {
   const r = new ShapeRenderer(hires);
   r.rot = 0;
   r.scale = 2;
   hires.hcolor(3);
-  for (const n of EX_FLASH_SHAPES) r.draw(shapes, n - 1, EX_FLASH_AT.x, EX_FLASH_AT.y);
+  for (const n of EX_FLASH_SHAPES) r.xdraw(shapes, n - 1, EX_FLASH_AT.x, EX_FLASH_AT.y);
 }
 
 /**
