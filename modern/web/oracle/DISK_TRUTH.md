@@ -3179,9 +3179,6 @@ address arithmetic and the display list are all read from the disk rather than f
 ship, the starfield and the ground each agree with the machine on every pixel in every state
 that has been captured.
 
-`radar.ts` and `cockpit.ts` pass the flight snapshot's object scale rather than their own,
-which is right for the flight view and unverified for the others.
-
 Five display-list opcodes - `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` - have not been
 read. None of the four models on the disk uses them.
 
@@ -4044,6 +4041,42 @@ returns the point mirrored through the origin - and the report line is gone.
 `fit_projection.mjs` itself is kept: it is how the constants were first found, and
 `captured/projection_fit.json` records what it measured. It no longer writes into `src/`, only
 `captured/projection_source.ts.txt`, so re-running it cannot put dead source back.
+
+### The object scale, in every view that draws
+
+`$690F` is `INY / LDA ($9B),Y / STA $600D,Y / CPY #$06 / BNE $690F` - six bytes copied out of the
+model stream into `$600D-$6013` - and `$6631` reads three of them back as 16-bit factors that
+scale the three rows of the rotation matrix. The mechanism is **per object**, so a model could
+carry its own triple, and the port carried one: `SNAPSHOT_SCALE = [16000, 32767, 9541]`, taken
+from the single object in the flight snapshot and handed to the cockpit and the radar alike.
+
+`oracle/probe_objectscale.mjs` traps `$6631` in every view that draws through `$6000`:
+
+| view | calls to `$6000` | objects per call | scale |
+| --- | --- | --- | --- |
+| flight, ship in space | 31 | 1 | 16000, 32767, 9541 |
+| in atmosphere, the ground | 19 | 1 | 16000, 32767, 9541 |
+| far out, the starfield | 19 | 1 | 16000, 32767, 9541 |
+| radar | 1 | 1 | 16000, 32767, 9541 |
+| ship I.D. | **0** | - | does not use the renderer |
+
+**One triple everywhere**, so the port was right, and is now right for a reason. The middle
+factor is `$7FFF`, which `$6631` takes as "skip the multiply", so row 1 passes through untouched.
+
+Three things worth keeping from how this was measured.
+
+- **`$6000` draws one object per call.** It is called once per object, not once per scene. The
+  first reading of this probe said "31 objects, one scale" and looked conclusive; counting the
+  calls to `$6000` alongside the hits showed it was 31 calls of one object each, which is a much
+  weaker fact. It needed a second and third state - atmosphere for the ground, and a long way out
+  for the starfield - before "one scale everywhere" meant anything.
+- **The ship I.D. screen does not use this renderer.** It loaded and ran and executed **zero**
+  instructions anywhere in `$6000-$6FFF` over 120 million instructions. It draws from its own
+  coordinate list, which is what `shipId.ts` already does.
+- **Long raw stepping has to tick the emulator.** Three recordings in a row left the keyboard
+  unserviced and COM would not start, and the state the flight variants poked in could not be
+  put back either. The menu views are measured on a second machine booted fresh for them, which
+  is cheaper than guessing which byte to restore.
 
 ### What this leaves the predicates for
 

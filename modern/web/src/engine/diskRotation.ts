@@ -292,8 +292,26 @@ export function applyObjectScale(
 
 
 /**
- * The scale the flight snapshot's one object carries, read at `$6631` by
- * `oracle/probe_pipeline.mjs`. It is patched per object from the model stream at `$690F`, so
- * this is a default rather than a constant of the renderer.
+ * The three factors `$6631` scales the matrix rows by, read at `$6631`.
+ *
+ * The mechanism is per object: `$690F` patches `$600D-$6013` from the model stream, so a model
+ * could carry its own triple and this was for a long time only "the flight snapshot's value,
+ * used everywhere for want of anything better". `oracle/probe_objectscale.mjs` measured it
+ * instead, trapping `$6631` in every view that draws through `$6000`:
+ *
+ * | view | calls to `$6000` | objects each | scale |
+ * | --- | --- | --- | --- |
+ * | flight, ship in space | 31 | 1 | 16000, 32767, 9541 |
+ * | in atmosphere, ground | 19 | 1 | 16000, 32767, 9541 |
+ * | far out, starfield | 19 | 1 | 16000, 32767, 9541 |
+ * | radar | 1 | 1 | 16000, 32767, 9541 |
+ *
+ * One triple everywhere, so passing it to the cockpit and the radar alike is right. The middle
+ * factor is `$7FFF`, which `$6631` treats as "skip the multiply", so row 1 is left alone.
+ *
+ * Two things the measurement turned up on the way. **`$6000` draws one object per call** - it
+ * is called once per object and not once per scene, which is why a count of 31 needed checking
+ * before it meant anything. And the ship I.D. screen executes **nothing** in `$6000-$6FFF`: it
+ * does not use this renderer at all, which is what `shipId.ts` already assumes.
  */
 export const SNAPSHOT_SCALE: readonly [number, number, number] = [16000, 32767, 9541];

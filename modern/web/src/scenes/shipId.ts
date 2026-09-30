@@ -2,6 +2,11 @@ import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 import { SHIP_ID_PROGRAMS } from './shipIdData';
 
+// RADAR 2056 `IF A$ <> "X" THEN 5000` reaches this on any key but X, and 5005 runs
+// `SHIP # n I.D.` for the ship at 38205. It draws from its own coordinate list rather than
+// through the renderer at $6000 - measured, not assumed: `oracle/probe_objectscale.mjs` watched
+// the screen load and run and counted zero instructions executed anywhere in $6000-$6FFF.
+
 /**
  * SHIP # 0, 1, 3 and 4 I.D. - four near-identical programs.
  *
