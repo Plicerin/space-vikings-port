@@ -4406,6 +4406,38 @@ The port had eight of those wrong - speed 60, condition green, env 100, troops 1
 4, fighters 8, tanks 8, ground missiles 8, and the troops on board rather than frozen. It starts
 where the disk starts now, checked in the running game.
 
+### COLLECT at tech 1, run at last
+
+`805 ON TECH + 1 GOSUB 820,840,910,1070,1090` sends a primitive planet to 840, and no assault
+had ever gone there - every planet played has been tech 3. Forcing the planet's tech byte
+(`TECH=1 node probe_rndloot.mjs`) reaches it, and the path is three lines with three oddities:
+
+```
+840 PRINT "PLANET IS PRIMITIVE. THE ONLY LOOT": PRINT "IS A LITTLE GOLD AND SILVER AND SOME":
+    PRINT "WINES AND LIQUORS, SIR."
+850 J = PEEK(38183) + (RND(1) * 5): IF J > 255 THEN J = 255
+860 POKE 38183,J
+870 F = PEEK(38182) + (RND(1) * 5): IF J > 255 THEN J = 255
+880 POKE 38182,J
+890 J = PEEK(38173) + (RND(1) * 10): IF J > 255 THEN J = 255
+900 POKE 38173,J: RETURN
+```
+
+- **870 works the silver out into `F`, tests `J`, and 880 stores `J`** - still gold's value.
+  Silver always comes out equal to gold. On the machine: gold 2, silver 2.
+- **The draw 870 makes is thrown away and still advances the stream.** The whole path costs
+  three draws, not two, which is what a replay would trip over if the discarded one were left
+  out. The recording is 21 draws: 18 for the combat round and 3 for the loot.
+- **840 promises "WINES AND LIQUORS" and 890 credits 38173**, which is luxury food. Wine is
+  38172 and this path never touches it - measured, 0 before and 0 after.
+
+`replay_parity.mjs` drives the port's `awardLoot` at tech 1 with the machine's own three draws:
+gold, silver and luxury food all agree to the unit, silver equals gold, the port takes exactly
+three draws, and 31180 stays where it was - 960's typo is on the 920 path, which tech 1 never
+reaches.
+
+The port had already transcribed all three; this is the first time any of it has been run.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -4421,8 +4453,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **COLLECT's tech 1 path.** Lines 840-900, including the line 880 silver bug, have never
-  been run - every assault reached so far has been tech 3.
 - **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read
   0. The read was taken after the simulator had resumed and may simply be too late, but that
   is not established.

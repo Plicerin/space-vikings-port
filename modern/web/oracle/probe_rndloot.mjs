@@ -66,6 +66,13 @@ if (!await waitFor(GF, 'GROUND FORCES')) { await a2.close(); throw new Error('no
 for (let i = 0; i < 30; i++) await a2.frames(20);
 
 const planet = await a2.read(38209);
+// The planet's own tech, or an override: `TECH=1 node probe_rndloot.mjs` forces the 840 path,
+// which no assault reaches by accident - every planet reached so far has been tech 3.
+const forced = process.env.TECH ? Number(process.env.TECH) : null;
+if (forced !== null) {
+  await a2.ev(`(() => { window.M.wr(38282 + ${planet}, ${forced}); return 'w'; })()`);
+  await a2.frames(20);
+}
 const tech = (await a2.readRange(0x9500, 0x9600))[38282 + planet - 0x9500];
 console.log(`  planet ${planet}, tech ${tech} - so 805 takes the ` +
   `${tech === 1 ? '840' : tech === 2 ? '910' : tech === 3 ? '1070' : '1090'} path`);
@@ -138,11 +145,13 @@ if (start >= 0) {
 }
 
 fs.mkdirSync('captured/replay', { recursive: true });
-fs.writeFileSync('captured/replay/loot.json', JSON.stringify({
+const outFile = forced === null ? 'captured/replay/loot.json'
+  : `captured/replay/loot-tech${forced}.json`;
+fs.writeFileSync(outFile, JSON.stringify({
   source: 'every entry to $EFAE from the winning assault into COLLECT, with the seed before the call and the thirteen cargo counters',
   planet, tech, loot: LOOT, start, calls,
   final: r.final, finalStray: r.finalStray, final301: r.final301,
 }) + String.fromCharCode(10));
 console.log('');
-console.log('wrote captured/replay/loot.json');
+console.log(`wrote ${outFile}`);
 if (a2.errors.length) console.log('page errors:', a2.errors.slice(0, 3));

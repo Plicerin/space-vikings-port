@@ -68,8 +68,11 @@ export interface CollectLoot {
  * Two of them are in the original and the port reproduces both:
  *
  * - **Line 880 pokes `J`, not `F`.** Line 870 works out silver into `F` and tests `J`, and
- *   880 stores `J` - still gold's value from 850. So at tech 1, silver comes out equal to
- *   gold. This path is not exercised above tech 1 and has not been seen on the machine.
+ *   880 stores `J` - still gold's value from 850. So at tech 1, silver comes out equal to gold.
+ *   Run on the machine at last, by forcing the planet's tech byte: gold 2, silver 2, and the
+ *   whole path costs three draws because 870 throws its value away but still advances the
+ *   stream. 840's message promises "WINES AND LIQUORS" and 890 credits **38173, luxury food** -
+ *   wine is 38172 and is never touched.
  * - **Line 960 pokes 31180, not 38180.** Titanium is never awarded, and `$79CC` - inside the
  *   ship model BLOADed to `$7879` - is written instead. Confirmed on the machine: a tech 3
  *   assault left titanium at 0 and took 31180 from 68 to 5, which is exactly the value 960

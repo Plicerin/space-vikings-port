@@ -240,6 +240,93 @@ if (fs.existsSync(lootFile)) {
   }
 }
 
+// ---- COLLECT's tech 1 path, 840-900 ---------------------------------------------------------
+//
+// `805 ON TECH + 1 GOSUB 820,840,910,1070,1090` sends a primitive planet to 840, which no
+// assault had ever reached - every planet played so far has been tech 3. Forcing the planet's
+// tech byte gets there, and the path is three lines with two bugs in them:
+//
+//   850 J = PEEK(38183) + (RND(1) * 5): IF J > 255 THEN J = 255
+//   860 POKE 38183,J
+//   870 F = PEEK(38182) + (RND(1) * 5): IF J > 255 THEN J = 255
+//   880 POKE 38182,J
+//   890 J = PEEK(38173) + (RND(1) * 10): IF J > 255 THEN J = 255
+//   900 POKE 38173,J: RETURN
+//
+// 870 works the silver out into `F`, tests **J** rather than F, and 880 stores **J** - still
+// gold's value. So silver always comes out equal to gold, and the draw 870 made is thrown away
+// but still advances the stream. And 840 promises "WINES AND LIQUORS" while 890 credits 38173,
+// which is luxury food; wine is 38172 and is never touched.
+const tech1File = 'captured/replay/loot-tech1.json';
+let tech1Bad = null;
+if (fs.existsSync(tech1File)) {
+  const T = JSON.parse(fs.readFileSync(tech1File, 'utf8'));
+  if (T.start >= 0) {
+    const names = T.loot.map((x) => x[0]);
+    const seeds = Array.from({ length: 3 }, (_, k) => T.calls[T.start + k].seed);
+    const b6 = await chromium.launch({ headless: true });
+    const p6 = await b6.newPage();
+    await p6.goto(PORT_URL, { waitUntil: 'load' });
+    await p6.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.awardLoot),
+      null, { timeout: 30000 });
+    const out = await p6.evaluate(({ ss, a4, before, addrs }) => {
+      const sv = window.__spaceVikings;
+      const drawn = ss.map((x) => sv.rndEFAE(x, a4).value);
+      let k = 0;
+      const rnd = () => drawn[k++];
+      const loot = {};
+      addrs.forEach((a, i) => { loot[a] = before[i]; });
+      const r = sv.awardLoot(loot, 1, false, rnd);
+      return { drawn, used: k, loot: addrs.map((a) => r.loot[a]),
+        modelByte: r.modelByteWritten };
+    }, {
+      ss: seeds,
+      a4: T.calls[T.start].a4,
+      before: T.calls[T.start].loot,
+      addrs: T.loot.map((x) => x[1]),
+    });
+    await b6.close();
+
+    tech1Bad = 0;
+    console.log('');
+    console.log(`COLLECT at tech ${T.tech}, the 840 path: ${T.calls.length} draws in all,` +
+      ` ${T.calls.length - T.start} of them the loot`);
+    console.log('  counter          before  disk after  port after   RND drawn');
+    const WATCH = ['gold', 'silver', 'luxuryFood', 'wine'];
+    for (const nm of WATCH) {
+      const i = names.indexOf(nm);
+      const before = T.calls[T.start].loot[i];
+      const disk = T.final[i];
+      const port = out.loot[i];
+      const ok = disk === port;
+      if (!ok) tech1Bad++;
+      console.log(`  ${nm.padEnd(15)} ${String(before).padStart(6)} ${String(disk).padStart(11)}` +
+        ` ${String(port).padStart(11)}${ok ? '' : '   DIFFERS'}`);
+    }
+    const gi = names.indexOf('gold');
+    const si = names.indexOf('silver');
+    const sameAsGold = T.final[gi] === T.final[si];
+    if (!sameAsGold) tech1Bad++;
+    console.log(`  silver equals gold on the machine: ${sameAsGold ? 'yes' : 'NO'}` +
+      ` (${T.final[si]} against ${T.final[gi]}) - 880 stores J, not F`);
+    const okDraws = out.used === 3;
+    if (!okDraws) tech1Bad++;
+    console.log(`  draws the port takes: ${out.used} against 3 on the machine` +
+      `${okDraws ? ' - 870 throws its value away but still advances the stream' : '   DIFFERS'}`);
+    const wi = names.indexOf('wine');
+    console.log(`  wine, which 840's message promises: ${T.calls[T.start].loot[wi]} ->` +
+      ` ${T.final[wi]}, untouched - 890 credits luxury food instead`);
+    const okStray = T.finalStray === T.calls[T.start].stray;
+    if (!okStray) tech1Bad++;
+    console.log(`  31180 stays at ${T.finalStray}: ${okStray ? 'yes' : 'NO'}` +
+      ' - 960 is on the 920 path, which tech 1 never reaches');
+    console.log('');
+    console.log(tech1Bad === 0
+      ? 'the tech 1 path agrees, bugs and all'
+      : `${tech1Bad} tech 1 check(s) differ`);
+  }
+}
+
 // ---- line 5000's ground fire --------------------------------------------------------------
 //
 // probe_rndground.mjs records the executing line number with every draw, so each one is
@@ -494,7 +581,8 @@ if (fs.existsSync(priceFile)) {
     : `${priceBad} price check(s) differ`);
 }
 
-const total = bad + (combatBad ?? 0) + (lootBad ?? 0) + (groundBad ?? 0) + (priceBad ?? 0);
+const total = bad + (combatBad ?? 0) + (lootBad ?? 0) + (groundBad ?? 0)
+  + (priceBad ?? 0) + (tech1Bad ?? 0);
 console.log('');
 console.log(total === 0 ? 'replay: clean' : `replay: ${total} differ`);
 process.exit(total === 0 ? 0 : 1);
