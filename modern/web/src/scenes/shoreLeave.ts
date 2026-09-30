@@ -45,8 +45,11 @@ async function readNumber(ctx: SceneContext, col: number, row: number): Promise<
     } else if (ch >= 0x30 && ch <= 0x39 && buf.length < 5) {
       buf += String.fromCharCode(ch);
     }
+    // 5006 echoes the digit and nothing else - the hi-res character generator draws no cursor,
+    // so the underscore that stood here was the port's. The trailing blank is 5002's `PRINT
+    // "  ";`, which is what takes a digit off again on a backspace.
     hires.hcolor(1);
-    hires.text(`${buf}_`, col, row);
+    hires.text(`${buf} `, col, row);
   }
 }
 
@@ -136,11 +139,11 @@ export async function shoreLeaveScene(
   }
 
   if (mode === 0 && !state.planetSurrendered) {
-    hires.hgr();
+    // 5. GROUND FORCES line 70's PRINT left the cursor on row 2, so these land on rows 2 and
+    // 3 - and SHORE LEAVE draws no frame on this path at all, because line 14 has not run yet.
     hires.hcolor(1);
-    writeLines(hires, 2, 4, ['SIR! THE PLANET', "HASN'T SURRENDERED!"]);
+    writeLines(hires, 2, 3, ['SIR! THE PLANET', "HASN'T SURRENDERED!"]);
     hires.hcolor(5);
-    hires.text('PRESS ANY KEY...', 2, 20);
     await ctx.input.waitForKey();
     return scenes.run('groundForces');
   }
@@ -183,9 +186,7 @@ async function shoreLeavePay(ctx: SceneContext, scenes: SceneManager): Promise<v
 
   glog('shoreLeave', `pay=${yes} credits=${state.credits}`);
 
-  hires.hcolor(5);
-  hires.text('PRESS ANY KEY...', 2, 20);
-  await input.waitForKey();
+  await commanderWait(ctx, 2500);   // 2099
   return scenes.run('groundForces');
 }
 
@@ -203,12 +204,7 @@ async function sellLoot(ctx: SceneContext, scenes: SceneManager): Promise<void> 
     l.platinum, l.silver, l.gold,
   ], rollArtRate());
 
-  hires.hgr();
-  hires.hcolor(1);
-  hires.line(1, 1, 139, 1);
-  hires.line(139, 1, 139, 110);
-  hires.line(139, 110, 1, 110);
-  hires.line(1, 110, 1, 1);
+  drawShoreLeaveFrame(hires);
 
   hires.hcolor(3);
   hires.text('SELL LOOT', 5, 2);
@@ -235,13 +231,10 @@ async function sellLoot(ctx: SceneContext, scenes: SceneManager): Promise<void> 
 
   glog('sellLoot', `value=${lootValue} credits=${state.credits}`);
 
-  hires.hcolor(5);
-  hires.text('PRESS ANY KEY...', 2, 20);
-  if (state.commanderMode) {
-    await commanderWait(ctx, 600);
-    return scenes.run('starshipSimulator');
-  }
-  await input.waitForKey();
+  // 2099: `FOR J = 1 TO 4000: NEXT` and then RUN GROUND FORCES. There is no key
+  // prompt on any of these screens - the disk simply waits.
+  await commanderWait(ctx, 2500);
+  if (state.commanderMode) return scenes.run('starshipSimulator');
   return scenes.run('groundForces');
 }
 
@@ -249,28 +242,15 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
   const { hires, state, input } = ctx;
 
   if (!state.atmosphere || state.inOrbit) {
-    hires.hgr();
-    hires.hcolor(1);
-    hires.line(1, 1, 139, 1);
-    hires.line(139, 1, 139, 110);
-    hires.line(139, 110, 1, 110);
-    hires.line(1, 110, 1, 1);
-    hires.hcolor(3);
-    hires.text('REPAIR/RESTOCK', 3, 2);
+    drawShoreLeaveFrame(hires);
+    // 2505 prints no title on the refusal either.
     hires.hcolor(1);
     writeLines(hires, 3, 3, ['YOU MUST LAND ON', 'PLANET FIRST.']);
-    hires.hcolor(5);
-    hires.text('PRESS ANY KEY...', 2, 20);
-    await input.waitForKey();
+    await commanderWait(ctx, 2500);   // 2099
     return scenes.run('groundForces');
   }
 
-  hires.hgr();
-  hires.hcolor(1);
-  hires.line(1, 1, 139, 1);
-  hires.line(139, 1, 139, 110);
-  hires.line(139, 110, 1, 110);
-  hires.line(1, 110, 1, 1);
+  drawShoreLeaveFrame(hires);
 
   hires.hcolor(3);
   hires.text('REPAIR SHIP', 4, 2);
@@ -318,21 +298,16 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
 
   await wait(1500);
 
-  hires.hgr();
-  hires.hcolor(1);
-  hires.line(1, 1, 139, 1);
-  hires.line(139, 1, 139, 110);
-  hires.line(139, 110, 1, 110);
-  hires.line(1, 110, 1, 1);
+  drawShoreLeaveFrame(hires);
 
   hires.hcolor(3);
   hires.text('REPAIR SHIP', 4, 2);
   hires.hcolor(1);
 
+  // 2550's title, a blank PRINT and two lines, and then 2560 straight on from row 6.
   writeLines(hires, 2, 4, [
     'ALL REPAIRS ARE',
     'COMPLETE, SIR.',
-    '',
     'THE TOTAL REPAIR',
     'BILL COMES TO',
     `${totalCost} CREDITS.`,
@@ -367,13 +342,10 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
   // BUY WEAPONS is not part of REPAIR/RESTOCK, whatever the menu calls it: the only GOSUB 3000
   // on the disk is at 2290, inside ENLIST TROOPS, so it is called from there instead.
 
-  hires.hcolor(5);
-  hires.text('PRESS ANY KEY...', 2, 20);
-  if (state.commanderMode) {
-    await commanderWait(ctx, 600);
-    return scenes.run('starshipSimulator');
-  }
-  await input.waitForKey();
+  // 2099: `FOR J = 1 TO 4000: NEXT` and then RUN GROUND FORCES. There is no key
+  // prompt on any of these screens - the disk simply waits.
+  await commanderWait(ctx, 2500);
+  if (state.commanderMode) return scenes.run('starshipSimulator');
   return scenes.run('groundForces');
 }
 
@@ -386,44 +358,53 @@ async function buyWeapons(ctx: SceneContext): Promise<void> {
     ['MISSILES', 30, 'groundMissiles'],
   ];
 
+  /**
+   * 3020-3060's list. `PRINT "CREDITS:";: HTAB 13: PRINT CR` puts the label at column 1 and the
+   * figure at column 12, and 3050's `HTAB 16` puts each count at column 15 - the semicolons are
+   * what make those two separate prints rather than one string. The four rows run from 4, and
+   * 3060's row of eighteen dots closes the list off.
+   *
+   * `prices` false is 3055's early exit: after the last purchase, 3110 calls 3020 again with
+   * PL = 7 and it returns before 3060, so the screen is left showing the new totals and no
+   * price at all.
+   */
+  const list = (prices: { name: string; price: number } | null): void => {
+    drawShoreLeaveFrame(hires);
+    hires.hcolor(3);
+    hires.text('BUY WEAPONS', 3, 2);   // 3020: `PRINT " BUY WEAPONS"`
+    hires.hcolor(1);
+    hires.text('CREDITS:', 2, 4);
+    hires.text(`${Math.floor(state.credits)}`, 13, 4);
+    for (let i = 0; i < items.length; i++) {
+      hires.text(`${items[i][0]}:`, 2, 5 + i);
+      hires.text(`${state.forces[items[i][2]]}`, 16, 5 + i);
+    }
+    if (!prices) return;
+    hires.text('.'.repeat(18), 2, 9);
+    hires.text(`${prices.name} COST${prices.price}`, 2, 10);   // 3060's `VTAB 10`
+  };
+
   for (const [name, basePrice, key] of items) {
     for (;;) {
-      hires.hgr();
-      hires.hcolor(1);
-      hires.line(1, 1, 139, 1);
-      hires.line(139, 1, 139, 110);
-      hires.line(139, 110, 1, 110);
-      hires.line(1, 110, 1, 1);
-
-      hires.hcolor(3);
-      hires.text('BUY WEAPONS', 4, 2);
-      hires.hcolor(1);
-
-      hires.text(`CREDITS: ${Math.floor(state.credits)}`, 2, 4);
-      for (const [n, , k] of items) {
-        const idx = items.findIndex(it => it[2] === k);
-        hires.text(`${n}: ${state.forces[k]}`, 2, 6 + idx);
-      }
-
       const price = Math.floor((Math.random() + 0.2) * 4 * basePrice);
-      hires.text(`${name} COST ${price}`, 2, 12);
-      hires.text('BUY HOW MANY?', 2, 13);
+      list({ name, price });
+      hires.text('BUY HOW MANY? ', 2, 11);   // 3070's `VTAB 11`
+      const qty = await readNumber(ctx, 2, 12);   // 3070's V = 12, H = 2
 
-      const qty = await readNumber(ctx, 2, 14);
-
+      // 3070, 3072 and 3090 all print their refusal back on row 11, over the question.
       if (qty < 0 || qty > 255) {
-      hires.text('BUY 255 MAX.', 2, 15);
+        hires.text('BUY 255 MAX.  ', 2, 11);
         await wait(1500);
         continue;
       }
       if (qty + (state.forces[key] as number) > 255) {
-        hires.text('255 MAX TOTAL', 2, 15);
+        hires.text('255 MAX        ', 2, 11);
         await wait(1500);
         continue;
       }
       if (qty * price > state.credits) {
-        hires.text('NOT ENOUGH CREDITS', 2, 15);
-        await wait(1500);
+        hires.text('NOT ENOUGH CREDITS', 2, 11);
+        await wait(2000);
         continue;
       }
 
@@ -433,38 +414,32 @@ async function buyWeapons(ctx: SceneContext): Promise<void> {
       break;
     }
   }
+  // 3110: `PL = 7: GOSUB 3020` - one last look at the list with the new counts on it.
+  list(null);
+  await wait(1500);
 }
 
 async function enlistTroops(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input } = ctx;
 
-  hires.hgr();
-  hires.hcolor(1);
-  hires.line(1, 1, 139, 1);
-  hires.line(139, 1, 139, 110);
-  hires.line(139, 110, 1, 110);
-  hires.line(1, 110, 1, 1);
+  drawShoreLeaveFrame(hires);
 
   hires.hcolor(3);
-  hires.text('ENLIST TROOPS', 3, 2);
+  hires.text('ENLIST TROOPS', 2, 2);   // 2200: no leading space
   hires.hcolor(1);
 
   // 2210 is tested before 2240, so a second visit is turned away whether or not the planet
   // has surrendered - and 2220 sets the flag before any of the rest of the screen runs.
   if (state.enlistedThisTrip) {
     hires.text('ONE TIME PER TRIP.', 2, 4);
-    hires.hcolor(5);
-    hires.text('PRESS ANY KEY...', 2, 20);
-    await input.waitForKey();
+    await commanderWait(ctx, 2500);   // 2099
     return scenes.run('groundForces');
   }
   state.enlistedThisTrip = true;                    // 2220
 
   if (!state.planetSurrendered) {
     writeLines(hires, 2, 4, ["THE PLANET HAS NOT", 'SURRENDERED YET!!']);
-    hires.hcolor(5);
-    hires.text('PRESS ANY KEY...', 2, 20);
-    await input.waitForKey();
+    await commanderWait(ctx, 2500);   // 2099
     return scenes.run('groundForces');
   }
 
@@ -474,9 +449,7 @@ async function enlistTroops(ctx: SceneContext, scenes: SceneManager): Promise<vo
     'CREDIT IN ADVANCE.',
     `YOU HAVE ${Math.floor(state.credits)}`,
     'CREDITS, SIR.',
-    '',
     `TROOPS= ${state.forces.troops}`,
-    '',
     'HOW MANY TROOPS',
     'DO YOU WANT TO',
     'ENLIST?',
@@ -485,10 +458,11 @@ async function enlistTroops(ctx: SceneContext, scenes: SceneManager): Promise<vo
   const en = await readNumber(ctx, 2, 13);
 
   if (en > state.credits) {
-    writeLines(hires, 2, 15, ["YOU DON'T HAVE", `${en} CREDITS!`]);
+    // 2280's `VTAB 10`
+    writeLines(hires, 2, 10, ["YOU DON'T HAVE", `${en} CREDITS!`]);
     await wait(2000);
   } else if (state.forces.troops + en > 20000) {
-    hires.text('TOO MANY TROOPS.', 2, 15);
+    hires.text('TOO MANY TROOPS.  ', 2, 12);   // 2285's `VTAB 12: HTAB 2`
     // 2285 `POKE 38389,0: GOTO 2200` - asking for an impossible number costs nothing, so the
     // trip's one enlistment is handed back. 2280's "you don't have the credits" does not.
     state.enlistedThisTrip = false;
@@ -502,46 +476,41 @@ async function enlistTroops(ctx: SceneContext, scenes: SceneManager): Promise<vo
     await buyWeapons(ctx);
   }
 
-  hires.hcolor(5);
-  hires.text('PRESS ANY KEY...', 2, 20);
-  await input.waitForKey();
+  await commanderWait(ctx, 2500);   // 2099
   return scenes.run('groundForces');
 }
 
 async function establishBase(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input } = ctx;
 
-  hires.hgr();
-  hires.hcolor(1);
-  hires.line(1, 1, 139, 1);
-  hires.line(139, 1, 139, 110);
-  hires.line(139, 110, 1, 110);
-  hires.line(1, 110, 1, 1);
+  drawShoreLeaveFrame(hires);
 
-  hires.hcolor(3);
-  hires.text('ESTABLISH BASE', 3, 2);
+  // 2100 prints no title. ESTABLISH BASE goes straight to its text.
   hires.hcolor(1);
 
   // 2100-2106, in the order the BASIC tests them. 2107 then sets the flag *before* the price
   // is even shown, so a refusal at 2130 for want of credits still spends the attempt.
   const refusal = baseRefusal2100({
     alreadyThere: state.planets[state.planetIndex].hasBase,
-    tooBackward: state.planets[state.planetIndex].defender < 2,
+    // 2105: `IF PEEK(38282 + PEEK(38209)) < 2` - the technology byte, which the port keeps as
+    // `defense`. This read `defender`, the ship in orbit.
+    tooBackward: state.planets[state.planetIndex].defense < 2,
     alreadyTriedThisTrip: state.baseTriedThisLanding,
   });
   if (refusal === 'THERE IS ALREADY A BASE ON THIS PLANET, SIR!') {
-    hires.text('THERE IS ALREADY', 2, 4);
-    hires.text('A BASE ON THIS', 2, 5);
-    hires.text('PLANET, SIR!', 2, 6);
+    // Every one of these starts on row 2: 2080 ends at the bottom of its blanking loop and
+    // 2081's `VTAB 2` brings the cursor back up before anything prints.
+    writeLines(hires, 2, 2, ['THERE IS ALREADY', 'A BASE ON THIS', 'PLANET, SIR!']);
   } else if (refusal === 'THIS PLANET IS TOO BACKWARD TO BUILD A BASE, SIR!') {
-    writeLines(hires, 2, 4, ['THIS PLANET IS TOO', 'BACKWARD TO BUILD', 'A BASE, SIR!']);
+    writeLines(hires, 2, 2, ['THIS PLANET IS TOO', 'BACKWARD TO BUILD', 'A BASE, SIR!']);
   } else if (refusal !== null) {
-    writeLines(hires, 2, 4, ['ONLY ONE TIME PER', 'TRIP, SIR.']);
+    writeLines(hires, 2, 2, ['ONLY ONE TIME PER', 'TRIP, SIR.']);
   } else {
     state.baseTriedThisLanding = true;              // 2107
     const cost = baseCost2170();                    // 2170, and 2110's INT
 
-    writeLines(hires, 2, 4, [
+    // 2110: six lines from row 2, the fourth of them blank.
+    writeLines(hires, 2, 2, [
       'SIR! IT WILL COST',
       `${cost} TO BUILD A`,
       'BASE HERE.',
@@ -551,35 +520,31 @@ async function establishBase(ctx: SceneContext, scenes: SceneManager): Promise<v
     ]);
 
     if (state.credits < cost) {
-      writeLines(hires, 2, 10, ["YOU DON'T HAVE", 'ENOUGH CREDITS TO', 'BUILD A BASE HERE.']);
+      // 2130, at the cursor 2110 left
+      writeLines(hires, 2, 8, ["YOU DON'T HAVE", 'ENOUGH CREDITS TO', 'BUILD A BASE HERE.']);
     } else {
-      hires.text('BUILD A BASE?', 2, 10);
-      hires.text('(Y/N)', 2, 11);
+      // 2140's `VTAB 8`
+      hires.text('BUILD A BASE?', 2, 8);
+      hires.text('(Y/N)', 2, 9);
       const yes = await getYN(ctx);
       if (yes) {
         state.credits = Math.floor(state.credits - cost);
         state.planets[state.planetIndex].hasBase = true;
-        writeLines(hires, 2, 12, ['CONSTRUCTION IS', 'UNDER WAY, SIR.']);
+        // 2155's `PRINT " "` finishes the (Y/N) row, so 2160 lands on row 10.
+        writeLines(hires, 2, 10, ['CONSTRUCTION IS', 'UNDER WAY, SIR.']);
         glog('base', `cost=${cost} credits=${state.credits}`);
       }
     }
   }
 
-  hires.hcolor(5);
-  hires.text('PRESS ANY KEY...', 2, 20);
-  await input.waitForKey();
+  await commanderWait(ctx, 2500);   // 2099
   return scenes.run('groundForces');
 }
 
 async function cryogenics(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input } = ctx;
 
-  hires.hgr();
-  hires.hcolor(1);
-  hires.line(1, 1, 139, 1);
-  hires.line(139, 1, 139, 110);
-  hires.line(139, 110, 1, 110);
-  hires.line(1, 110, 1, 1);
+  drawShoreLeaveFrame(hires);
 
   hires.hcolor(3);
   hires.text('CRYOGENICS', 4, 2);
@@ -601,8 +566,6 @@ async function cryogenics(ctx: SceneContext, scenes: SceneManager): Promise<void
     glog('cryo', 'frozen');
   }
 
-  hires.hcolor(5);
-  hires.text('PRESS ANY KEY...', 2, 20);
-  await input.waitForKey();
+  await commanderWait(ctx, 2500);   // 2099
   return scenes.run('groundForces');
 }

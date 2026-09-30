@@ -5045,6 +5045,52 @@ The port put them in a block at row 16, on top of the panel, in its own wording:
 `NO BASE`, not "NO BASE ON THIS PLANET!". Each ends `GOTO 310`, the same `POKE 38151,7: RUN COM`,
 so a refusal takes the long way round through COM and back to the menu.
 
+### SHORE LEAVE's other four screens
+
+`shoreleave_parity.mjs` had two of SHORE LEAVE's six screens exact - the pay screen and
+cryogenics - and those two are the ones `drawShoreLeaveFrame` draws. The other four were written
+without a capture to check them against, and every one of them had the same three inventions.
+
+**The screen was being cleared.** SHORE LEAVE never clears or fills anything: line 14 draws the
+same box COM does and line 2080 blanks the left column, rows 2 to 13, with eighteen printed
+spaces. COM's twelve readouts down the right, its 40-character row 14, the HCOLOR 6 flood and
+the whole instrument panel are all still on the page. Eight `hgr()` calls were taking them away.
+
+**There is no key prompt.** Ten screens ended with `PRESS ANY KEY...` and a wait for one. Line
+2099 is `FOR J = 1 TO 4000: NEXT` and then `RUN GROUND FORCES` - the disk simply waits. The real
+GETs are elsewhere and stay: 2085's PAY THEM, 2140's BUILD A BASE, 2580's ARE YOU GOING TO PAY,
+and 3070's BUY HOW MANY through the digit reader at 5000.
+
+**Two of the titles were invented and two were misplaced.** 2410, 2510 and 3020 print their own
+titles with leading spaces that put them at columns 5, 4 and 3; 2200's has none and belongs at
+column 2. ESTABLISH BASE and the "you must land first" refusal print no title at all.
+
+**And everything started two rows too low.** 2080 ends at the foot of its blanking loop and
+2081's `VTAB 2` brings the cursor back to row 1 before anything prints, so every one of these
+screens begins on row 2 - which is what the pay screen, the one that was checked, already did.
+
+Line by line, the four that were not checked:
+
+- **ESTABLISH BASE** (2100-2160): refusals on rows 2 to 4, the price on 2 to 7, 2130's refusal
+  on 8 to 10, 2140's `VTAB 8` prompt on 8 and 9, and 2160 on 10 and 11 because 2155's
+  `PRINT " "` finishes the `(Y/N)` row first. 2105 tests `PEEK(38282 + PEEK(38209))`, the
+  technology - the port was reading the ship in orbit, the same mix-up GROUND FORCES had.
+- **ENLIST TROOPS** (2200-2290): 2260 and 2270 run straight on from 2250, so there are no blank
+  rows in the middle of it; 2280's refusal is at its own `VTAB 10` and 2285's at `VTAB 12`, not
+  below the input.
+- **REPAIR SHIP** (2550-2560): 2550's title, one blank and two lines, and then 2560 straight on
+  from row 6 - the port had a blank between them.
+- **BUY WEAPONS** (3020-3110) was the furthest off. `PRINT "CREDITS:";: HTAB 13: PRINT CR` is two
+  prints, so the label sits at column 2 and the figure at column 13; 3050's `HTAB 16` does the
+  same for each count; 3060 closes the list with a row of eighteen dots and puts the price at
+  `VTAB 10`; 3070 asks at `VTAB 11` and reads at V 12, H 2; and all three refusals print back
+  over row 11. 3110's last `GOSUB 3020` returns at 3055 before the price line, so the screen is
+  left showing the new totals and no price.
+
+One smaller thing: the digit reader drew an underscore cursor. 5006 echoes the digit and nothing
+else - the hi-res character generator has no cursor - and 5002's `PRINT "  ";` is what takes a
+digit back off on a backspace.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
