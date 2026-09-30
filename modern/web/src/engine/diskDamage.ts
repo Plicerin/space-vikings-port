@@ -80,8 +80,14 @@ export const DAMAGED_SYSTEMS = [
   { name: 'hull', address: 38193, scale: 4 },
 ] as const;
 
-/** The ones it leaves alone, which is worth naming so the omission is deliberate. */
-export const UNDAMAGED_SYSTEMS = [38199, 38194, 38190, 38187, 38184] as const;
+/**
+ * The ones it leaves alone, which is worth naming so the omission is deliberate.
+ *
+ * 38185 is COM's twelfth readout and no program on the disk writes it at all - it is not even
+ * in SHORE LEAVE line 2500's repair DATA, which covers the other eleven. It sits at 1 from the
+ * ship's data file onwards, so `COM NO/GO` is permanently normal video.
+ */
+export const UNDAMAGED_SYSTEMS = [38199, 38194, 38190, 38187, 38185, 38184] as const;
 
 export interface ShipDamage {
   shields: number;

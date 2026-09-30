@@ -5166,6 +5166,48 @@ None of that is visible on a screen of zeros, and none of it could have been got
 reading the listing carelessly. It is the same thinness `status_values_parity.mjs` was written
 for: a capture of one state is a capture of one state.
 
+### COM's twelve readouts, and the byte no program writes
+
+The damage-control grid is COM lines 40 to 72. `ST()` at 15140 gives the twelve addresses, lines
+40 and 50 give the twelve positions, and the labels come out of the DATA at 15000-15030 - two
+five-character strings per cell, printed on consecutive rows. **The labels are fixed.** The only
+thing state changes is whether a cell is drawn inverse, from `GOSUB 10000`:
+
+    10000 IF J1 = 7 AND PEEK(ST(J1)) < 16 THEN POKE 973,255: RETURN
+    10005 IF T = 0 THEN POKE 973,255: RETURN
+    10010 POKE 973,0: RETURN
+
+- cell 7 is POWER / LOW, and it lights when the energy byte drops below 16
+- any cell lights when its byte is 0
+- everything else is normal video
+
+`com_parity.mjs` has both of those, and the port's rule matches. What it cannot see is whether
+the **game's own state** holds the same twelve values, because it draws from `COM_FRESH_SHIP`, a
+fixture in the source rather than anything the game produces. `probe_comreadouts.mjs` reads the
+twelve off the machine early in a new game and compares them with the port's state at the same
+point, and that found one: **38185, COM's twelfth readout, is 1 on the machine and the port's
+opening state had 100.** Both are non-zero, so the cell renders identically and no pixel harness
+could ever have separated them.
+
+Which of the twelve can move at all is worth writing down, because it is fewer than the grid
+suggests. Reading every write on the disk:
+
+| byte | cell | written by |
+| --- | --- | --- |
+| 38200 | SHLD | START 2030, the damage tick at 3205, SHORE LEAVE's repair |
+| 38195, 38198, 38197, 38196, 38186 | RADAR, 1 ENG, 2 ENG, COMP, LASER | the damage tick at 3230-3270, SHORE LEAVE's repair |
+| 38193 | HULL | the damage tick at 3270-3350, SHORE LEAVE's repair |
+| 38199 | POWER | H/D 15 spends it, SHORE LEAVE 2525 repairs it |
+| 38187 | MSL | START 2030, the simulator's 1090 |
+| 38194 | ENV | in SHORE LEAVE's repair DATA, but it sits at **128** and 2520 only repairs `IF D < 100` |
+| 38190 | HYPER DRIVE | in the repair DATA, and nothing ever damages it |
+| 38185 | COM | **nothing, anywhere** - it is not even in the repair DATA |
+
+So `ENV NO/GO`, `HYPER DRIVE` and `COM NO/GO` are decoration: three of the twelve cells can
+never change state in a whole game. The port's commander was setting `envPct` and `comsPct` to
+100 on a restock, which is two of the three - it is left alone now, and 38185 has joined
+`UNDAMAGED_SYSTEMS` beside the others.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

@@ -216,7 +216,9 @@ export class GameState {
     hyperdrivePct: 100,
     missilePct: 100,
     laserPct: 100,
-    comsPct: 100,
+    // 38185, COM's twelfth readout. The machine holds **1** here, not 100 - read off the
+    // flight snapshot - and nothing on the disk ever writes it, so 1 is what it stays.
+    comsPct: 1,
     powerPct: 100,
     laserOperational: true,
     pendingUpdate: false,

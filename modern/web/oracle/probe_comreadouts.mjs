@@ -1,154 +1,114 @@
-// What COM's twelve right-hand readouts are, and when each one is drawn.
+// COM's twelve readout bytes, on the machine and in the port, at the same point in a new game.
 //
-// Lines 40-70 lay them out in a 3 x 4 grid and print two lines each. The layout falls out
-// of the listing, but one thing does not: line 70 calls GOSUB 10000 before every PRINT, and
-// that subroutine does nothing but POKE 973 (= $3CD) to either 0 or 255.
+// `com_parity.mjs` compares the drawn screen and passes, but it draws from `COM_FRESH_SHIP`, a
+// fixture in the source. What it cannot see is whether the *game's own state* holds the same
+// twelve values - and it did not. 38185, COM's twelfth readout, is **1** on the machine and the
+// port's opening state had 100. Both are non-zero so the cell renders the same, and no pixel
+// harness could ever have told them apart.
 //
-//   10000 IF J1 = 7 AND PEEK(ST(J1)) < 16 THEN POKE 973,255: RETURN
-//   10005 IF T = 0 THEN POKE 973,255: RETURN
-//   10010 POKE 973,0: RETURN
+// The twelve are COM line 15140's ST() array, in the order lines 40 and 50 place them:
 //
-// $3CD is part of the character generator's vector area, so 255 is either "draw" or "skip"
-// and the listing cannot say which. Reading it either way gives an opposite UI: the grid
-// either lists the systems that have failed, or lists the ones still working.
+//   ST(1) = 38198  ST(2) = 38197  ST(3) = 38196  ST(4) = 38195
+//   ST(5) = 38194  ST(6) = 38193  ST(7) = 38199  ST(8) = 38200
+//   ST(9) = 38190  ST(10) = 38187 ST(11) = 38186 ST(12) = 38185
 //
-// So measure it. STARSHIP SIMULATOR is the program COM is reached from, and it does not
-// touch these bytes on the way, so poking a system to 0 in flight and then pressing C runs
-// COM's loop over the poked value. COM option 5 goes back to flight, which makes a second
-// pass possible in one session.
+// Reading which programs write them is the other half of the picture, and it is short. The
+// damage tick at 3205-3350 touches 38200, 38195, 38198, 38197, 38196, 38186 and 38193 and
+// nothing else; H/D 15 spends 38199; the simulator's 1090 spends 38187; SHORE LEAVE's repair
+// covers eleven of the twelve through its line 2500 DATA. **Nothing anywhere writes 38185**, and
+// 38194 sits at 128, which line 2520's `IF D < 100` will not repair. So of the twelve cells,
+// ENV, HYPER DRIVE and COM can never change at all.
 import { openOracle } from './a2.mjs';
 import { openDisk, DISK, asMemory } from './dsk.mjs';
 import { listProgram } from './detokenise.mjs';
-import { decodeHgr, toPng, HGR_W } from './hgr.mjs';
+import { chromium } from 'playwright';
 import fs from 'fs';
 
-// ST(1..12) from COM line 15140, paired with the DATA at 15000-15030 in READ order.
+const PORT_URL = process.env.PORT_URL || 'http://localhost:4545/';
+
+/** ST(1)..ST(12), with the label pair lines 15000-15030 supply for each. */
 const READOUTS = [
-  { j: 1, addr: 38198, lines: ['  1  ', ' ENG '], what: '# 1 ENGINE' },
-  { j: 2, addr: 38197, lines: ['  2  ', ' ENG '], what: '# 2 ENGINE' },
-  { j: 3, addr: 38196, lines: [' COMP', 'NO/GO'], what: 'COMPUTER' },
-  { j: 4, addr: 38195, lines: ['RADAR', 'NO/GO'], what: 'RADAR' },
-  { j: 5, addr: 38194, lines: [' ENV ', 'NO/GO'], what: 'ENV. CONTROL' },
-  { j: 6, addr: 38193, lines: [' HULL', ' DMG '], what: 'HULL DMG.' },
-  { j: 7, addr: 38199, lines: ['POWER', ' LOW '], what: 'ENERGY' },
-  { j: 8, addr: 38200, lines: [' SHLD', 'NO/GO'], what: 'SHIELD' },
-  { j: 9, addr: 38190, lines: ['HYPER', 'DRIVE'], what: 'HYPERDRIVE' },
-  { j: 10, addr: 38187, lines: [' MSL ', 'NO/GO'], what: 'MISSILES' },
-  { j: 11, addr: 38186, lines: ['LASER', 'NO/GO'], what: 'LASER' },
-  { j: 12, addr: 38185, lines: [' COM ', 'NO/GO'], what: 'COMS' },
+  [38198, '  1   / ENG '], [38197, '  2   / ENG '], [38196, ' COMP/NO/GO'],
+  [38195, 'RADAR/NO/GO'], [38194, ' ENV /NO/GO'], [38193, ' HULL/ DMG '],
+  [38199, 'POWER/ LOW '], [38200, ' SHLD/NO/GO'], [38190, 'HYPER/DRIVE'],
+  [38187, ' MSL /NO/GO'], [38186, 'LASER/NO/GO'], [38185, ' COM /NO/GO'],
 ];
-// V(1..12) and H(1..12) from lines 40 and 50, as 0-based cells. HTAB and TAB( ) are
-// absolute screen columns here, so H - 1 is the column outright.
-for (let i = 0; i < 12; i++) {
-  READOUTS[i].col = [23, 29, 35][i % 3] - 1;
-  READOUTS[i].row = [2, 5, 8, 11][(i / 3) | 0] - 1;
-}
 
 const disk = openDisk(DISK);
-const textOf = (name) => {
-  const r = disk.read(disk.files.find((f) => f.name === name));
+const simText = (() => {
+  const r = disk.read(disk.files.find((f) => f.name === 'STARSHIP SIMULATOR'));
   return listProgram(asMemory(r, 0x801), 0x801, 0x801 + r.len + 2)
     .map((l) => `${l.num} ${l.text}`).join('\n');
-};
-const SIM = textOf('STARSHIP SIMULATOR');
-const COM = textOf('COM');
+})();
 
 const a2 = await openOracle();
 await a2.boot();
 await a2.key('N');
-
-const loaded = async () => {
-  const bytes = await a2.readRange(0x800, 0x2000);
-  const mem = {};
-  for (let k = 0; k < bytes.length; k++) mem[0x800 + k] = bytes[k];
-  try { return listProgram(mem, 0x801, 0x2000).map((l) => `${l.num} ${l.text}`).join('\n'); }
-  catch { return ''; }
+const inSim = async () => {
+  const b = await a2.readRange(0x800, 0x2000);
+  const m = {};
+  for (let k = 0; k < b.length; k++) m[0x800 + k] = b[k];
+  try { return listProgram(m, 0x801, 0x2000).map((l) => `${l.num} ${l.text}`).join('\n') === simText; }
+  catch { return false; }
 };
-const waitFor = async (wanted, label) => {
-  for (let i = 0; i < 500; i++) { await a2.frames(20); if ((await loaded()) === wanted) return; }
-  await a2.close();
-  throw new Error(`${label} never started`);
-};
-const settle = async () => {
-  let last = '';
-  for (let i = 0; i < 80; i++) {
-    await a2.frames(20);
-    const h = await a2.ev(`window.M.hash(0x2000, 0x6000)`);
-    if (h === last) return;
-    last = h;
-  }
-};
-const statusBytes = async () => {
-  const out = {};
-  for (const r of READOUTS) out[r.addr] = await a2.read(r.addr);
-  return out;
-};
-const cells = (on) => {
-  const c = (cx, cy) => { let n = 0; for (let y = cy * 8; y < cy * 8 + 8; y++) for (let x = cx * 7; x < cx * 7 + 7; x++) if (on[y * HGR_W + x]) n++; return n; };
-  return c;
-};
-// A readout is "drawn" when its five cells are not plain background. The fill is HCOLOR 6
-// across the whole row, so an untouched cell is bright; a printed one is mostly black.
-const litOf = (c, r) => { let n = 0; for (let k = 0; k < 5; k++) n += c(r.col + k, r.row); return n; };
-
-async function capture(label) {
-  await settle();
-  const on = decodeHgr(await a2.readRange(0x2000, 0x4000));
-  fs.mkdirSync('captured/com', { recursive: true });
-  fs.writeFileSync(`captured/com/readouts-${label}.png`, toPng(on));
-  const pts = [];
-  for (let y = 0; y < 192; y++) for (let x = 0; x < HGR_W; x++) if (on[y * HGR_W + x]) pts.push([x, y]);
-  CAPTURES[label] = pts;
-  return on;
-}
-const CAPTURES = {};
-
 console.log('waiting for STARSHIP SIMULATOR...');
-await waitFor(SIM, 'STARSHIP SIMULATOR');
-console.log('pressing C for COM');
-await a2.key('C');
-await waitFor(COM, 'COM');
-const baseBytes = await statusBytes();
-const baseOn = await capture('healthy');
+let ok = false;
+for (let i = 0; i < 900; i++) { await a2.frames(20); if (await inSim()) { ok = true; break; } }
+if (!ok) { await a2.close(); throw new Error('the simulator never started'); }
+await a2.frames(300);
 
-console.log('\nthe twelve status bytes as COM found them:');
-console.log('   J1  addr    what            value   line 1   line 2   row,col   lit/280');
-const baseC = cells(baseOn);
-for (const r of READOUTS) {
-  console.log(`  ${String(r.j).padStart(3)}  ${r.addr}  ${r.what.padEnd(14)}  ${String(baseBytes[r.addr]).padStart(5)}   ` +
-    `"${r.lines[0]}"  "${r.lines[1]}"   ${String(r.row).padStart(2)},${String(r.col).padStart(2)}    ${String(litOf(baseC, r)).padStart(3)}`);
-}
-
-// Now break three systems and drop the energy below 16, and go round again.
-const BREAK = { 38196: 0, 38186: 0, 38200: 0, 38199: 9 };
-console.log('\npressing 5 to return to flight, then poking:',
-  Object.entries(BREAK).map(([a, v]) => `${a}=${v}`).join(', '));
-await a2.key('5');
-await waitFor(SIM, 'STARSHIP SIMULATOR (second time)');
-for (const [a, v] of Object.entries(BREAK)) await a2.ev(`(() => { window.M.wr(${a}, ${v}); return 'w'; })()`);
-const poked = await statusBytes();
-await a2.key('C');
-await waitFor(COM, 'COM (second time)');
-const afterBytes = await statusBytes();
-const afterOn = await capture('broken');
-const afterC = cells(afterOn);
-
-console.log('\n   J1  what            before  poked  in COM    lit before  lit after   drawn?');
-for (const r of READOUTS) {
-  const b = litOf(baseC, r), a = litOf(afterC, r);
-  // Five cells are 5 x 7 x 8 = 280, so before + after = 280 means the glyph was redrawn as
-  // its own complement - inverse video - rather than removed.
-  const drawn = a === b ? 'same' : (a + b === 280 ? 'INVERSE (a + b = 280)' : 'changed');
-  console.log(`  ${String(r.j).padStart(3)}  ${r.what.padEnd(14)}  ${String(baseBytes[r.addr]).padStart(6)}  ` +
-    `${String(poked[r.addr]).padStart(5)}  ${String(afterBytes[r.addr]).padStart(6)}    ` +
-    `${String(b).padStart(10)}  ${String(a).padStart(9)}   ${drawn}`);
-}
-fs.writeFileSync('captured/com/readouts.json', JSON.stringify({
-  source: 'COM reached from flight, once with a fresh ship and once with four systems broken',
-  healthy: { bytes: baseBytes, points: CAPTURES.healthy },
-  broken: { bytes: afterBytes, poked: BREAK, points: CAPTURES.broken },
-}, null, 0) + String.fromCharCode(10));
-console.log('');
-console.log('wrote captured/com/readouts.json');
+const bytes = await a2.readRange(38185, 38201);
+const diskOf = (addr) => bytes[addr - 38185];
 if (a2.errors.length) console.log('page errors:', a2.errors.slice(0, 3));
 await a2.close();
+
+// --- the port, driven to the same place ---------------------------------------------------
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage();
+const errors = [];
+page.on('pageerror', (e) => errors.push(e.message));
+await page.goto(PORT_URL, { waitUntil: 'load' });
+await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikingsState),
+  null, { timeout: 30000 });
+const portBytes = await page.evaluate(async () => {
+  const press = (key) => new Promise((res) => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key, code: 'Key' + key.toUpperCase(), bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key, code: 'Key' + key.toUpperCase(), bubbles: true }));
+    setTimeout(res, 700);
+  });
+  for (let i = 0; i < 7; i++) await press('N');
+  await new Promise((r) => setTimeout(r, 2500));
+  const s = window.__spaceVikingsState;
+  const d = s.damage;
+  return {
+    38198: d.engine1Pct, 38197: d.engine2Pct, 38196: d.computerPct, 38195: d.radarPct,
+    38194: d.envPct, 38193: d.hullPct, 38199: Math.round(s.energy), 38200: d.shieldsPct,
+    38190: d.hyperdrivePct, 38187: s.missilesRemaining, 38186: d.laserPct, 38185: d.comsPct,
+  };
+});
+await browser.close();
+for (const e of errors.slice(0, 3)) console.log('page error:', e);
+
+console.log('');
+console.log('  addr    readout        disk   port');
+let bad = 0;
+const rows = [];
+for (const [addr, label] of READOUTS) {
+  const want = diskOf(addr);
+  const got = portBytes[addr];
+  const same = want === got;
+  if (!same) bad++;
+  rows.push({ addr, label, disk: want, port: got });
+  console.log(`  ${addr}  ${label.padEnd(13)} ${String(want).padStart(5)}  ${String(got).padStart(5)}` +
+    (same ? '' : '   <-- differs'));
+}
+
+fs.mkdirSync('captured/comreadouts', { recursive: true });
+fs.writeFileSync('captured/comreadouts/golden.json', JSON.stringify({
+  source: "COM's ST() bytes read off the machine early in a new game, against the port's own state",
+  readouts: rows,
+}) + String.fromCharCode(10));
+console.log('');
+console.log(bad === 0 ? 'com readouts: all twelve agree'
+  : `com readouts: ${bad} of 12 differ`);
+process.exit(bad === 0 ? 0 : 1);

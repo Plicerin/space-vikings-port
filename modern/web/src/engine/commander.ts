@@ -72,13 +72,14 @@ export function serviceCommanderShip(state: GameState): void {
   state.damage.engine2Pct = 100;
   state.damage.computerPct = 100;
   state.damage.radarPct = 100;
-  state.damage.envPct = 100;
+  // Not envPct. 38194 is in SHORE LEAVE 2500's DATA, but it sits at 128 and line 2520 only
+  // repairs `IF D < 100`, so a repair never touches it - and nothing damages it either.
   state.damage.hullPct = 100;
   state.damage.shieldsPct = 100;
   state.damage.hyperdrivePct = 100;
   state.damage.missilePct = 100;
   state.damage.laserPct = 100;
-  state.damage.comsPct = 100;
+  // Not comsPct. 38185 is not in the repair DATA and nothing writes it.
   state.damage.powerPct = 100;
   state.damage.laserOperational = true;
   state.damage.pendingUpdate = false;
