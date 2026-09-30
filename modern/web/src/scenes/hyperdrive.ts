@@ -142,15 +142,30 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   state.enlistedThisTrip = false;
   state.baseTriedThisLanding = false;
 
-  // Lines 90-93. TECH is the destination's, because line 26 has already moved 38209.
-  const tech = state.planets[state.planetIndex]?.defense ?? 0;
+  // Line 16's `POKE 38152,0`. The enemy-damage counter is cleared on **every** jump, whatever
+  // the destination's tech - measured at line 16 on both a tech 2 and a tech 1 arrival. This
+  // used to sit inside the tech >= 2 branch below, standing in for 93's `POKE 38161,0`, so a
+  // jump to a primitive planet carried the previous system's damage across.
+  state.shipVitality = 0;
+
+  // Line 25's `POKE 38823, PEEK(38163): POKE 38824,0: CALL 38825` loads the destination's
+  // record, and 38204 comes with it - $97D2 inside TRANLIT.OBJ0 writes it. Measured: 150
+  // arriving at SOL, 20 at VARCAR, 0 at a tech 1 planet. For tech > 1 line 93 overwrites it a
+  // moment later, so it only shows through on a primitive destination.
+  const arriving = state.planets[state.planetIndex];
+  if (arriving) state.shipDestructionLimit = arriving.destructionLimit;
+
+  // Lines 90-93. TECH is the destination's, because line 25's CALL has already moved 38209 -
+  // line 26's `POKE 38209, PEEK(38163)` is a second write of a value that is already there.
+  const tech = arriving?.defense ?? 0;
   if (tech < 2) {
-    state.planetVitalityLimit = 0;
+    state.planetVitalityLimit = 0;            // 90
   } else {
-    state.planetVitalityLimit = tech * 60;
+    state.planetVitalityLimit = tech * 60;    // 93
     state.shipDestructionLimit = tech * 60;
     state.planetVitality = 0;
-    state.shipVitality = 0;
+    // 93 also pokes 38161 to 0. Nothing on the disk ever reads 38161 - it is the only write
+    // to it anywhere - so there is nothing here to mirror.
   }
 
   return scenes.run('starshipSimulator');

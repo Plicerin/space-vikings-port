@@ -397,6 +397,8 @@ export interface PlanetState {
   groundAssaultFailed: boolean;
   defender: number;
   defense: number;
+  /** 38204, which H/D line 25's `CALL 38825` loads with the destination's record. */
+  destructionLimit: number;
   population: number;
   visited: boolean;
   x: number;
@@ -423,6 +425,7 @@ export function makeInitialGalaxy(): PlanetState[] {
     groundAssaultFailed: false,
     defender: resolveShipKind(p.shipKind), // START 230's IF J = 2 THEN J = 3
     defense: p.tech,                       // 38282+P, GROUND FORCES 500 calls it TECH
+    destructionLimit: p.destructionLimit,  // 38204, loaded by H/D 25's CALL 38825
     population: p.population,              // 38261+P; COM 1110 prints it * 35294
     visited: p.known,                      // 38240+P, COM 1005
     x: p.x,

@@ -4438,6 +4438,55 @@ reaches.
 
 The port had already transcribed all three; this is the first time any of it has been run.
 
+### H/D lines 90-93, and what else a jump moves
+
+```
+16 ... POKE 38152,0: POKE 38240 + PEEK(38163),1
+25 POKE 38823, PEEK(38163): POKE 38824,0: CALL 38825
+26 POKE 38209, PEEK(38163)
+90 TECH = PEEK(38282 + PEEK(38209)): IF TECH < 2 THEN POKE 38150,0
+93 IF TECH > 1 THEN POKE 38150,TECH * 60: POKE 38204,TECH * 60: POKE 38160,0: POKE 38161,0
+```
+
+A reading taken once before said 38150 came out 0 after jumping to planet 5, whose tech is 2 -
+where 93 should have left 120. It was taken after the simulator had resumed, so it could not say
+whether 93 never ran, ran with a different TECH, or ran and was overwritten.
+
+`oracle/probe_hdjump.mjs` watches the bytes through the whole jump instead, recording the line
+and PC at every change. **The earlier reading was simply wrong.** Jumping to planet 5:
+
+| byte | | line | PC |
+| --- | --- | --- | --- |
+| 38152 | 77 -> 0 | **16** | `$E783` |
+| 38204 | 77 -> 20 | **25** | `$97D2` |
+| 38209 | 1 -> 5 | **25** | `$97D2` |
+| 38150 | 77 -> **120** | **93** | `$E783` |
+| 38204 | 20 -> 120 | 93 | `$E783` |
+| 38160 | 1 -> 0 | 93 | `$E783` |
+| 38161 | 77 -> 0 | 93 | `$E783` |
+
+120 is `TECH * 60`, and it holds into the simulator. Three things came with the answer:
+
+- **Line 25's `CALL 38825` moves 38209, not line 26.** `$97D2` is inside TRANLIT.OBJ0, and the
+  routine loads the destination's record - 38204 arrives with it, at **150** for SOL, **20** for
+  VARCAR and **0** for a tech 1 planet. Line 26's `POKE 38209, PEEK(38163)` writes a value that
+  is already there.
+- **38152 is cleared at line 16, on every jump.** Not in 93's branch, and not conditional on
+  tech. Confirmed on a tech 1 arrival as well as a tech 2 one.
+- **38161 is written once on the whole disk and never read.** Line 93's `POKE 38161,0` is the
+  only write to it anywhere, and nothing peeks it.
+
+A tech 1 arrival takes 90's branch instead, and what it does *not* do is as informative: 38150
+goes to 0, but **38160 keeps its old value and 38161 is left alone** - a marker written there
+before the jump was still sitting in it afterwards.
+
+The port had `shipVitality = 0` inside the tech >= 2 branch, standing in for 93's dead
+`POKE 38161,0`, so a jump to a primitive planet carried the previous system's enemy damage
+across. It is line 16's now, unconditional. `shipDestructionLimit` is loaded from the
+destination's record first, the way line 25 does it, so a tech 1 arrival gets the planet's own
+number rather than keeping the last one; `PlanetState` carries `destructionLimit` for it, which
+`DISK_PLANETS` already had.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -4453,9 +4502,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **H/D lines 90-93.** Planet 5's tech is 2, so 38150 should be 120 after the jump; it read
-  0. The read was taken after the simulator had resumed and may simply be too late, but that
-  is not established.
 - **Two of SHORE LEAVE's six sub-screens.** ENLIST TROOPS and REPAIR/RESTOCK are not
   captured; REPAIR needs the ship in atmosphere. SELL LOOT and ESTABLISH BASE came out of
   `probe_economy.mjs`.
