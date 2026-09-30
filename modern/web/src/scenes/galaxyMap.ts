@@ -63,6 +63,11 @@ type H = import('../engine/hires').Hires;
  * 3200 XDRAWs it away again, so it toggles forever - drawGalaxyCursor does that separately.
  */
 export function drawGalaxyMap(hires: H, shapes: ShapeTable, d: GalaxyMapData): void {
+  // Line 3000, which listed as `PRINT ""` until control characters were made visible and is
+  // really `PRINT "^L"` - a form feed. The generator's form feed fills 8192 bytes from the base
+  // of the page with $00, or with $FF when 973 is 255, and it ignores the text window the same
+  // line sets. Measured entering the map: 973 is 0 and 974 is 32, so the whole of page 1 goes
+  // black, which is what hgr() does. See oracle/probe_galaxyclear.mjs.
   hires.hgr();
 
   // 3010

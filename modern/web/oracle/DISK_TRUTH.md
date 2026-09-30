@@ -4179,6 +4179,45 @@ Three wrong turns worth recording, because each looked plausible:
 What settled it was running S/X for real and reading the accumulator at `$933C`: two
 characters, and the first was not the one the listing implied.
 
+### Every control character hidden inside a string
+
+Making `detokenise.mjs` show control characters turned one listing from a puzzle into three
+plain lines, so the obvious question was what else had been invisible.
+`oracle/probe_controlchars.mjs` reads the tokenised bytes of all twenty-three Applesoft programs
+straight off the disk image and reports every control byte between quotes:
+
+| byte | what it is | count | where |
+| --- | --- | --- | --- |
+| `$04` | Ctrl-D, the DOS command prefix | 159 | 23 programs |
+| `$0C` | form feed, clears the page | **2** | S/X 5, GALAXY MAP 3000 |
+
+and nothing else at all. Every one of the 159 Ctrl-Ds is the **first byte of its string**, which
+is exactly what DOS reads them for, so none of them is doing anything but opening a command.
+That is the useful shape of this result: the sweep is complete, and the only thing the listings
+were hiding is two form feeds.
+
+One of the two was already run down - S/X line 5, which whitens the page because 973 is 255
+there. The other is new:
+
+```
+GALAXY MAP 3000  POKE 32,0: POKE 33,39: POKE 34,19: POKE 35,23: PRINT "^L": HTAB 1: VTAB 20
+```
+
+`oracle/probe_galaxyclear.mjs` drives COM's central-computer menu into the map and records the
+character with the flags as the generator saw them: **973 = 0 and 974 = 32**, so this one fills
+page 1 with `$00` - the whole page black - and `hires.hgr()` in `galaxyMap.ts` is the right
+equivalent. The window `POKE`d on the same line makes no difference: the fill starts at the page
+base and runs 8192 bytes whatever `$20-$23` hold.
+
+**COM has a line 3000 too**, `PRINT " ": PRINT "^DRUN GALAXY MAP"`, so a probe that waits for
+"line 3000" and then starts watching is watching the wrong program. The first run of this did
+exactly that and recorded COM's trailing carriage return with COM's text window, which read
+plausibly and meant nothing. The reading that counts is the one taken at the form feed itself.
+
+Line 3000 also ends with `HTAB 1: VTAB 20`, so Applesoft's current line sits at 3000 for a while
+*after* the PRINT has gone - which is the second way to start watching too late and see only the
+carriage return that follows.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
