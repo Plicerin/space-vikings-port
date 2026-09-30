@@ -5534,6 +5534,39 @@ is already in, and when no destination is set - and the refusal is silent, the p
 straight back to the simulator. The way out is to take off first, which is what the harness does
 now, with the refusal itself checked on the way.
 
+### The flight view
+
+The one screen nothing compared. `transition_parity.mjs` reports it and moves on - two live
+flights are never at the same point - but that is a reason not to compare two runs, not a reason
+not to compare the drawing. `oracle/probe_flightview.mjs` stops the machine at line 156, where
+the frame is finished and 159 has not started erasing the needles, and captures the page **and
+the six camera cells that drew it**: XI, YI and ZI at 29467, 29469 and 29471, and P1, B1 and H1
+at 29473 to 29475. `oracle/flight_view_parity.mjs` then asks the port for that exact frame.
+
+**396 lit pixels on both sides, nothing differing.**
+
+Getting there took two corrections, and the second is the interesting one.
+
+**The ship is drawn whether or not the planet has surrendered.** `CALL CA` walks one display
+list; the model sits at A30841 from START onwards and only H/D 37's `POKE 30841,127`, EX 40's
+BLOAD DEBRIS or a new BLOAD on arrival change it. Nothing gates the drawing on 38208 - that gates
+the **damage tick** at 190 and 192. The port was hiding the ship at a secured planet, which is
+why its opening frame was a bare star ball where the disk's has a ship in the middle of it.
+
+**And line 2's `X9 = 400: Y9 = -100: Z9 = -3500` is not somewhere to put the ship.** It is where
+the ship already is. `ship-3-bytecode` spans x 150 to 600, y -120 to 30 and z -3650 to -3350 -
+centred on exactly that point - so the model carries absolute world coordinates and takes **no
+offset**, the same as the radar's. Adding X9/Y9/Z9 on top put it twice as far out.
+
+Nothing on the disk moves it, either. Searching every program for a write into the model area
+gives four BLOADs and two blanks and no other write at all, so **the enemy is a fixed object in
+the world**: it does not manoeuvre, you fly at it. The port already had that right - `spawnEnemy`
+places it at line 2's coordinates and never moves it - but it was hiding it and drawing it in the
+wrong place.
+
+With both fixed, the live flight step of the scene route is 3,695 lit against the disk's 3,697,
+and what is left between them is that the two ships are not in the same place.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

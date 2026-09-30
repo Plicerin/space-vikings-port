@@ -760,8 +760,15 @@ const enemy = spawnEnemy(state);
 
     function renderEnemyShip(cam: Camera) {
       enemyVisible = false;
-      const visibleShip = enemy.alive ? enemy.pos : null;
-      if (!visibleShip || state.atmosphere) return;
+      // Whether the ship is **drawn** is not whether it is a threat. `CALL CA` walks one
+      // display list, and the model sits at A30841 from START onwards; only H/D 37's
+      // `POKE 30841,127`, EX 40's BLOAD DEBRIS or a new BLOAD on arrival change it. Nothing on
+      // the disk gates the drawing on 38208, the surrender flag - that gates the damage tick at
+      // 190 and 192. The port was hiding the ship at a secured planet, which is why the opening
+      // frame had a star ball and the disk's had a ship in the middle of it.
+      const modelKind = (state.shipKind as number) === 2 ? 3 : (state.shipKind as number);
+      if (modelKind <= 0 || state.atmosphere) return;
+      const visibleShip = enemy.pos;
       const ep = project(cam, visibleShip);
       if (!ep.visible) return;
       const sprScale = Math.max(1, Math.min(64, Math.round(2500 / ep.depth)));
@@ -785,14 +792,19 @@ const enemy = spawnEnemy(state);
         // oracle/fit_projection.mjs; measured against the original, this took ship shape
         // agreement from 12.1% to 69.8% and the aspect ratio from 2.30x too tall to 1.05x.
         //
-        // The model's coordinates on the disk are absolute world coordinates, so it is
-        // moved to wherever the enemy currently is and keeps its shape.
+        // The model's coordinates are absolute world coordinates, so it takes **no offset**.
+        // Line 2's `X9 = 400: Y9 = -100: Z9 = -3500` is not somewhere to put the ship - it is
+        // where the ship already is: `ship-3-bytecode` spans x 150-600, y -120-30, z -3650 to
+        // -3350, centred on exactly that point. Adding it as an offset put the model twice as
+        // far out. Measured at the machine's own camera by `oracle/flight_view_parity.mjs`: with
+        // no offset the star table and the ship together give 396 lit pixels against the disk's
+        // 396, nothing differing.
         const projection = projectShipWorld(
           enemyBytecodeOps,
           { x: state.x, y: state.y, z: state.z },
           state.heading,
           state.pitch,
-          visibleShip,
+          null,
         );
         if (projection.segments.length || projection.dots.length) {
           drawShipWorld(hires, projection);
