@@ -14,13 +14,32 @@ import { drawExBurst } from './ex';
  */
 
 /**
- * Line 5: `HCOLOR= 0: Y1 = 20: POKE 973,255: PRINT ""`.
+ * Line 5: `HCOLOR= 0: Y1 = 20: POKE 973,255: PRINT "^L"`.
  *
- * That single inverse `PRINT` leaves the **whole page solid white** - measured, watching the
- * lit count go 3,909 to 16,872 to 53,760 of 53,760 over about twenty-five frames while
- * `$3CD` read 255 and `$E4` read 0. One empty PRINT blanking an entire 24-row window is not
- * what a newline does on its own, so something in the hi-res character generator's scroll or
- * window handling is doing it; that part is not derived, only the result is.
+ * The string is not empty. Its bytes are `22 0C 22` - a **form feed** between the quotes - and
+ * it only ever listed as `PRINT ""` because control characters inside strings were written out
+ * as themselves, which is invisible. (Line 3 is the same: `PRINT "^DBLOAD EXPL"`, the Ctrl-D
+ * that starts every DOS command.)
+ *
+ * With that, the whole page going white is three plain steps:
+ *
+ * ```
+ * $933F  CMP #$8D        ; carriage return? no
+ * $9343  CMP #$8C        ; form feed - clear the screen
+ * $9347  LDY #$00
+ * $9349  STY $2A         ; a pointer at the base of the hi-res page
+ * $934B  LDA $3CE        ; 974 is the page's HIGH BYTE - 32 is $2000, 64 is $4000
+ * $934E  STA $2B
+ * $9350  LDA $3CD        ; 973, the inverse flag
+ * $9353  CMP #$FF
+ * $9355  BEQ $9358       ; inverse, so the fill byte stays $FF
+ * $9358  STA ($2A),Y     ; and 8192 bytes of it go down
+ * ```
+ *
+ * So a form feed clears the page to whatever the inverse flag says: `$00` normally, `$FF` when
+ * 973 is 255. Measured both ways in `oracle/probe_printmargin.mjs`'s companion
+ * `probe_inverseprint.mjs` - form feed normal leaves 0 pixels lit, form feed inverse leaves
+ * 53,760 and all 192 rows solid, and a carriage return changes nothing either way.
  */
 export function drawPlayerDeathBackground(hires: import('../engine/hires').Hires): void {
   hires.hcolor(3);

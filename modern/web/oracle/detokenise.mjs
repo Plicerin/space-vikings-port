@@ -21,7 +21,14 @@ export const APPLESOFT_TOKENS = ('END,FOR,NEXT,DATA,INPUT,DEL,DIM,READ,GR,TEXT,P
  * The line is split into alternating code and quoted runs, and only the code runs get
  * their spacing tidied. Tidying the whole line would eat the spaces inside string
  * constants, which on this disk are load-bearing — the title box is PRINT "*   ...   *".
+ *
+ * Control characters inside strings come out in caret notation. They used to be emitted as
+ * themselves, which is invisible in a terminal, and that hid two things worth seeing: the
+ * Ctrl-D that starts every DOS command, and S/X line 5, which listed as `PRINT ""` while
+ * actually being `PRINT "^L"` - a form feed, and the thing that whitens the page before the
+ * death burst is cut out of it.
  */
+const caret = (c) => (c < 0x20 ? '^' + String.fromCharCode(c + 0x40) : (c === 0x7f ? '^?' : null));
 function detokeniseLine(mem, from, limit) {
   const segs = [{ quoted: false, text: '' }];
   let q = from;
@@ -30,7 +37,11 @@ function detokeniseLine(mem, from, limit) {
     const cur = segs[segs.length - 1];
     if (b === 0x22) segs.push({ quoted: !cur.quoted, text: '' });
     else if (b >= 0x80 && !cur.quoted) cur.text += ' ' + APPLESOFT_TOKENS[b - 0x80] + ' ';
-    else cur.text += String.fromCharCode(b & 0x7f);
+    else {
+      const c = b & 0x7f;
+      const shown = cur.quoted ? caret(c) : null;
+      cur.text += shown !== null ? shown : String.fromCharCode(c);
+    }
   }
   // Every quoted run is preceded by its opening quote; a run that is followed by another
   // segment was closed by one too. A string left open at end of line (line 3020 on this

@@ -1988,9 +1988,11 @@ next pass.
 - **Line 2's row-23 clear**, `VTAB 24: HTAB 1: PRINT "<17 spaces>";: HTAB 24: PRINT
   "<16 spaces>"`, lands on cells INSTRUMENTS never draws into - measured, columns 0-16 and
   23-38 of row 23 are empty on the original's page either way. It is a no-op.
-- **Line 21's `POKE 974,64`** comes before line 22's HPLOT, but 974 only gates the character
-  generator, not HPLOT, so the lamp is drawn. It is there to keep line 30's BLOAD commands
-  off the hi-res screen.
+- **Line 21's `POKE 974,64`** comes before line 22's HPLOT, but 974 is the character
+  generator's page, not HPLOT's, so the lamp is drawn. 974 holds the **high byte of the page
+  the generator writes to** - 32 is `$2000`, 64 is `$4000` - so poking 64 sends line 30's BLOAD
+  echo to the undisplayed page instead of over the picture. See *The empty inverse PRINT*
+  below, where the same byte turns up as the base of the form-feed clear.
 
 ### The needles are not ORBIT's to lose
 
@@ -4122,6 +4124,61 @@ starting there is what makes the numbers mean anything.
 comment; `supply.ts`, `status.ts` and `groundForces.ts` call it instead of carrying a hard 38
 or 40 that nobody could account for.
 
+### The empty inverse PRINT, which was neither empty nor a PRINT problem
+
+S/X line 5 listed as `HCOLOR= 0: Y1 = 20: POKE 973,255: PRINT ""` and left the page solid
+white, which looked like a newline doing something extraordinary. **The listing was wrong.**
+The line's bytes end `BA 22 0C 22` - `PRINT "<$0C>"`, a form feed inside the quotes.
+`detokenise.mjs` was writing control characters out as themselves, which a terminal does not
+show, so the string read as empty. It writes them in caret notation now, and the line reads
+`PRINT "^L"`. Line 3 turns out to be `PRINT "^DBLOAD EXPL"` - the Ctrl-D that starts every DOS
+command, invisible until now in every listing quoted in this file.
+
+The rest follows from the generator, traced by running the character through `$FDED` and
+disassembling only what executed:
+
+```
+$933F  CMP #$8D        ; carriage return? no
+$9343  CMP #$8C        ; form feed - clear the screen
+$9347  LDY #$00
+$9349  STY $2A         ; a pointer at the base of the hi-res page
+$934B  LDA $3CE        ; 974 is the page's HIGH BYTE: 32 is $2000, 64 is $4000
+$934E  STA $2B
+$9350  LDA $3CD        ; 973, the inverse flag
+$9353  CMP #$FF
+$9355  BEQ $9358       ; inverse, so the fill byte stays $FF
+$9358  STA ($2A),Y     ; and 8192 bytes of it go down
+```
+
+Measured on a page seeded at 5,760 lit:
+
+| character | inverse flag | pixels lit after | solid rows |
+| --- | --- | --- | --- |
+| form feed `$8C` | 0 | **0** | 0 |
+| form feed `$8C` | 255 | **53,760** | 192 |
+| carriage return `$8D` | 0 | 5,760 | 0 |
+| carriage return `$8D` | 255 | 5,760 | 0 |
+
+and on the real S/X, line 5 hands the generator exactly two characters - `$8C` at CH 0, CV 16
+with `$3CD` at 255, then `$8D` at CH 0, CV 0 - with `$2000` going `$00` to `$FF` between them.
+
+**974 is the page, not a mode.** That also explains the `POKE 974,64` before every DOS command
+on this disk: it points the generator at `$4000`, so the command echo lands on the page nobody
+is looking at.
+
+Three wrong turns worth recording, because each looked plausible:
+
+- **The carriage return does nothing.** The first test pushed `$8D` through `$FDED` with the
+  inverse flag set and the page did not change - which is correct, and would have been the end
+  of it if the conclusion drawn had been "so the premise is wrong" rather than "so try harder".
+- **Line 6's five hundred `CALL EX` do nothing to the page either.** EXPL at `$9270` is a sound
+  routine - `LDA $C030` and a shift register - and 500 calls leave every pixel where it was.
+- **The generator has no scroll.** A carriage return on the last row wraps `CV` to 0 and that
+  is all, so no amount of scrolling could have filled anything.
+
+What settled it was running S/X for real and reading the accumulator at `$933C`: two
+characters, and the first was not the one the listing implied.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -4137,8 +4194,6 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Why one empty inverse PRINT whitens a whole page.** S/X line 5 does it, measured; the
-  mechanism in the character generator is not derived.
 - **EX line 6's XDRAW.** The port draws the five flash shapes rather than XORing them, which
   differs wherever the flight view already has a pixel.
 - **COLLECT's tech 1 path.** Lines 840-900, including the line 880 silver bug, have never
