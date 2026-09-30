@@ -1,5 +1,7 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { log as glog } from '../engine/gameLog';
+import { getPanelShapes } from './instruments';
+import { eraseComNeedleTracks } from './com';
 import { parseShipBytecode, projectShipWorld, drawShipWorld } from '../engine/shipBytecode';
 import type { ShipBytecodeOp } from '../engine/shipBytecode';
 
@@ -106,16 +108,37 @@ export async function radarScene(ctx: SceneContext, scenes: SceneManager): Promi
     /* no table: the reticle still draws, with nothing behind it */
   }
 
-  hires.hgr();
+  // No hgr(). 2005's `CALL 24576: CALL 37936` redraw the view, and nothing in RADAR touches
+  // rows 124-191 - the instrument panel is flight's and stays put. Clearing the page took it
+  // away, which is what playing it showed; the parity harness never saw it because it draws
+  // `drawInstruments` itself before calling in here.
+  hires.hcolor(0);
+  for (let y = 0; y <= 123; y++) hires.hlin(0, 279, y);
   drawRadarScreen(hires, ops, radarCamera(state));
+  // 2010: `VTAB 24: HTAB 1: PRINT <18 spaces>;: HTAB 26: PRINT <13 spaces>;` - the same two
+  // blanks RE and ORBIT make, over line 155's readouts.
+  hires.hcolor(0);
+  hires.text(' '.repeat(18), 1, 24);
+  hires.text(' '.repeat(13), 26, 24);
 
-  // 2050, then 2056: X goes back, anything else identifies the contact.
+  // 2050, then 2056: `IF A$ <> "X" THEN 5000`, and 5005 runs the ship's own I.D. program.
   const k = await input.waitForKey();
   const ch = String.fromCharCode(k & 0x7f).toUpperCase();
-  if (ch === 'X') {
-    glog('radar', 'return');
+  if (ch !== 'X') {
+    glog('radar', 'ship id');
+    return scenes.run('shipId');
+  }
+
+  // 2057, on the X path only: the needle-track erase.
+  const shapes = getPanelShapes();
+  if (shapes) eraseComNeedleTracks(hires, shapes);
+
+  // 2058 and 2059: back to COM only if COM sent us here, otherwise to flight.
+  if (state.radarFromCom) {
+    state.radarFromCom = false;
+    glog('radar', 'return to com');
     return scenes.run('com');
   }
-  glog('radar', 'ship id');
-  return scenes.run('com');
+  glog('radar', 'return to flight');
+  return scenes.run('starshipSimulator');
 }

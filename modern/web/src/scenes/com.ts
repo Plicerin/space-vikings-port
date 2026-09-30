@@ -306,6 +306,8 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
         glog('com', 'ground forces');
         return scenes.run('groundForces');
       case 3:
+        // 133: `POKE 38388,2` before the RUN, which is what sends RADAR back here.
+        state.radarFromCom = true;
         glog('com', 'radar');
         return scenes.run('radar');
       case 4:

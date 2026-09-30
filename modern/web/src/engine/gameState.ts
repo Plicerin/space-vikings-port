@@ -357,6 +357,16 @@ export class GameState {
   collectedThisTrip = false;
 
   /**
+   * 38388 set to 2, which is how RADAR knows it was run from COM rather than from flight.
+   *
+   * COM line 133 is `IF COM = 3 THEN POKE 38388,2: PRINT "^DRUN RADAR"`, and RADAR line 2058 is
+   * `IF PEEK(38388) > 0 THEN POKE 38388,0: PRINT "^DRUN COM"` - otherwise 2059 runs the
+   * simulator. 38388 carries several different handoffs on the disk and the port splits them by
+   * meaning; this is the one RADAR reads.
+   */
+  radarFromCom = false;
+
+  /**
    * 38151 set to 7, which sends the next COM straight back to GROUND FORCES.
    *
    * COM line 98 - before its menu and after its box - is `IF PEEK(38151) = 7 THEN POKE 38151,0:

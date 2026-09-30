@@ -5399,6 +5399,35 @@ this harness took the asked-for values as the drawn ones and left two pixels of 
 the wrong place. Reading PX and PY back off the variable table afterwards - less the 35 that 3215
 has already added - is what makes the comparison mean anything.
 
+### Playing it again: the radar, and a screen nothing could reach
+
+`radar_parity.mjs` reports RADAR's reticle at 100% and "the panel below, rows 124-191: disk 2993
+lit, port 2993 lit, 0 differ". Pressing R in the game showed the panel gone. Both are true: the
+harness draws `drawInstruments` itself before calling `drawRadarScreen`, and the **scene** was
+starting with `hires.hgr()`.
+
+RADAR never clears below row 123. 2005's `CALL 24576: CALL 37936` redraw the view and 2010 blanks
+just the two readout fields on row 23 - `VTAB 24: HTAB 1: PRINT <18 spaces>;: HTAB 26: PRINT <13
+spaces>;`, the same pair RE and ORBIT blank. The instrument panel is flight's and stays put.
+
+Two more things were wrong on the way out, and they hid a whole screen:
+
+    2056 IF A$ < > "X" THEN 5000
+    2058 POKE 974,64: IF PEEK(38388) > 0 THEN POKE 38388,0: PRINT " ": PRINT "^DRUN COM"
+    2059 ... PRINT "^DRUN STARSHIP SIMULATOR"
+    5005 J = PEEK(38205): POKE 38151,5: PRINT "^DRUN SHIP # ";J;" I.D."
+
+- **Any key but X identifies the contact.** The port went back to COM whatever was pressed, so
+  the four SHIP # n I.D. screens were unreachable in play - `shipid_parity.mjs` has been passing
+  against a screen nothing in the game could get to.
+- **X goes back where you came from.** COM line 133 pokes 38388 to 2 before running RADAR, so the
+  radar reached from COM's menu returns to COM and the radar reached from flight returns to
+  flight. The port went to COM from both.
+
+Checked in play: R from flight now keeps the panel and blanks the two readouts, any other key
+brings up LIGHT CRUISER's identification, X from flight returns to flight, and COM's option 3
+returns to COM.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
