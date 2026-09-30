@@ -14,6 +14,7 @@ import { damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS,
   UNDAMAGED_SYSTEMS } from '../engine/diskDamage';
 import { fireLaser1500, fireMissile1000, storeIfUnder255, missileHits1050,
   groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE } from '../engine/diskWeapons';
+import { rndEFAE, rndSequence, facValue, RND_MULTIPLIER, RND_ADDEND } from '../engine/diskRnd';
 import { ShapeRenderer, decodeShapeTableJson } from '../engine/shapeTable';
 import { parseShipBytecode, projectShipBytecode, drawShipWireframe,
   projectShipWorld, drawShipWorld, COCKPIT_SHIP_WIREFRAME_VIEW } from '../engine/shipBytecode';
@@ -124,7 +125,8 @@ function boot(): void {
     combatRound550, truncate4000,
     damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS, UNDAMAGED_SYSTEMS,
     fireLaser1500, fireMissile1000, storeIfUnder255, missileHits1050,
-    groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE };
+    groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE,
+    rndEFAE, rndSequence, facValue, RND_MULTIPLIER, RND_ADDEND };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();

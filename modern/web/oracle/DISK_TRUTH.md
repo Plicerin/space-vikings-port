@@ -3602,6 +3602,84 @@ identically in all five captures, and the comparison is over rows 0-183.
 
 ---
 
+## Applesoft's RND - read, most of it verified, not finished
+
+`$EFAE` is what every `RND(1)` in the game goes through, and without it nothing RND-driven can
+be replayed. It is read now, and most of it is verified against the machine. It is **not**
+finished: the transcription in `diskRnd.ts` reproduces between 30 and 708 consecutive calls
+depending on the seed and then diverges. That is recorded here rather than dressed up, and
+`oracle/rnd_parity.mjs` prints INCOMPLETE rather than passing.
+
+```
+$EFAE  JSR $EB82                          ; the sign of FAC
+$EFB2  BMI $EFCC                          ; a negative argument reseeds from FAC
+$EFB4  LDA #$C9 / LDY #$00 / JSR $EAF9    ; FAC <- the seed at $00C9
+$EFBB  TXA / BEQ $EFA5                    ; RND(0) returns the last value unchanged
+$EFBE  LDA #$A6 / LDY #$EF / JSR $E97F    ; FAC *= 11879546.40625
+$EFC5  LDA #$AA / LDY #$EF / JSR $E7BE    ; FAC += 3.927677783011063e-8
+$EFCC  LDX $A1 / LDA $9E / STA $A1 / STX $9E   ; swap mantissa bytes 1 and 4
+$EFD4  LDA #$00 / STA $A2                 ; force it positive
+$EFD8  LDA $9D / STA $AC                  ; the guard byte becomes the OLD exponent
+$EFDC  LDA #$80 / STA $9D                 ; and the exponent becomes $80
+$EFE0  JSR $E82E                           ; normalise
+$EFE3  LDX #$C9 / LDY #$00 / JMP $EB2B     ; round, store over the seed, return it
+```
+
+The constants at `$EFA6` and `$EFAA` are the well-known pair. Three things about the rest are
+less often said, and all three are confirmed stage by stage against real calls.
+
+**`$EFD8` feeds the old exponent into the guard byte.** A byte with nothing to do with the
+mantissa is shifted into it by the normalise and then rounded in by the store. Leaving it out
+gives a different sequence within a handful of calls.
+
+**`$A4` is a hidden operand of both FMULT and FADD.** The shift-right routine fills from it -
+`$E8EC LDY $A4 / STY $01,X` - and **nothing in either routine sets it**. It is the sign
+extension for a shift and the caller is supposed to have it right; RND's callers do not touch
+it, so it is whatever the interpreter last left there. `$FF` in every capture taken here. It is
+not ignorable: aligning the tiny addend against a large FAC shifts five bytes of `$FF` into the
+top of it and the add then carries where it otherwise would not, which changes the exponent and
+every byte after it.
+
+**`$E7EE CMP #$F9 / BMI $E7B9` is not a bail.** It reads like "give up if the operands are more
+than seven apart", and taking it that way makes FADD drop the addend entirely. `$E7B9` is
+`JSR $E8F0`, the whole-byte shift, and it carries straight on into the add. Reading it wrongly
+was what made the first attempt diverge on call zero.
+
+### Where it stops
+
+`fmultE97F`'s guard byte comes out one too low whenever a multiplier byte is zero and
+`$E9B2 JMP $E8DA` takes the whole-byte shortcut. For the seed `80 69 8b 1e ce` the machine's
+accumulator is `a5 5d d5 68 01` and the transcription gives `a5 5d d5 68 00`; everything after
+that - the add's carry, the byte swap, the round - follows from the one bit, which is why the
+symptom is the top mantissa byte off by one rather than the low bit it started as.
+
+What is left to read is the shortcut. `$E8DA` shifts one byte and falls into `$E8F0`:
+
+```
+$E8F0  ADC #$08 / BMI $E8DC / BEQ $E8DC
+$E8F6  SBC #$08 / TAY / LDA $AC / BCS $E911
+$E8FD  ASL $01,X / BCC / INC $01,X / ROR x5 / INY / BNE $E8FD
+```
+
+Entering that with A = 0 does not plainly stop after eight bits, and the sign-extending rotate
+at `$E8FD` may contribute a bit the plain byte shift does not. That is the remaining unknown.
+
+### What is measured
+
+| | result |
+| --- | --- |
+| consecutive calls reproduced, seed `80 00 00 00 00` | 499 |
+| seed `81 49 0f da a2` | 708 |
+| seed `01 00 00 00 01` | 30 |
+| stage-by-stage agreement on a single call | exact, including the `$A4` fill and the carry |
+
+Two of the five seeds tried never return at all: `ff 00 00 ff ff` and `fe 7f ff ff ff` overflow
+on the first multiply and Applesoft takes its error exit instead. The first of those is what
+`$00C9` happens to hold after a reset, which is uninitialised RAM rather than a seed the
+interpreter would ever start from.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -3626,10 +3704,11 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
-- **Applesoft's RND.** `$EFAE` is a five-byte float LCG through `$E97F` and `$E7BE`. Without
-  it no `RND`-driven routine can be reproduced exactly - which is why the combat is checked
-  by predicate rather than by replay, and why EXPL's noise can only be matched given the same
-  floating-bus reads. Transcribing it means transcribing Applesoft's floating point.
+- **The last bit of Applesoft's RND.** Read, and verified stage by stage for real calls, but
+  the transcription still diverges after 30 to 708 consecutive values. The whole of the gap is
+  FMULT's guard byte on the `$E9B2 JMP $E8DA` whole-byte shortcut; the section above says what
+  is left to read. Until it is closed, the combat and the damage model stay checked by
+  predicate rather than by replay.
 - **The game logic is done.** The economy, GROUND FORCES' combat, the damage model, the
   weapons and all five of RECALL's branches have been run against the disk, and there is no
   enemy AI to do. What is left of the BASIC is COLLECT's tech-1 path and two of SHORE LEAVE's
