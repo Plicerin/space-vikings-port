@@ -3203,10 +3203,31 @@ out exact for all 366 reachable pairs while this went unnoticed: **no harness wa
 anywhere else.** The sweep is part of `line6dd5_parity.mjs`'s report now, so the number is
 tracked rather than rediscovered.
 
-What is not settled is whether the specks are ever seen. Line 147 alternates the pages through
-`$7315` and sets `$7317`/`$7319` to the other one, and line 150 calls `$9023`, so a page written
-by accident this frame is the page drawn into next. Whether anything clears it first has not
-been traced.
+#### and they are seen, for one pass
+
+Whether the specks matter is a question about what happens to those bytes next, so
+`oracle/probe_pageclear.mjs` plants `$AA` at the four addresses the wrap was measured writing to
+and reads them at every entry to `$9023`:
+
+| call | `$7315` | `$7317`/`$7319` | the page 1 marks | the page 2 marks |
+| --- | --- | --- | --- | --- |
+| 0 | `$54` | 1 | `$AA` | `$AA` |
+| 1 | `$55` | 0 | `$AA` | **`$00`** |
+| 2 | `$54` | 1 | **`$00`** | `$00` |
+
+So **both pages are cleared before being drawn into**, and the parameters say which: `$7317` and
+`$7319` at 1 means this pass clears and draws page 2, at 0 page 1, and `$7315` displays the
+other one. Ordinary double buffering.
+
+That settles the timing rather than dismissing it. While page 1 is on screen (`$7315` = `$54`)
+the renderer is drawing into page 2 - and a wrap stray from that draw lands in page 1, **the
+page being looked at**. It stays there until the next pass clears page 1 to draw into it, by
+which time page 2 is on screen. So each stray is two bytes visible for about one pass, and the
+main loop runs at roughly two passes a second.
+
+A speck for half a second, then gone, twice per line that reaches `sy` 96. The port draws one
+page and drops those stores, so what it is missing is exactly that transient - not a permanent
+mark, and not nothing either.
 
 ### What is still not done
 
@@ -3217,7 +3238,9 @@ on every pixel of page 2 in every state that has been captured.
 
 The one thing measured and not reproduced is `$6DD5` storing **outside** page 2: a line with an
 endpoint at `sy` 96 puts two bytes into page 1, and 11 of the 370 sweep pairs that `$68A1` can
-produce do it. The port models one page and drops them. See *The wrap leaves the page*.
+produce do it. Those two bytes land on the page being displayed and survive about one pass
+before the double buffering clears that page to draw into it, so what the port is missing is a
+half-second speck rather than a lasting mark. See *The wrap leaves the page*.
 
 Five display-list opcodes - `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` - are read now, and
 none of the four models on the disk uses any of them: they are a page select, a draw-or-erase
