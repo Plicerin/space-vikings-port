@@ -172,12 +172,21 @@ export async function groundForcesScene(
 
     const c = await getChoice(input, hires, 1, 9);
 
+    // 62 and 65: the box is redrawn and then `R = 5: GOSUB 12` wipes the menu - for **every**
+    // choice, before the dispatch at 70 ever happens. RECALL is where that showed: it blanks
+    // nothing of its own, so its message was landing on top of the options.
+    hires.hcolor(1);
+    hires.line(1, 1, 139, 1);
+    hires.line(139, 1, 139, 110);
+    hires.line(139, 110, 1, 110);
+    hires.line(1, 110, 1, 1);
+    clearGroundForcesMenu(hires);
+
     // Lines 65, 66 and 67. Each one runs `R = 5: GOSUB 12` first - the menu is wiped, the box
     // and the options with it - and then prints inside that same left column from row 2, not in
     // a block at row 16 over the instrument panel. Each ends `GOTO 310`, which is
     // `POKE 38151,7: RUN COM`, so the refusal takes the long way round through COM and back.
     const refuse = async (lines: string[], from: number): Promise<void> => {
-      clearGroundForcesMenu(hires);
       hires.hcolor(5);
       for (let i = 0; i < lines.length; i++) hires.text(lines[i], 2, from + i);
       await wait(3000);
@@ -190,14 +199,17 @@ export async function groundForcesScene(
       return scenes.run('com');
     }
 
-    if (c === 4 && state.forces.troopLocation !== 0) {
+    if (c === 4 && state.forces.troopPlanetIndex !== state.planetIndex) {
       // 66: a blank PRINT first, so these start on row 3.
       await refuse(['DO YOU REALLY', 'EXPECT ANYONE TO', 'ENLIST!? YOU LEFT',
         'YOUR TROOPS ON', 'ANOTHER PLANET!'], 3);
       return scenes.run('com');
     }
 
-    if (c === 1 && state.forces.troopLocation !== 0 && state.forces.troopLocation !== 3) {
+    // 66 and 67 both test `PEEK(38158) <> PEEK(38209)` - **where the troops are**, not what
+    // they are doing. Reinforcing an assault on the planet they are already on is allowed; the
+    // thing the game refuses is leaving them behind and starting again somewhere else.
+    if (c === 1 && state.forces.troopPlanetIndex !== state.planetIndex) {
       // 67
       await refuse(["YOU CAN'T ATTACK!", 'YOU LEFT', 'YOUR TROOPS ON',
         'ANOTHER PLANET!'], 3);
@@ -440,8 +452,7 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
   // still aboard is not how the assault ends.
   if (Math.round(troops) === 0) {
     state.planets[state.planetIndex].groundAssaultFailed = true;
-    state.forces.troopLocation = 0;
-    state.forces.troopPlanetIndex = -1;
+    state.forces.troopLocation = 0;   // 665
     state.forces.troops = 0;
     state.pendingGroundForcesDefeatPlanet = state.planetIndex;
     state.pendingGroundForcesNeedsRecovery = true;
@@ -463,7 +474,6 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
       {
         state.planets[state.planetIndex].groundAssaultFailed = true;
         state.forces.troopLocation = 0;
-        state.forces.troopPlanetIndex = -1;
         state.forces.troops = Math.round(troops) + troopsLeft;
         let m = state.forces.morale - 1;
         if (m < 1) m = 1;

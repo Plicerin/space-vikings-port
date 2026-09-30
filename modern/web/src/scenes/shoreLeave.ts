@@ -182,6 +182,10 @@ async function shoreLeavePay(ctx: SceneContext, scenes: SceneManager): Promise<v
     state.credits = Math.floor(state.credits - pay);
   }
 
+  // 2098: `POKE 38158, PEEK(38209): POKE 38166,2` - both bytes, not just the location. Without
+  // the first one the troops are on shore leave on no particular planet, and RECALL's line 2000
+  // and GROUND FORCES' 66 and 67 all read that byte.
+  state.forces.troopPlanetIndex = state.planetIndex;
   state.forces.troopLocation = 2;
 
   glog('shoreLeave', `pay=${yes} credits=${state.credits}`);

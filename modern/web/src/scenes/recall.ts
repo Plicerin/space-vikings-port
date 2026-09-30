@@ -76,8 +76,9 @@ export async function recallScene(ctx: SceneContext, scenes: SceneManager): Prom
   });
   drawRecall(hires, r.lines);
   if (r.newLocation !== null) {
+    // 2005 and 2010 poke 38166 and nothing else. 38158 keeps the planet it had - which is what
+    // GROUND FORCES 66 and 67 go on reading - so there is no clearing it here.
     state.forces.troopLocation = r.newLocation as 0 | 1 | 2 | 3;
-    if (r.newLocation === 0) state.forces.troopPlanetIndex = -1;
   }
   glog('recall', `line ${r.line}: ${r.lines.filter(Boolean).join(' ')}`);
 

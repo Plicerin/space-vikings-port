@@ -95,7 +95,8 @@ export function serviceCommanderShip(state: GameState): void {
   state.forces.tanks = Math.max(state.forces.tanks, 24);
   state.forces.groundMissiles = Math.max(state.forces.groundMissiles, 24);
   state.forces.troopLocation = 0;
-  state.forces.troopPlanetIndex = -1;
+  // Nothing on the disk ever clears 38158; it holds a planet from START 2030 onwards.
+  state.forces.troopPlanetIndex = state.planetIndex;
   state.credits = Math.max(0, Math.floor(state.credits - 500 - troopBudget));
 
   glog('commander', `repair/restock at ${state.planets[state.planetIndex].name} credits=${beforeCredits}->${state.credits}`);

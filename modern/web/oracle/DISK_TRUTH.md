@@ -5091,6 +5091,48 @@ One smaller thing: the digit reader drew an underscore cursor. 5006 echoes the d
 else - the hi-res character generator has no cursor - and 5002's `PRINT "  ";` is what takes a
 digit back off on a backspace.
 
+### RECALL, and the byte that says where the troops are
+
+RECALL's own twelve lines were already exact - `recall_parity.mjs` has all five branches against
+the machine, pixel for pixel, including which of them poke 38166. What playing it showed was
+that its message was landing **on top of the GROUND FORCES menu**: "TROOPS ARE IN" over
+"2) RECALL TROOPS", "CRYOGENIC SLEEP!" over "3) SHORE LEAVE".
+
+RECALL blanks nothing. It does not need to, because GROUND FORCES line 65 is
+
+    65 R = 5: GOSUB 12: VTAB 2: IF COM > 2 AND COM < 7 AND PEEK(38303 + PEEK(38209)) = 0 ...
+
+and that `GOSUB 12` runs for **every** choice, before line 70's dispatch - line 12 wipes the left
+column, box and options with it, and returns at its own `IF R = 5`. Line 62 redraws the box just
+before it. The port only did that for the refusals, so every other screen arrived with the menu
+still standing; RECALL is simply the one that draws nothing over it.
+
+The rest of RECALL is 38158, the byte at the heart of its first branch - `IF PEEK(38209) < >
+PEEK(38158) AND PEEK(38166) > 0 AND PEEK(38166) < 3`. Reading every program on the disk for it
+gives four writes and nothing else:
+
+| where | what |
+| --- | --- |
+| START 2030 | `POKE 38158,1` - planet 1, which is index 0 here |
+| GROUND FORCES 150 | `POKE 38158, PEEK(38209)` - the assault |
+| SHORE LEAVE 2098 | `POKE 38158, PEEK(38209)` - the pay screen |
+| H/D 11 | `IF PEEK(38166) = 0 OR PEEK(38166) = 3 THEN POKE 38158, PEEK(38163)` |
+
+**Nothing ever clears it.** The port had two of the four - it started the byte one planet out, it
+did not move it on the pay screen, and it did not carry it through a jump - and it invented a
+`-1` for "nowhere", written by RECALL and by both of GROUND FORCES' defeat paths.
+
+That last one is what makes the whole thing work: troops on board or in cryogenic sleep travel
+with the ship, so the planet they count as being on follows the jump; troops left planetside or
+on shore leave do not. Which is exactly what GROUND FORCES 66 and 67 are for -
+
+    66 IF COM = 4 AND PEEK(38158) < > PEEK(38209) THEN ... "YOU LEFT YOUR TROOPS ON ANOTHER PLANET!"
+    67 IF COM = 1 AND PEEK(38158) < > PEEK(38209) THEN ... "YOU CAN'T ATTACK!"
+
+**- both of which test where the troops are, not what they are doing.** The port tested the
+location byte instead, which refuses a second landing on the planet the troops are already on
+and allows an assault from a system they were never brought to.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

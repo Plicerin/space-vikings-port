@@ -112,6 +112,14 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   hires.hcolor(0);
   for (const [tx, ty] of targets) hires.line(HD_ORIGIN.x, HD_ORIGIN.y, tx, ty);
 
+  // H/D line 11: `IF PEEK(38166) = 0 OR PEEK(38166) = 3 THEN POKE 38158, PEEK(38163)`. Troops
+  // on board or in cryogenic sleep travel with the ship, so the planet they count as being on
+  // follows the jump; troops left planetside or on shore leave do not, which is what makes
+  // GROUND FORCES 66 and 67 turn you away at the far end.
+  if (state.forces.troopLocation === 0 || state.forces.troopLocation === 3) {
+    state.forces.troopPlanetIndex = state.navDestination;
+  }
+
   state.planetIndex = state.navDestination;
   state.navDestination = null;
   state.commanderMapTarget = null;

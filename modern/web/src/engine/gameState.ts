@@ -254,7 +254,8 @@ export class GameState {
     inGroundBattle: false,
     /** Which planet the troops are deployed on (-1 = on board ship).
      *  START 2030 pokes 38158 to 1, so a new game has them at planet 1. */
-    troopPlanetIndex: 1,
+    // START 2030's `POKE 38158,1`. 38158 is 1-based, so planet 1 is SOL - index 0 here.
+    troopPlanetIndex: 0,
   };
 
   /** Loot quantities, each at the unit/multiplier the manual lists. The
