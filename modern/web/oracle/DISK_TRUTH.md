@@ -3758,6 +3758,47 @@ this looked like twelve failures. And **4000 does not truncate VP**, so it carri
 round to round: in Applesoft's 32-bit mantissa where the port carries a double, which is why it
 is compared to a tolerance while everything stored as a byte is exact.
 
+### COLLECT's loot
+
+`805 ON TECH + 1 GOSUB 820,840,910,1070,1090` picks a path by the planet's tech level. Three of
+them set two rates and fall into 920, which draws thirteen values in a fixed order - gold, silver,
+platinum, titanium, collapsium, steel, fissionables, electronics, weapons, fighter parts, luxury
+food, wine, art - each `J = PEEK(addr) + (RND(1) * rate): GOSUB 915: POKE addr,J`, with
+`915 IF J > 255 THEN J = 255` and a POKE that truncates. Line 1030's luxury food is the one flat
+rate, 20, whatever the tech level.
+
+`oracle/probe_rndloot.mjs` drives a winning assault - surrender point 2 against morale 6, so 660
+surrenders on the first round and 690 falls into 800 - and records every entry to `$EFAE` with the
+seed, all thirteen cargo counters, and **J1 and J2 as Applesoft held them**. Reading the rates off
+the machine rather than working them out from the flag is what makes the replay a test: 920's
+`IF PEEK(301) = 1 THEN J1 = J1 * .6` needs no assumption about what 301 was.
+
+The recording lands 31 draws: 18 for the combat round, 13 for the loot. Two independent counts of
+draws that were worked out separately, agreeing.
+
+| | |
+| --- | --- |
+| counters predicted from the recomputed RND value | **13 of 13** |
+| the byte line 960 writes instead of titanium | **also exact** |
+
+**Line 960's typo is now pinned down, not just noticed.** `960 J = PEEK(38180) + (RND(1) * J2):
+GOSUB 915: POKE 31180,J` peeks titanium and pokes **31180**, a typo for 38180. So titanium is never
+awarded on any path - and 31180 is `$79CC`, which is inside the ship model BLOADed to `$7879`. The
+machine took it from 68 to 5, and 5 is exactly the titanium award the line computed. The typo does
+not lose the value; it writes it into the loaded ship.
+
+**301 is `$012D`, inside the 6502 stack page.** The "already collected this trip" flag lives 210
+bytes down a stack that grows down from `$01FF`, so deep enough nesting would write over it. That
+is worth knowing but it is not a bug in practice: `oracle/probe_flag301.mjs` samples the stack
+pointer across an assault and a collection and it gets no lower than `$019D`, 112 bytes clear of
+the flag, and 301 changes exactly once in eighty million instructions - 0 to 1, from 921's own
+POKE. Only three lines on the whole disk touch it: 920 reads it, 921 sets it, and H/D line 5 pokes
+it back to 0 on a jump. So the 60% penalty on a second haul between jumps is real and reachable,
+and the port's flag models it correctly.
+
+The port's `awardLoot` already transcribed all of this - both bugs included - and the replay
+confirms it on the values.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -3790,9 +3831,10 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
-- **Replaying the rest.** The damage tick and the combat are replayed and exact. COLLECT's
-  loot rolls, SHORE LEAVE's base and weapon prices and 5000's ground fire are still checked by
-  range rather than by replay, and all three are single draws that the same method would settle.
+- **Replaying the rest.** The damage tick, the combat and COLLECT's thirteen loot draws are
+  replayed and exact. SHORE LEAVE's base and weapon prices and 5000's ground fire are still
+  checked by range rather than by replay, and both are single draws that the same method would
+  settle.
 - **The game logic is done.** The economy, GROUND FORCES' combat, the damage model, the
   weapons and all five of RECALL's branches have been run against the disk, and there is no
   enemy AI to do. What is left of the BASIC is COLLECT's tech-1 path and two of SHORE LEAVE's

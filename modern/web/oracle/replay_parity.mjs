@@ -171,7 +171,76 @@ if (fs.existsSync(combatFile)) {
     `- four weapon counts and the troop total to the unit, the assault's progress to ${drift.toExponential(1)}`);
 }
 
-const total = bad + (combatBad ?? 0);
+// ---- COLLECT's thirteen loot draws --------------------------------------------------------
+//
+// 920 draws thirteen values in a fixed order at rates J1 and J2, each stored through
+// `915 IF J > 255 THEN J = 255` and a truncating POKE. The recording says where they start - the
+// draw after which gold first moves is 925 - and carries J1 and J2 as the machine held them, so
+// 920's `IF PEEK(301) = 1 THEN J1 = J1 * .6` needs no guessing at what 301 was.
+const lootFile = 'captured/replay/loot.json';
+let lootBad = null;
+if (fs.existsSync(lootFile)) {
+  const L = JSON.parse(fs.readFileSync(lootFile, 'utf8'));
+  if (L.start >= 0) {
+    const names = L.loot.map((x) => x[0]);
+    const seeds = Array.from({ length: 13 }, (_, k) => L.calls[L.start + k].seed);
+    const b3 = await chromium.launch({ headless: true });
+    const p3 = await b3.newPage();
+    await p3.goto(PORT_URL, { waitUntil: 'load' });
+    await p3.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.rndEFAE), null, { timeout: 30000 });
+    const drawn = await p3.evaluate(({ ss, a4 }) => {
+      const sv = window.__spaceVikings;
+      return ss.map((s) => sv.rndEFAE(s, a4).value);
+    }, { ss: seeds, a4: L.calls[L.start].a4 });
+    await b3.close();
+
+    const { J1: j1, J2: j2 } = L.calls[L.start].rates;
+    // 925-1050 in order, with the rate each line uses. 1030's luxury food is the one flat rate.
+    const ORDER = [
+      ['gold', j2], ['silver', j2], ['platinum', j2], ['titanium', j2], ['collapsium', j1],
+      ['steel', j2], ['fissionables', j2], ['electronics', j1], ['weapons', j1],
+      ['fighterParts', j2], ['luxuryFood', 20], ['wine', j2], ['art', j1],
+    ];
+    // 915 caps at 255 and the POKE truncates.
+    const cap = (v) => (v > 255 ? 255 : Math.trunc(v));
+    // the counters after the thirteenth draw are only visible once the loop has finished
+    const after = (k, idx) => (L.calls[L.start + k + 1]
+      ? L.calls[L.start + k + 1].loot[idx] : L.final[idx]);
+
+    console.log('');
+    console.log(`COLLECT at tech ${L.tech}: 920 ran with J1 = ${j1} and J2 = ${j2}`);
+    console.log('  line  counter          before  after   RND drawn     predicted');
+    lootBad = 0;
+    const LINES = [925, 940, 950, 960, 970, 980, 990, 1000, 1010, 1020, 1030, 1040, 1050];
+    ORDER.forEach(([name, rate], k) => {
+      const idx = names.indexOf(name);
+      const before = L.calls[L.start + k].loot[idx];
+      // 960 peeks 38180 but pokes 31180, so titanium is read and left where it was
+      const stray = name === 'titanium';
+      const predicted = stray ? before : cap(before + drawn[k] * rate);
+      const got = after(k, idx);
+      const ok = predicted === got;
+      if (!ok) lootBad++;
+      console.log(`  ${String(LINES[k]).padStart(4)}  ${name.padEnd(15)}${String(before).padStart(6)} ` +
+        `${String(got).padStart(6)}   ${drawn[k].toFixed(9)}   ${String(predicted).padStart(9)}` +
+        `${stray ? '   (960 pokes 31180 instead)' : ''}${ok ? '' : '   DIFFERS'}`);
+    });
+
+    // and where 960's value actually went: J = PEEK(38180) + RND * J2, poked to 31180.
+    const tIdx = names.indexOf('titanium');
+    const strayPredicted = cap(L.calls[L.start + 3].loot[tIdx] + drawn[3] * j2);
+    const strayOk = strayPredicted === L.finalStray;
+    if (!strayOk) lootBad++;
+    console.log(`  960's value lands in 31180 = $79CC, inside the loaded ship model: ` +
+      `${L.calls[L.start].stray} -> ${L.finalStray}, predicted ${strayPredicted}` +
+      `${strayOk ? '' : '   DIFFERS'}`);
+    console.log('');
+    console.log(`${ORDER.length + 1 - lootBad} of ${ORDER.length + 1} predicted - the thirteen ` +
+      `counters and the ship-model byte 960 writes instead of titanium`);
+  }
+}
+
+const total = bad + (combatBad ?? 0) + (lootBad ?? 0);
 console.log('');
 console.log(total === 0 ? 'replay: clean' : `replay: ${total} differ`);
 process.exit(total === 0 ? 0 : 1);

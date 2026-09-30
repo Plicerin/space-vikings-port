@@ -71,12 +71,19 @@ export interface CollectLoot {
  *   880 stores `J` - still gold's value from 850. So at tech 1, silver comes out equal to
  *   gold. This path is not exercised above tech 1 and has not been seen on the machine.
  * - **Line 960 pokes 31180, not 38180.** Titanium is never awarded, and `$79CC` - inside the
- *   ship model BLOADed to `$7879` - is written instead. Confirmed: a tech 3 assault left
- *   titanium at 0 and took 31180 from 68 to 0.
+ *   ship model BLOADed to `$7879` - is written instead. Confirmed on the machine: a tech 3
+ *   assault left titanium at 0 and took 31180 from 68 to 5, which is exactly the value 960
+ *   worked out for titanium.
  *
  * Line 920 halves the rates once per trip: `IF PEEK(301) = 1 THEN J1 = J1 * .6: J2 = J2 * .6`,
- * then it pokes 301 to 1. H/D line 5 pokes it back to 0, so the first haul after a jump is
- * the full one.
+ * then 921 pokes 301 to 1. H/D line 5 pokes it back to 0, so the first haul after a jump is
+ * the full one. 301 is `$012D`, inside the 6502 stack page - the flag is kept 210 bytes down
+ * a stack that grows down from `$01FF` - but an assault and a collection take the stack no
+ * lower than `$019D`, so nothing overwrites it and the flag works as intended.
+ *
+ * All thirteen draws are replayed against the machine's own RND stream in
+ * `oracle/replay_parity.mjs`, so the order, the rates and both bugs are confirmed on the
+ * values and not on their bounds.
  */
 export function awardLoot(
   loot: CollectLoot,
