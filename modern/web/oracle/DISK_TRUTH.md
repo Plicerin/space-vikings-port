@@ -5501,6 +5501,39 @@ flight view has. The route scores it on its panel, which is exact, and `radar_pa
 the view at a camera captured with it. With that, the whole route is clean: **twenty-three
 screens, every one of them exact.**
 
+### A game played end to end
+
+Every harness in this directory compares pixels. `oracle/playthrough.mjs` asks a different
+question - does the game still work? - and answers it by playing one: in to the planet, down
+through re-entry, up to orbit, down again, take the world, collect the loot, build a base, sell
+the haul, out to flight, jump to another system, and through the radar and the ship
+identification on the way. Twenty-two checks on **where it goes and what it leaves behind**,
+not on what it draws.
+
+That is the class of thing the pixel harnesses keep missing - RADAR drawing perfectly and
+returning to the wrong program, the ship identification being unreachable, the galaxy directory
+coming back to the wrong menu. All three were right in every capture and wrong in the game.
+
+Two shortcuts are taken and marked where they happen: the ship is placed rather than flown,
+because a pass is two and a half seconds and crossing the map takes minutes, and a planet's
+surrender flag is cleared so the assault has something to do. Neither invents behaviour.
+
+It passes, and what it checks on the way is worth listing: RE leaves the ship at Y 1024 and
+Z -7000, ORBIT at X 700 and Z 2000, a won assault comes back to the ground-forces menu rather
+than COM's, the loot is sold and the hold empties, and the radar returns to flight when flight is
+where it was opened from.
+
+**One thing it taught me by failing.** The first run could not make the hyperdrive jump, and the
+port turned out to be right: H/D line 1 is
+
+    1 POKE -16300,0: POKE 38392,0: IF PEEK(38210) = 1 OR PEEK(38209) = PEEK(38163)
+      OR PEEK(38163) = 0 THEN PRINT "^DRUN STARSHIP SIMULATOR"
+
+so a jump is refused while the ship is in the atmosphere, when the destination is the system it
+is already in, and when no destination is set - and the refusal is silent, the program bouncing
+straight back to the simulator. The way out is to take off first, which is what the harness does
+now, with the refusal itself checked on the way.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
