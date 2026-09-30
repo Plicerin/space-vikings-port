@@ -352,6 +352,17 @@ export class GameState {
    * one and every later haul on the same trip is worth 60%.
    */
   collectedThisTrip = false;
+
+  /**
+   * 38151 set to 7, which sends the next COM straight back to GROUND FORCES.
+   *
+   * COM line 98 - before its menu and after its box - is `IF PEEK(38151) = 7 THEN POKE 38151,0:
+   * POKE 974,64: PRINT "^DRUN GROUND FORCES"`, and line 115 repeats it. Four places set it:
+   * GROUND FORCES 310 when the planet is uninhabited, 670 when the troops are all dead, 1130 on
+   * a retreat, and COLLECT 17 after the loot is taken. So an assault of any outcome puts the
+   * player back in the ground-forces menu rather than in COM's.
+   */
+  runGroundForcesOnReturn = false;
   /**
    * 38149 - SHORE LEAVE 2107 sets it and 2106 refuses a second base with "ONLY ONE TIME PER
    * TRIP, SIR."

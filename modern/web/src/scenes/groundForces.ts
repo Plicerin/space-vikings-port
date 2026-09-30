@@ -76,10 +76,22 @@ export function drawGroundForcesBattle(hires: import('../engine/hires').Hires): 
  * line 60, which is HCOLOR 1 - COM's line 90. So the box and all of this text are green, not
  * the white the port used for the title.
  */
+/**
+ * Line 12's `FOR C = 2 TO 13: VTAB C: PRINT <18 spaces>`, which is also what line 65's
+ * `R = 5: GOSUB 12` runs on its own before a refusal - 12 returns at its own `IF R = 5` before
+ * 13 redraws the box and the menu.
+ *
+ * Eighteen columns from column 2, because COM left the window at `POKE 32,1: POKE 33,21`.
+ */
+export function clearGroundForcesMenu(hires: import('../engine/hires').Hires): void {
+  hires.hcolor(1);
+  for (let r = 2; r <= 13; r++) hires.text(' '.repeat(18), 2, r);
+}
+
 export function drawGroundForcesMenu(hires: import('../engine/hires').Hires): void {
   hires.hcolor(1);
-  // 12: FOR C = 2 TO 13: VTAB C: PRINT <18 spaces>
-  for (let r = 2; r <= 13; r++) hires.text(' '.repeat(18), 2, r);
+  // 12
+  clearGroundForcesMenu(hires);
   // 13
   hires.line(1, 1, 139, 1);
   hires.line(139, 1, 139, 110);
@@ -160,25 +172,36 @@ export async function groundForcesScene(
 
     const c = await getChoice(input, hires, 1, 9);
 
-    if (c >= 3 && c <= 6 && !hasBase) {
+    // Lines 65, 66 and 67. Each one runs `R = 5: GOSUB 12` first - the menu is wiped, the box
+    // and the options with it - and then prints inside that same left column from row 2, not in
+    // a block at row 16 over the instrument panel. Each ends `GOTO 310`, which is
+    // `POKE 38151,7: RUN COM`, so the refusal takes the long way round through COM and back.
+    const refuse = async (lines: string[], from: number): Promise<void> => {
+      clearGroundForcesMenu(hires);
       hires.hcolor(5);
-      writeLines(hires, 2, 16, ['NO BASE ON THIS', 'PLANET!'], 5);
-      await wait(2000);
-      continue;
+      for (let i = 0; i < lines.length; i++) hires.text(lines[i], 2, from + i);
+      await wait(3000);
+      state.runGroundForcesOnReturn = true;
+    };
+
+    if (c >= 3 && c <= 6 && !hasBase) {
+      // 65: one word, on the row VTAB 2 leaves the cursor on.
+      await refuse(['NO BASE'], 2);
+      return scenes.run('com');
     }
 
     if (c === 4 && state.forces.troopLocation !== 0) {
-      hires.hcolor(5);
-      writeLines(hires, 2, 16, ['DO YOU REALLY', 'EXPECT ANYONE TO', 'ENLIST!? YOU LEFT', 'YOUR TROOPS ON', 'ANOTHER PLANET!'], 5);
-      await wait(2000);
-      continue;
+      // 66: a blank PRINT first, so these start on row 3.
+      await refuse(['DO YOU REALLY', 'EXPECT ANYONE TO', 'ENLIST!? YOU LEFT',
+        'YOUR TROOPS ON', 'ANOTHER PLANET!'], 3);
+      return scenes.run('com');
     }
 
     if (c === 1 && state.forces.troopLocation !== 0 && state.forces.troopLocation !== 3) {
-      hires.hcolor(5);
-      writeLines(hires, 2, 16, ["YOU CAN'T ATTACK!", 'YOU LEFT', 'YOUR TROOPS ON', 'ANOTHER PLANET!'], 5);
-      await wait(2000);
-      continue;
+      // 67
+      await refuse(["YOU CAN'T ATTACK!", 'YOU LEFT', 'YOUR TROOPS ON',
+        'ANOTHER PLANET!'], 3);
+      return scenes.run('com');
     }
 
     if (c === 1) return attackPlanet(ctx, scenes);
@@ -288,19 +311,26 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
   // 195: `R4 = 1: GOSUB 170` - the band goes back down and the cursor with it.
   band();
 
-  const tech = state.planets[state.planetIndex].defender;
+  // 200: `C = PEEK(38282 + PEEK(38209))` - the planet's technology, which the port keeps as
+  // `defense`. This read `defender`, which is `resolveShipKind(shipKind)`, the ship in orbit -
+  // a different byte with a different meaning, so the assault could describe one planet and
+  // COLLECT, which reads `defense`, describe another.
+  const tech = state.planets[state.planetIndex].defense;
 
   // 210: `ON C + 1 GOTO 220,300,330,400,450`.
   if (tech === 0) {
     say(['PLANET IS NON HABITABLE. THERE IS NO', 'ENEMY TO RESIST LANDING FORCE.']);
     await commanderWait(state, 3000);
-    // 230, 240: blank again, take the loot, and go straight back to COM. There is no battle
-    // for a world with nothing on it.
+    // 230, 240, 310: blank again, `GOSUB 740` marks the planet taken, and then `GOTO 310` -
+    // `POKE 38151,7: RUN COM`. There is no battle and **no COLLECT**: 805's tech-0 branch at
+    // 820 is not reachable from here, because nothing on a non-habitable world is worth the
+    // trip. The port was running the collect scene.
     band();
     markPlanetConquered(state);
     glog('attack', 'surrendered - no resistance');
     await commanderWait(state, 2000);
-    return scenes.run('collect');
+    state.runGroundForcesOnReturn = true;
+    return scenes.run('com');
   } else if (tech === 1) {
     say(['PLANET IS VERY PRIMITIVE.', 'THE LOCAL INHABITANTS ARE UNABLE TO',
       'RESIST THE LANDING FORCE!!!', 'PLANET SECURE WITH MINIMUM OF FIGHTING!']);
@@ -420,6 +450,7 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
       say(['THE BATTLE IS LOST! ALL TROOPS', 'HAVE BEEN DESTROYED!!!']);
       glog('attack', 'defeat - troops lost');
       await commanderWait(state, 3000);
+      state.runGroundForcesOnReturn = true;   // 670
       return scenes.run('com');
     }
 
@@ -444,6 +475,7 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
         say(['GROUND FORCES RETREATING, SIR!', 'PLANET NOT SECURED!']);
         glog('attack', 'retreat');
         await commanderWait(state, 2000);
+        state.runGroundForcesOnReturn = true;   // 1130
         return scenes.run('com');
       }
     }

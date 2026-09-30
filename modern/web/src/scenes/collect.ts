@@ -43,7 +43,16 @@ export function clearCollectBand(hires: H): void {
   for (let r = 12; r <= 15; r++) hires.text(' '.repeat(39), 1, r, INVERSE);
 }
 
-/** Lines 802-805. `VTAB 12: HTAB 1` is 0-based row 11, column 0. */
+/**
+ * Lines 802-805. `VTAB 12: HTAB 1` is 0-based row 11, column 0.
+ *
+ * COLLECT does not clear the band before printing - 800 and 802 only move the cursor. It does
+ * not need to: GROUND FORCES line 690 ran `R4 = 1: GOSUB 160` on its way here, so the band is
+ * already the white one and carries nothing but "TROOPS ARE NOW COLLECTING LOOT.", which every
+ * one of these messages is long enough to cover. The tech-2 branch at 910 is the exception and
+ * does blank it itself, after a pause. The band is drawn here so the screen can be compared on
+ * its own.
+ */
 export function drawCollectMessage(hires: H, tech: number): void {
   clearCollectBand(hires);
   const lines = COLLECT_MESSAGES[tech] ?? [];
@@ -156,8 +165,12 @@ export async function collectScene(ctx: SceneContext, scenes: SceneManager): Pro
 
   const tech = state.planets[state.planetIndex]?.defense ?? 0;
 
-  // 13: the tech message, then line 810's delay.
+  // 13, 805. The tech-2 branch at 910 waits before it says anything - `FOR J = 1 TO 4000: NEXT`
+  // ahead of its own `R4 = 1: GOSUB 160` - so the previous message stands a while longer. The
+  // other four print straight over the band GROUND FORCES left.
+  if (tech === 2) await new Promise((r) => setTimeout(r, 4000));
   drawCollectMessage(hires, tech);
+  // 810: `FOR J = 1 TO 7000: NEXT`.
   await new Promise((r) => setTimeout(r, 2500));
 
   const before: CollectLoot = {
@@ -178,5 +191,8 @@ export async function collectScene(ctx: SceneContext, scenes: SceneManager): Pro
   glog('collect', `tech=${tech} planet=${PLANET_NAMES[state.planetIndex]}`);
   await new Promise((r) => setTimeout(r, 1500));
 
+  // 17: `POKE 38151,7`, which COM line 98 turns into a `RUN GROUND FORCES` before it ever shows
+  // its menu - so the trip ends back in the ground-forces menu, not COM's.
+  state.runGroundForcesOnReturn = true;
   return scenes.run('com');
 }

@@ -287,6 +287,15 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
     // handed, it owns it from here on, so the galaxy map's does not outlive this screen.
     state.textWindow = { top: 0, bottom: 23 };
 
+    // Line 98, between the box and the menu: `IF PEEK(38151) = 7 THEN POKE 38151,0: POKE
+    // 974,64: PRINT "^DRUN GROUND FORCES"`. COM draws its whole screen and then chains away
+    // without ever offering the menu, which is how every ground assault comes back.
+    if (state.runGroundForcesOnReturn) {
+      state.runGroundForcesOnReturn = false;
+      glog('com', 'ground forces (38151 = 7)');
+      return scenes.run('groundForces');
+    }
+
     const mainChoice = await getChoice(input, hires, 1, 5);
 
     switch (mainChoice) {

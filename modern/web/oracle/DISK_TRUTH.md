@@ -5006,6 +5006,45 @@ gauge $9602 updates, is 38167** - and STATUS line 1386 reads 38167 as the high b
 `(PEEK(38167) * 256) + PEEK(38159)`, the count it tests for "THE TROOPS ARE ALL DEAD!". The two
 uses are the original's, not the port's.
 
+### COLLECT, and where a won assault actually leaves you
+
+COLLECT itself is short - a message for the planet's technology, thirteen loot draws and a
+sign-off - and `collect_parity.mjs` already had its band and both of the original's loot bugs
+exact. What reading it end to end turned up was everything around it.
+
+**COLLECT does not clear the band it prints into.** Lines 800 and 802 only move the cursor;
+GROUND FORCES line 690 ran `R4 = 1: GOSUB 160` on the way here, so the band is already white and
+carries nothing but "TROOPS ARE NOW COLLECTING LOOT.", which every one of these messages is long
+enough to cover. The tech-2 branch at 910 is the exception: it waits, blanks the band itself and
+then prints four lines.
+
+**Line 17 is `POKE 38151,7`, and that is where a won assault ends.** COM line 98, between its box
+and its menu, is
+
+    98 IF PEEK(38151) = 7 THEN POKE 38151,0: POKE 974,64: PRINT "^DRUN GROUND FORCES"
+
+so COM draws its whole screen and chains away without ever offering the menu. Four places set
+that byte - GROUND FORCES 310 for an uninhabited world, 670 when the troops are all dead, 1130 on
+a retreat, and COLLECT 17 after the loot - **so an assault of any outcome puts the player back in
+the ground-forces menu**, not in COM's. The port went to COM's menu from all four.
+
+**And a non-habitable planet never reaches COLLECT.** 220 prints its two lines, 230 blanks, 240
+is `GOSUB 740: GOTO 310` - take the planet, set the flag, run COM. 805's own tech-0 branch at 820
+is unreachable from here. The port was running the collect scene for it.
+
+**The assault was reading the wrong byte for the planet.** Line 200 is `C = PEEK(38282 +
+PEEK(38209))`, the technology, which the port keeps as `defense`; `groundForces.ts` was reading
+`defender`, which is `resolveShipKind(shipKind)` - the ship in orbit. Two different bytes with
+two different meanings, so the assault could describe one planet while COLLECT, which does read
+`defense`, described another.
+
+**The three menu refusals were drawn over the instrument panel.** Lines 65, 66 and 67 each run
+`R = 5: GOSUB 12` first - line 12 blanks the left column, rows 2 to 13, and returns at its own
+`IF R = 5` before 13 redraws the box and the menu - and then print inside that column from row 2.
+The port put them in a block at row 16, on top of the panel, in its own wording: 65 says just
+`NO BASE`, not "NO BASE ON THIS PLANET!". Each ends `GOTO 310`, the same `POKE 38151,7: RUN COM`,
+so a refusal takes the long way round through COM and back to the menu.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
