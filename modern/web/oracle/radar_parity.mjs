@@ -2,12 +2,15 @@
 //
 // RADAR is two things on one page and they have to be scored separately. The reticle is
 // plain HPLOT line work from lines 2005-2042 and should be exact. Behind it is whatever
-// CALL 24576 drew from the borrowed camera - the flight renderer, which the port
-// reimplements in floating point and which star_parity puts at 38.9% exact and 91.7% within
-// a pixel. Averaging the two would hide both.
+// CALL 24576 drew from the borrowed camera - the flight renderer, which the port reimplements
+// in floating point. That used to be the weaker half, which is why the two are scored apart;
+// `star_parity.mjs` now has the projection itself at 100% over twelve camera states.
 //
 // So: the reticle is compared on its own pixels, and the rest of the page is reported as the
 // renderer's, with a within-one-pixel figure as well as an exact one.
+//
+// `CALL 24576` is one call over one display list, so it draws the ship model as well as the
+// star table. The port keeps them in two files and this passes both.
 import { HGR_W, HGR_H, toPng } from './hgr.mjs';
 import { chromium } from 'playwright';
 import fs from 'fs';
@@ -15,6 +18,7 @@ import fs from 'fs';
 const PORT_URL = process.env.PORT_URL || 'http://localhost:4545/';
 const golden = JSON.parse(fs.readFileSync('captured/radar/golden.json', 'utf8'));
 const stars = JSON.parse(fs.readFileSync('../public/data/shapes/starfield-bytecode.json', 'utf8')).bytes;
+const ship = JSON.parse(fs.readFileSync('../public/data/shapes/ship-3-bytecode.json', 'utf8')).bytes;
 
 // Line 2000's camera. X, Z and heading are flight's, read while RADAR held at the GET -
 // RADAR never writes them - and Y and the pitch are the ones line 2000 forces.
@@ -32,7 +36,7 @@ await page.goto(PORT_URL, { waitUntil: 'load' });
 await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.drawRadarScreen), null, { timeout: 30000 })
   .catch(() => { throw new Error('the port did not expose drawRadarScreen - is the dev server running at ' + PORT_URL + '?'); });
 
-const shots = await page.evaluate(({ bytes, c }) => {
+const shots = await page.evaluate(({ bytes, shipBytes, c }) => {
   const sv = window.__spaceVikings;
   const mk = () => {
     const el = document.createElement('canvas');
@@ -45,9 +49,9 @@ const shots = await page.evaluate(({ bytes, c }) => {
   sv.drawRadarOverlay(overlayOnly);
   const full = mk();
   sv.drawInstruments(full);
-  sv.drawRadarScreen(full, sv.parseShipBytecode(bytes), c);
+  sv.drawRadarScreen(full, sv.parseShipBytecode(bytes), c, sv.parseShipBytecode(shipBytes));
   return { overlay: Array.from(overlayOnly.snapshot().on), full: Array.from(full.snapshot().on) };
-}, { bytes: stars, c: cam });
+}, { bytes: stars, shipBytes: ship, c: cam });
 await browser.close();
 for (const e of errors.slice(0, 3)) console.log('page error:', e);
 

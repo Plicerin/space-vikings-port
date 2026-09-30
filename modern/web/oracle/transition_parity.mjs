@@ -82,9 +82,19 @@ const litIn = (on, from, to) => {
 
 // The flight view moves every frame, and the galaxy map's cursor toggles, so those two are
 // reported rather than required. The menus and reports are static and are compared outright.
-// Everything is compared except the three screens that move: the flight view, which never
-// repeats, and the galaxy map, whose cursor is toggling over it.
-const MOVES = new Set(['in flight', 'computer -> galaxy map', 'end -> flight']);
+// Everything is compared except the screens that move.
+//
+// The flight view never repeats and the galaxy map's cursor is toggling over it. The radar's
+// two are the same case one step removed: 2000 borrows the ship's own X, Z and heading and only
+// forces Y and the pitch, so the view is a projection from wherever the ship happens to be, and
+// the two machines are not at the same point in the same flight. Its **panel** is compared -
+// rows 124-191 are exact - and the view itself is what `radar_parity.mjs` checks, at a camera
+// captured with it, where it now agrees on all 1,226 pixels.
+const MOVES = new Set(['in flight', 'computer -> galaxy map', 'end -> flight',
+  'COM -> radar', 'ship id -> radar']);
+
+/** For the ones that move, the panel underneath is still fair game. */
+const PANEL_ONLY = new Set(['COM -> radar', 'ship id -> radar']);
 
 // Text row 23, y 184 to 191, is STARSHIP SIMULATOR line 155's five numbers - INT(X/2),
 // INT(Y/2), INT(Z/2) and the two headings. They are the ship's live position, and the two
@@ -104,21 +114,25 @@ const results = [];
 golden.steps.forEach((g, i) => {
   const want = diskOf(g);
   const got = Uint8Array.from(shots[i].on);
+  const panelOnly = PANEL_ONLY.has(g.label);
   let diff = 0;
   for (let k = 0; k < want.length; k++) {
-    if (skipped(g.label, Math.floor(k / HGR_W))) continue;
+    const y = Math.floor(k / HGR_W);
+    if (skipped(g.label, y)) continue;
+    if (panelOnly && y < 124) continue;
     if ((want[k] ? 1 : 0) !== (got[k] ? 1 : 0)) diff++;
   }
   const panelWant = litIn(want, 124, HGR_H - 1);
   const panelGot = litIn(got, 124, HGR_H - 1);
-  const compared = !MOVES.has(g.label);
+  const compared = !MOVES.has(g.label) || panelOnly;
   const ok = compared ? diff === 0 : true;
   if (!ok) failures++;
   results.push({ label: g.label, chain: g.chain, diskLit: g.lit, portLit: litIn(got, 0, HGR_H - 1),
     diff, panelWant, panelGot, compared });
   console.log(`  ${g.label.padEnd(26)} ${String(g.lit).padStart(8)} ` +
     `${String(litIn(got, 0, HGR_H - 1)).padStart(10)} ${String(diff).padStart(11)}   ` +
-    (compared ? (ok ? 'exact' : 'DIFFERS') : 'not compared - it moves'));
+    (panelOnly ? (ok ? 'panel exact - the view follows the ship' : 'PANEL DIFFERS')
+      : compared ? (ok ? 'exact' : 'DIFFERS') : 'not compared - it moves'));
 });
 
 // Where the difference lives. A count that matches while the pixels do not says the ink has

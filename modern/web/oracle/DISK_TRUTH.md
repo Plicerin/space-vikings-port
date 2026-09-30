@@ -5470,6 +5470,37 @@ Four things the route found that nothing else could:
 - the `CRYOGENICS` heading the scene was adding, and
 - the `hires.hgr()` at the top of the radar scene.
 
+### The star projection, which was not the problem
+
+The last measured gap was RADAR's view: 98.7% exact, sixteen of the disk's pixels with no port
+pixel anywhere near them, and the scene route reporting the same thing as 171 differing.
+
+**The projection was not at fault.** `star_parity.mjs` puts it at 100% exact and 100% within a
+pixel over twelve camera states - the header comment in `radar_parity.mjs` still said 38.9%, left
+over from before it was fixed. The sixteen pixels are a six-by-four blob at x 132-137, y 30-33
+that the star table cannot produce, and rendering `ship-3-bytecode` at the radar's camera gives
+**exactly** those sixteen.
+
+So they are the enemy contact, and the reason the port did not draw it is a difference in how the
+two are organised. `CALL 24576` is **one call over one display list**: the star table is BLOADed
+to A29440 and the ship model to A30841, and the renderer walks both. The port keeps them in two
+files and draws them from two places - `renderStarfield` and `renderEnemyShip` in the cockpit -
+so RADAR, which makes the one call, got only the stars.
+
+One detail decides how to draw it. The port's cockpit moves the model to the enemy's current
+position, with a note that its coordinates are absolute world ones. At the radar's camera the
+model with **no offset at all** lands on the disk's sixteen pixels, so on this screen the ship is
+drawn where the model says it is. `drawRadarScreen` takes both lists now.
+
+RADAR's view is now **100.0% exact, all 1,226 pixels**, and its reticle and panel with it.
+
+The scene route still cannot compare that screen, and the reason is worth stating rather than
+hiding: line 2000 borrows the ship's own X, Z and heading and forces only Y and the pitch, so the
+radar view is a projection from wherever the ship happens to be - the same live-state problem the
+flight view has. The route scores it on its panel, which is exact, and `radar_parity.mjs` checks
+the view at a camera captured with it. With that, the whole route is clean: **twenty-three
+screens, every one of them exact.**
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

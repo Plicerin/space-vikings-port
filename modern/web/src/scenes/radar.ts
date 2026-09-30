@@ -80,11 +80,24 @@ export function drawRadarOverlay(hires: H): void {
 }
 
 /** The whole screen: what CALL 24576 draws from the borrowed camera, then the reticle. */
-export function drawRadarScreen(hires: H, ops: ShipBytecodeOp[] | null, cam: RadarCamera): void {
-  if (ops) {
-    hires.hcolor(3);
-    drawShipWorld(hires, projectShipWorld(ops, cam.camera, cam.heading, cam.pitch, null));
-  }
+/**
+ * 2005's `CALL 24576`, which is one call over one display list - the star table **and** the
+ * ship model, if one is loaded. The port keeps them in two files, so both go in here.
+ *
+ * The ship takes no offset. Its coordinates on the disk are absolute world ones and the model
+ * does not move, which is measurable: rendering `ship-3-bytecode` at the radar's camera with no
+ * offset gives sixteen lit pixels in the box x 132-137, y 30-33, and those are exactly the
+ * sixteen the disk's radar has and the port's did not.
+ */
+export function drawRadarScreen(
+  hires: H,
+  ops: ShipBytecodeOp[] | null,
+  cam: RadarCamera,
+  shipOps: ShipBytecodeOp[] | null = null,
+): void {
+  hires.hcolor(3);
+  if (ops) drawShipWorld(hires, projectShipWorld(ops, cam.camera, cam.heading, cam.pitch, null));
+  if (shipOps) drawShipWorld(hires, projectShipWorld(shipOps, cam.camera, cam.heading, cam.pitch, null));
   drawRadarOverlay(hires);
 }
 
@@ -128,7 +141,18 @@ export async function radarScene(ctx: SceneContext, scenes: SceneManager): Promi
       energy: Math.round(state.energy),
     });
   }
-  drawRadarScreen(hires, ops, radarCamera(state));
+  // The ship model is part of the same display list - see drawRadarScreen. Kind 0 is no ship,
+  // and RADAR 5002 maps kind 2 to SHIP # 3.
+  let shipOps: ShipBytecodeOp[] | null = null;
+  const kind = (state.shipKind as number) === 2 ? 3 : (state.shipKind as number);
+  if (kind > 0 && !state.atmosphere) {
+    try {
+      const shipJson = await loader.json<{ bytes: number[] }>(`data/shapes/ship-${kind}-bytecode.json`);
+      shipOps = parseShipBytecode(shipJson.bytes);
+    } catch { /* no model, no contact */ }
+  }
+  drawRadarScreen(hires, ops, radarCamera(state), shipOps);
+
   // 2010: `VTAB 24: HTAB 1: PRINT <18 spaces>;: HTAB 26: PRINT <13 spaces>;` - the same two
   // blanks RE and ORBIT make, over line 155's readouts.
   hires.hcolor(0);

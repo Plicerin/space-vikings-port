@@ -366,6 +366,7 @@ export class GameState {
    */
   radarFromCom = false;
 
+
   /**
    * 38151 set to 7, which sends the next COM straight back to GROUND FORCES.
    *
