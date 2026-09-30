@@ -5208,6 +5208,45 @@ never change state in a whole game. The port's commander was setting `envPct` an
 100 on a restock, which is two of the three - it is left alone now, and 38185 has joined
 `UNDAMAGED_SYSTEMS` beside the others.
 
+### The galaxy directory
+
+COM 900-1180, reached by 2 from the central computer or 1 from the navigation computer. No
+capture in this directory covered it, and it had drifted further from the disk than anything
+since the ground assault.
+
+**The listing is twenty PRINTs and nothing else.** Line 940 is
+
+    940 FOR C = 1 TO 10: HTAB 2: PRINT C;")";S$(C);: HTAB 21: PRINT C + 10;")";S$(C + 10): NEXT
+
+- ten rows, two across, the number with no leading space and the paren straight after it, so it
+reads `1)SOL` and `20)SHIVANDA`. The port had a `>` marking the current system, a `+` or `*`
+marking whether each was taken or visited, a colour per planet, and a `CURRENT:` line underneath,
+and every row of it a column and two rows out of place.
+
+The page is also inverse on orange: 910 floods rows 0-123 in `HCOLOR= 5` and pokes 973 to 255,
+and only 960 puts the flag back. 900's window is the full width, `POKE 32,0: POKE 33,40`.
+
+**950's refusal is a redraw.** `GET C$: C = VAL(C$): IF C < 1 OR C > 2 THEN GOTO 910` - an
+unrecognised key just draws the page again. The port was calling COM's `getChoice`, which prints
+"PLEASE ENTER YOUR / COMMAND AGAIN." at row 21, on top of the instrument panel.
+
+**And 1180 is `GOTO 900`.** After a planet's data has been read and its READY answered, the
+listing comes back. The only way out is option 2. The port returned to the menu it came from.
+
+The data page itself, 979-1170, does not flood and does not clear the whole screen: 979 narrows
+the window to `POKE 32,1: POKE 33,39` and 980 blanks **rows 1 to 14**, so the directory's title
+on row 0 is still standing above it. Everything is one PRINT after another from row 3 at column
+1, and two of the blank PRINTs - 1080's and 1150's - happen whichever way the test after them
+goes. What the port had drawn instead was a screen of its own: a `STATUS: SECURED` line, a
+`DEFENDER:` line, a `LOOT COLLECTED` line and a `REPAIR BASE PRESENT` line, none of which the
+original prints. The disk's wording is `SIRIUS HAS BEEN SECURED` / `SIRIUS IS INDEPENDENT.` and
+`THERE IS AN OPERATIONAL REPAIR BASE` / `ON THE PLANET.`
+
+Two smaller ones in the same screen. 1110 prints `PEEK(38261 + C) * 35294` through Applesoft,
+which has **no thousands separators** - the port was formatting it with commas. And 1070 is a
+single PRINT of thirty-eight characters, `ADVANCED CAPABILITY-SUPERIOR TO  OURS!`, two spaces
+before OURS and all; the port had split it over two lines.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than

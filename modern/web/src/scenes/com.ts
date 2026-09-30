@@ -16,7 +16,8 @@ const TECH_DESC = [
   'PRIMITIVE PSEUDO SOCIETY ONLY.',
   'LIMITED ATOMIC DEVELOPMENT',
   'SOPHISTICATED TECHNOLOGY WITH\nSTARSHIP CAPABILITY.',
-  'ADVANCED CAPABILITY-SUPERIOR\nTO OURS!',
+  // 1070 is one PRINT of thirty-eight characters, two spaces before OURS and all.
+  'ADVANCED CAPABILITY-SUPERIOR TO  OURS!',
 ];
 
 async function wait(ms: number): Promise<void> {
@@ -421,123 +422,138 @@ function enterNavComputer(hires: import('../engine/hires').Hires): boolean {
   return true;
 }
 
+/**
+ * COM 979-1170, the planetary data page.
+ *
+ * It does not flood and it does not clear the whole screen. 979 narrows the window to
+ * `POKE 32,1: POKE 33,39` and 980 blanks **rows 1 to 14** with 38 printed spaces, so the
+ * directory's title on row 0 is still standing above it and 910's orange flood is still behind
+ * it. 973 is 255 all the way through - 970 set it and only 1172 puts it back - so the whole page
+ * is inverse.
+ *
+ * Everything here is one PRINT after another from row 3, at the window's left edge, column 1.
+ * What stood in this function instead was a screen of the port's own: a STATUS: SECURED line,
+ * a DEFENDER: line, a LOOT COLLECTED line and a REPAIR BASE PRESENT line, none of which the
+ * original prints, and a population with thousands separators in it, which Applesoft does not do.
+ */
+const INVERSE = { invert: true } as const;
+
 function showPlanetData(
   hires: import('../engine/hires').Hires,
   planet: import('../engine/gameState').PlanetState,
   name: string,
   _idx: number,
 ): void {
-  hires.hgr();
-  fillBackground(hires, 5, 0, 123);
+  // 980
+  for (let r = 2; r <= 15; r++) hires.text(' '.repeat(38), 2, r, INVERSE);
 
-  hires.hcolor(3);
-  hires.text(`${name} STAR SYSTEM`, 5, 2);
+  // 990: `PRINT TAB( 5);S$(C);" STAR SYSTEM"` - TAB is absolute, so column 4.
+  hires.text(`${name} STAR SYSTEM`, 5, 2, INVERSE);
 
-  hires.hcolor(planet.surrendered ? 2 : 1);
-  hires.text(`STATUS: ${planet.surrendered ? 'SECURED' : 'INDEPENDENT'}`, 3, 3);
+  const say = (text: string, row: number) => hires.text(text, 2, row, INVERSE);
 
+  // 1005: `PEEK(38240 + C)`, the visited flag.
   if (!planet.visited) {
-    hires.hcolor(1);
-    hires.text('NO INFORMATION AVAILABLE', 3, 5);
-    hires.text('AT THIS TIME.', 3, 6);
+    say('NO INFORMATION AVAILABLE AT THIS TIME.', 4);
     return;
   }
 
-  hires.hcolor(1);
-  hires.text('TECHNOLOGICAL DEVELOPMENT:', 3, 5);
+  say('TECHNOLOGICAL DEVELOPMENT:', 4);
   const tech = planet.defense;
   const desc = TECH_DESC[tech] ?? TECH_DESC[0];
-  const descLines = desc.split('\n');
-  for (let i = 0; i < descLines.length; i++) {
-    hires.text(descLines[i], 3, 6 + i);
-  }
+  const descLines = desc.split(String.fromCharCode(10));
+  let r = 5;
+  for (const line of descLines) say(line, r++);
 
-  let r = 9;
-  if (tech >= 2) {
-    hires.text('ORBITING DEFENSE CAPABILITY --', 3, r);
-    hires.text('FIGHTER PROTECTION PROBABLE.', 3, r + 1);
-    r += 2;
-  }
-
-  const pop = planet.population * 35294;
-  hires.text(`POPULATION = APPROX. ${pop.toLocaleString('en-US')}`.slice(0, 38), 3, r);
+  // 1080's blank PRINT happens whichever way the test goes.
   r++;
-
-  if (planet.defender > 0) {
-    hires.text(`DEFENDER: ${SHIP_NAMES[planet.defender] ?? 'UNKNOWN'}`, 3, r + 1);
-    r += 2;
+  if (tech >= 2) {
+    say('ORBITING DEFENSE CAPABILITY --', r++);
+    say('FIGHTER PROTECTION PROBABLE.', r++);
   }
 
+  // 1110: `PEEK(38261 + C) * 35294`, printed by Applesoft - no thousands separators.
+  say(`POPULATION = APPROX. ${planet.population * 35294}`, r++);
+
+  // 1120-1140
+  say(planet.surrendered ? `${name} HAS BEEN SECURED` : `${name} IS INDEPENDENT.`, r++);
+
+  // 1150's blank PRINT, again unconditional.
+  r++;
   if (planet.hasBase) {
-    hires.text('REPAIR BASE PRESENT', 3, r + 1);
-  }
-
-  if (planet.looted) {
-    hires.hcolor(5);
-    hires.text('LOOT COLLECTED', 3, 23);
+    say('THERE IS AN OPERATIONAL REPAIR BASE', r++);
+    say('ON THE PLANET.', r++);
   }
 }
 
+/**
+ * COM 900-978, the galaxy directory.
+ *
+ * 900 opens the window right out - `POKE 32,0: POKE 33,40: POKE 34,0: POKE 35,15` - and 910
+ * floods rows 0 to 123 in HCOLOR 5 and pokes 973 to 255, so this page is black text on orange
+ * behind a white inverse band, the same trick STATUS and SUPPLY use.
+ *
+ * 940 is the whole listing: `PRINT C;")";S$(C);: HTAB 21: PRINT C + 10;")";S$(C + 10)`. No
+ * markers, no icons and no colours - Applesoft prints the number with no leading space and the
+ * paren straight after it, twice across, ten rows. The port had a `>` for the current system, a
+ * `+` or `*` for its state, a colour per planet and a `CURRENT:` line underneath, and every row
+ * of it a column and two rows out of place.
+ */
 async function galaxyDirectory(ctx: SceneContext): Promise<void> {
-  const { hires, input, state } = ctx;
+  const { hires, input } = ctx;
 
-  hires.hgr();
-  fillBackground(hires, 5, 0, 123);
-
-  hires.hcolor(3);
-  hires.text('** GALAXY DIRECTORY **', 10, 1);
-
-  hires.hcolor(1);
-  for (let i = 0; i < 10; i++) {
-    const leftP = state.planets[i];
-    const rightP = state.planets[i + 10];
-    const leftIcon = leftP.surrendered ? '+' : leftP.visited ? '*' : ' ';
-    const rightIcon = rightP.surrendered ? '+' : rightP.visited ? '*' : ' ';
-    const leftCur = i === state.planetIndex ? '>' : ' ';
-    const rightCur = (i + 10) === state.planetIndex ? '>' : ' ';
-
-    hires.hcolor(leftP.surrendered ? 2 : leftP.visited ? 5 : 1);
-    let left = `${leftCur}${leftIcon}${i + 1}) ${PLANET_NAMES[i]}`.slice(0, 20);
-    hires.text(left, 1, 3 + i);
-
-    hires.hcolor(rightP.surrendered ? 2 : rightP.visited ? 5 : 1);
-    let right = `${rightCur}${rightIcon}${i + 11}) ${PLANET_NAMES[i + 10]}`.slice(0, 20);
-    hires.text(right, 21, 3 + i);
-  }
-
-  hires.hcolor(1);
-  hires.text(`CURRENT: ${PLANET_NAMES[state.planetIndex]}`, 2, 14);
-
-  hires.hcolor(5);
-  hires.text('1) DISPLAY PLANETARY DATA', 7, 15);
-  hires.text('2) RETURN               ', 7, 16);
-
-  drawPrompt(hires, 18, 10);
-
-  const choice = await getChoice(input, hires, 1, 2);
-
-  if (choice === 2) return;
-
+  // The outer loop is 1180's `GOTO 900`: after a planet has been looked at and its READY
+  // answered, the listing comes straight back. The only way out is 969, option 2.
   for (;;) {
-    clearLines(hires, 1, 15, 40, 6);
-    hires.hcolor(5);
-    hires.text('WHICH SYSTEM?', 10, 15);
+    // 910. No hgr(): the flood is the clear.
+    fillBackground(hires, 5, 0, 123);
 
-    const planetIdx = await readTwoDigitNumber(input, hires, 16, 24, 1, 20);
-    if (planetIdx === null) continue;
+    // 920: `HTAB 10` is column 9, and its trailing PRINT leaves row 1 blank.
+    hires.text('** GALAXY DIRECTORY **', 10, 1, INVERSE);
+    // 930: thirteen rows of 38 spaces from row 2, then VTAB 3 comes back to row 2.
+    for (let r = 3; r <= 15; r++) hires.text(' '.repeat(38), 2, r, INVERSE);
 
-    if (planetIdx < 1 || planetIdx > 20) {
-      await showError(hires, ['TRY AGAIN PLEASE.']);
-      continue;
+    // 940
+    for (let i = 0; i < 10; i++) {
+      hires.text(`${i + 1})${PLANET_NAMES[i]}`, 2, 3 + i, INVERSE);
+      hires.text(`${i + 11})${PLANET_NAMES[i + 10]}`, 21, 3 + i, INVERSE);
     }
+    hires.text('1) DISPLAY PLANETARY DATA', 7, 13, INVERSE);
+    hires.text('2) RETURN                ', 7, 14, INVERSE);
 
-    const idx = planetIdx - 1;
-    showPlanetData(hires, ctx.state.planets[idx], PLANET_NAMES[idx], idx);
+    // 950: `HTAB 10: PRINT "READY ";`
+    hires.text('READY ', 10, 15, INVERSE);
 
-    hires.hcolor(5);
-    hires.text('READY', 10, 20);
-    await input.waitForKey();
-    return;
+    // 950: `GET C$: C = VAL(C$): IF C < 1 OR C > 2 THEN GOTO 910` - an unrecognised key simply
+    // redraws the page. There is no "PLEASE ENTER YOUR COMMAND AGAIN." here; that belongs to
+    // COM's own menus, and the port was printing it at row 21, over the instrument panel.
+    const k = await input.waitForKey();
+    const choice = parseInt(String.fromCharCode(k & 0x7f), 10);
+    if (choice !== 1 && choice !== 2) continue;
+    if (choice === 2) return;
+
+    for (;;) {
+      // 970: `VTAB 15: HTAB 10: PRINT "WHICH SYSTEM ";` - no question mark, and the two digits go
+      // in at HTAB 24 + J, columns 25 and 26 of the same row.
+      hires.text('WHICH SYSTEM ', 10, 15, INVERSE);
+      const planetIdx = await readTwoDigitNumber(input, hires, 15, 25, 1, 20);
+
+      // 978: `IF C < 1 OR C > 20` - and VAL of nothing is 0, so an empty entry lands here too.
+      if (planetIdx === null || planetIdx < 1 || planetIdx > 20) {
+        hires.text('TRY AGAIN PLEASE.', 10, 15, INVERSE);
+        await wait(3000);
+        hires.text(' '.repeat(20), 10, 15, INVERSE);
+        continue;
+      }
+
+      const idx = planetIdx - 1;
+      showPlanetData(hires, ctx.state.planets[idx], PLANET_NAMES[idx], idx);
+
+      // 1170: `VTAB 15: PRINT "READY ";`, at the window's left edge this time.
+      hires.text('READY ', 2, 15, INVERSE);
+      await input.waitForKey();
+      break;
+    }
   }
 }
 
