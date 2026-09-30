@@ -699,6 +699,14 @@ const enemy = spawnEnemy(state);
         }
       }
 
+      // $6DD5 walks its address out of page 2 for any line reaching sy 96 - y/z of 1, which
+      // is what a clipped endpoint gives - and puts two bytes into hi-res page 1. Page 1 is
+      // what the original has on screen while it draws into page 2, so those bytes show as
+      // specks until the next pass clears that page: about half a second. Measured in
+      // oracle/probe_line6dd5wrap.mjs, the cells and masks matched here exactly. The port
+      // redraws every frame, so plotting them now gives the same one-frame speck.
+      hires.plotOffPageStrays();
+
       renderTargetReticle();
       renderProjectiles(cam);
       renderLaserBolts();

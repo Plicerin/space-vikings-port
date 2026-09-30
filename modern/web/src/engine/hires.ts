@@ -251,6 +251,9 @@ export class Hires {
    *
    * Measured on the real Applesoft ROM by oracle/probe_hcolor.mjs, all eight values.
    */
+  /** Stores $6DD5 walked out of page 2 and into page 1. See orByte(). */
+  private offPageStrays: Array<{ cell: number; mask: number }> = [];
+
   private argbAt(x: number): number {
     switch (this.phase) {
       case Phase.None: return 0;
@@ -308,6 +311,35 @@ export class Hires {
    * colour does not paint, and this keeps that behaviour rather than inventing one: the only
    * XDRAW on this disk runs under `HCOLOR= 3`, which paints every column.
    */
+  /**
+   * The stores `$6DD5` made into hi-res page 1 since this was last called, cleared as they go.
+   *
+   * Each is a cell of the page and the mask that was ORed into it. A live frame plots them; a
+   * parity capture ignores them, because the machine put them on the other page.
+   */
+  takeOffPageStrays(): Array<{ cell: number; mask: number }> {
+    const out = this.offPageStrays;
+    this.offPageStrays = [];
+    return out;
+  }
+
+  /** Plot what `takeOffPageStrays()` returns, as the original's page 1 would show it. */
+  plotOffPageStrays(): number {
+    const strays = this.takeOffPageStrays();
+    for (const s of strays) {
+      const y = (s.cell / 40) | 0;
+      const base = (s.cell % 40) * 7;
+      for (let bit = 0; bit < 7; bit++) {
+        if (!(s.mask & (1 << bit))) continue;
+        const x = base + bit;
+        if (x < 0 || x >= W || y < 0 || y >= H) continue;
+        this.buf[y * W + x] = this.argbAt(x);
+      }
+    }
+    if (strays.length) this.dirty = true;
+    return strays.length;
+  }
+
   hplotXor(x: number, y: number): void {
     const ix = Math.round(x);
     const iy = Math.round(y);
@@ -346,13 +378,35 @@ export class Hires {
    * OR one byte into the page, at a raw address, the way `ORA ($99),Y / STA ($99),Y` does.
    *
    * `$99` is zero - `$6140` clears `$7C-$9C` and nothing in the renderer ever writes it - so
-   * the address is simply `$9A` and Y. An address that is not a byte the display fetches,
-   * which includes every address outside page 2, is written in memory and never seen; the
-   * capture cannot see it either, so it is dropped here.
+   * the address is simply `$9A` and Y.
+   *
+   * This used to say that an address outside page 2 "is written in memory and never seen".
+   * That is wrong, and `oracle/probe_line6dd5wrap.mjs` measured it: a line with an endpoint at
+   * `sy` 96 - `y/z` of 1, which is what a clipped endpoint gives - walks its address out of the
+   * page and puts **two bytes into hi-res page 1**, at `$20xx` and `$3Bxx`. Page 1 is the page
+   * being displayed while the renderer draws into page 2, so those two bytes are on screen from
+   * the moment they are written until the next pass clears page 1 to draw into it: about half a
+   * second, at the main loop's two passes a second.
+   *
+   * They are collected rather than plotted. The buffer stays a page 2 buffer, which is what
+   * every renderer harness compares against, and `takeOffPageStrays()` hands them to whoever
+   * is drawing a live frame.
    */
   private orByte(hi: number, lo: number, mask: number): void {
-    const cell = ADDR_TO_CELL[(((hi << 8) | lo) - PAGE_LO) & 0xffff];
-    if (cell === undefined || cell < 0) return;
+    const addr = ((hi << 8) | lo) & 0xffff;
+    const cell = ADDR_TO_CELL[(addr - PAGE_LO) & 0xffff];
+    if (cell === undefined || cell < 0) {
+      // Page 1 is the same geometry one page down, so the same table answers for it.
+      if (addr >= 0x2000 && addr < 0x4000) {
+        const c = ADDR_TO_CELL[addr - 0x2000];
+        // Capped: a caller that never drains these should not grow a list forever. A line
+        // leaves at most a couple behind, so 64 is far more than any frame produces.
+        if (c !== undefined && c >= 0 && this.offPageStrays.length < 64) {
+          this.offPageStrays.push({ cell: c, mask });
+        }
+      }
+      return;
+    }
     const y = (cell / 40) | 0;
     const base = (cell % 40) * 7;
     for (let bit = 0; bit < 7; bit++) {

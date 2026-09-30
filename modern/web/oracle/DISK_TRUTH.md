@@ -3225,9 +3225,41 @@ page being looked at**. It stays there until the next pass clears page 1 to draw
 which time page 2 is on screen. So each stray is two bytes visible for about one pass, and the
 main loop runs at roughly two passes a second.
 
-A speck for half a second, then gone, twice per line that reaches `sy` 96. The port draws one
-page and drops those stores, so what it is missing is exactly that transient - not a permanent
-mark, and not nothing either.
+A speck for half a second, then gone, twice per line that reaches `sy` 96.
+
+#### and the port shows them now
+
+`orByte` used to drop any address outside page 2, with a comment saying such a byte "is written
+in memory and never seen". That was the assumption this whole thread disproved. It collects them
+instead: the port's buffer stays a page 2 buffer, which is what every renderer harness compares,
+and `takeOffPageStrays()` hands the stores to whoever is drawing a live frame. `cockpit.ts`
+plots them, so a speck appears for one frame exactly as one appears on the original for one
+pass.
+
+Nothing about the walk had to change. The port was already reaching page 1 with the right
+addresses; `orByte` was throwing the stores away at the last step. `line6dd5_parity.mjs` checks
+them against the machine now:
+
+| pair | bytes into page 1 | |
+| --- | --- | --- |
+| `[68,96]` -> `[82,110]` | cells 2563 = `$18`, 5043 = `$60` | match |
+| `[68,96]` -> `[69,96]` | cell 2563 = `$78` | match |
+| `[0,34]` -> `[-69,96]` | cells 4 = `$C`, 2484 = `$C` | match |
+| `[30,60]` -> `[0,96]` | cells 24 = `$3`, 2504 = `$3` | match |
+| `[-40,-28]` -> `[-69,96]` | cells 4 = `$C`, 2484 = `$C` | match |
+
+**The machine's side of that table is final byte values; the port's is a list of stores.** A
+two-pixel horizontal run ORs `$18` and `$60` into the same address and leaves `$78`, so
+comparing a store list against changed bytes reports a difference that is not there - which is
+what the first version of this check did, on `[68,96]` -> `[69,96]`. The port's stores are
+folded per cell before comparing.
+
+One correction. The claim in the previous round that "the divergence is in the walk after the
+first store, not the entry" was drawn from a comparison that had passed **unmapped** endpoints
+to `segment6DD5`, which takes them already mapped by `x + 70` and `95 - y`. That test was
+meaningless. The conclusion happens to hold, and now for a reason: the strays are the stores at
+the `sy` 96 end and they match exactly, so the entry agrees and the page-2 disagreement on that
+one unreachable pair comes later.
 
 ### What is still not done
 
@@ -3239,8 +3271,9 @@ on every pixel of page 2 in every state that has been captured.
 The one thing measured and not reproduced is `$6DD5` storing **outside** page 2: a line with an
 endpoint at `sy` 96 puts two bytes into page 1, and 11 of the 370 sweep pairs that `$68A1` can
 produce do it. Those two bytes land on the page being displayed and survive about one pass
-before the double buffering clears that page to draw into it, so what the port is missing is a
-half-second speck rather than a lasting mark. See *The wrap leaves the page*.
+before the double buffering clears that page to draw into it. The port collects them out of
+`orByte` and the cockpit plots them, so the speck is there too; the page 2 buffer the harnesses
+compare is untouched by it. See *The wrap leaves the page*.
 
 Five display-list opcodes - `$6D44`, `$7148`, `$718A`, `$632A` and `$6338` - are read now, and
 none of the four models on the disk uses any of them: they are a page select, a draw-or-erase

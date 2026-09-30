@@ -96,27 +96,80 @@ for (const w of worst.slice(0, 8)) {
 
 // ---- and where the stores actually land ------------------------------------------------------
 //
-// Everything above compares page 2. probe_line6dd5wrap.mjs asks a different question: whether
-// $6DD5 ever stores outside it. It does. A line with an endpoint at sy 96 - row 255 once
-// `95 - y` has been applied, which is exactly what a clipped endpoint gives, since y/z of 1 is
-// sy 96 - puts two bytes into hi-res **page 1**, the page being displayed while the renderer
-// draws into page 2.
+// Everything above compares page 2. `$6DD5` also stores outside it: a line with an endpoint at
+// sy 96 - row 255 once `95 - y` has been applied, which is exactly what a clipped endpoint
+// gives, since y/z of 1 is sy 96 - puts two bytes into hi-res **page 1**, the page being
+// displayed while the renderer draws into page 2.
+//
+// The port keeps a page 2 buffer, so those stores are collected rather than plotted, and
+// checked here against the addresses the machine wrote. `cockpit.ts` plots what it collects, so
+// the specks appear in a live frame without ever entering a parity capture.
 const wrapFile = 'captured/line6dd5wrap/golden.json';
 if (fs.existsSync(wrapFile)) {
   const w = JSON.parse(fs.readFileSync(wrapFile, 'utf8'));
-  const leaks = (w.sweep || []).filter((r) => r.leaked);
+  const sweep = w.sweep || [];
+  const leaks = sweep.filter((r) => r.leaked);
   const inReach = (x, y) => x >= -69 && x <= 69 && y >= -28 && y <= 96;
   const reachableLeaks = leaks.filter((r) => inReach(r.ax, r.ay) && inReach(r.bx, r.by));
+
+  // page 1 address -> the cell of the page, so the machine's bytes and the port's line up
+  const cellOf = (addr) => {
+    const off = addr - 0x2000;
+    const g1 = (off >> 10) & 7;
+    const rem = off - g1 * 0x400;
+    const g2 = (rem >> 7) & 7;
+    const rem2 = rem - g2 * 0x80;
+    const g3 = (rem2 / 0x28) | 0;
+    const col = rem2 - g3 * 0x28;
+    if (col >= 40) return -1;
+    return (g1 + g2 * 8 + g3 * 64) * 40 + col;
+  };
+  const detail = (w.pairs || []).filter((d) => (d.touched || [])
+    .some(([a]) => a >= 0x2000 && a < 0x4000));
+
+  const b2 = await chromium.launch({ headless: true });
+  const p2 = await b2.newPage();
+  await p2.goto(PORT_URL, { waitUntil: 'load' });
+  await p2.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.Hires),
+    null, { timeout: 30000 });
+  const mine = await p2.evaluate((cs) => {
+    const sv = window.__spaceVikings;
+    return cs.map((c) => {
+      const cv = document.createElement('canvas');
+      cv.width = 560; cv.height = 384;
+      const h = new sv.Hires(cv);
+      h.hgr();
+      h.hcolor(3);
+      h.segment6DD5(c.a[0] + 70, 95 - c.a[1], c.b[0] + 70, 95 - c.b[1]);
+      return h.takeOffPageStrays();
+    });
+  }, detail.map((d) => ({ a: d.a, b: d.b })));
+  await b2.close();
+
   console.log('');
-  console.log('  stores outside page 2:');
-  console.log(`    pairs that wrote into page 1        ${leaks.length} of ${(w.sweep || []).length}`);
+  console.log('  stores outside page 2, into page 1:');
+  console.log(`    pairs that wrote there              ${leaks.length} of ${sweep.length}`);
   console.log(`    ...of them, ones $68A1 can produce  ${reachableLeaks.length}`);
-  const detail = (w.pairs || []).filter((p) => p.label === 'reachable, leaks');
-  for (const d of detail) {
-    const out = (d.touched || []).filter(([a]) => a < 0x4000 || a >= 0x6000);
-    console.log(`    [${d.a}] -> [${d.b}]: ${out.length} byte(s) into page 1` +
-      (out.length ? ` at ${out.map(([a]) => '$' + a.toString(16).toUpperCase()).join(', ')}` : ''));
-  }
-  console.log('    the port models one page, so it drops those - which is why page 2 above is');
-  console.log('    exact for all 366 and this is reported rather than counted as a failure');
+  // The machine's side is what the bytes ended up as; the port's is the list of stores it
+  // made. Two stores into one byte look like a mismatch unless the port's are folded first -
+  // a two-pixel horizontal run ORs $18 and $60 into the same address and leaves $78.
+  let strayBad = 0;
+  detail.forEach((d, k) => {
+    const want = new Map();
+    for (const [a, v] of (d.touched || [])) {
+      if (a >= 0x2000 && a < 0x4000) want.set(cellOf(a), v);
+    }
+    const got = new Map();
+    for (const st of (mine[k] || [])) got.set(st.cell, (got.get(st.cell) || 0) | st.mask);
+    const cells = [...want.keys()].sort((x, y) => x - y);
+    const ok = want.size === got.size && cells.every((c) => got.get(c) === want.get(c));
+    if (!ok) strayBad++;
+    console.log(`    [${d.a}] -> [${d.b}]: ${want.size} byte(s), cells ` +
+      cells.map((c) => `${c}=$${(want.get(c) || 0).toString(16).toUpperCase()}`).join(' ') +
+      `${ok ? '   match' : '   DIFFERS (port ' +
+        [...got.entries()].map(([c, m]) => `${c}=$${m.toString(16).toUpperCase()}`).join(' ') + ')'}`);
+  });
+  console.log(`    ${strayBad === 0 ? 'every stray matches the machine, cell and mask'
+    : strayBad + ' pair(s) differ'}`);
+  process.exitCode = strayBad === 0 ? process.exitCode : 1;
 }
