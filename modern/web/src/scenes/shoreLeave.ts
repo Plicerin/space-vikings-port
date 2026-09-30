@@ -1,6 +1,6 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
-import { lootValue2400, rollArtRate, repairBill2500, baseRefusal2100,
-  baseCost2170 } from '../engine/diskEconomy';
+import { lootValue2400, rollArtRate, repairBill2500, repairAvailable2505,
+  baseRefusal2100, baseCost2170 } from '../engine/diskEconomy';
 import { setScene, log as glog } from '../engine/gameLog';
 import { clearPendingConquestCollection } from '../engine/commander';
 import { writeLines } from '../engine/menu';
@@ -243,10 +243,19 @@ async function sellLoot(ctx: SceneContext, scenes: SceneManager): Promise<void> 
   return scenes.run('groundForces');
 }
 
+/** 2510's list starts on the line under the title, which 2510's own PRINT leaves at row 3. */
+export const REPAIR_LIST_ROW = 3;
+
 async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<void> {
   const { hires, state, input } = ctx;
 
-  if (!state.atmosphere || state.inOrbit) {
+  // 2505: `IF PEEK(38210) = 0 OR PEEK(29469) > 22`. 29469 is YI, the **low byte** of the
+  // ship's Y as 140 stores it, so the test is "landed", not "somewhere in the air": 147 puts
+  // Y on 20 and holds it there, and that 20 is what gets through. Measured on the machine by
+  // `probe_repair.mjs` - at Y 200 the screen refuses, at Y 20 it does not. `state.inOrbit`,
+  // which the port tested instead, let a repair happen at any height.
+  const yLow = (((Math.round(state.y) % 65536) + 65536) % 65536) & 255;
+  if (!repairAvailable2505(!!state.atmosphere, yLow)) {
     drawShoreLeaveFrame(hires);
     // 2505 prints no title on the refusal either.
     hires.hcolor(1);
@@ -269,17 +278,23 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
   // Nav. comp. is 38184 and the port has no field for it; nothing in the game damages it, so
   // it is passed as 100, which is what 2520's `IF D < 100` skips. On the disk a damaged one
   // would be repaired and charged for like any other.
+  // Two of the twelve are not percentages of anything. 38199 is the **energy** line 8 reads
+  // into E and the flight loop spends, and 2525 tops it up to 63; 38187 is the **missile
+  // count** 1090 decrements two at a time, and 2530 restocks it to 100. The port had both
+  // pointed at `damage.powerPct` and `damage.missilePct`, fields nothing else reads, so a
+  // paid-for repair left the ship with the same energy and the same empty rack it came in
+  // with. Both measured on the machine: 38199 went 9 to 63 and 38187 went 0 to 100.
   const dmg = state.damage;
   const bill = repairBill2500([
-    dmg.shieldsPct, dmg.powerPct, dmg.engine1Pct, dmg.engine2Pct, dmg.computerPct,
-    dmg.radarPct, dmg.envPct, dmg.hullPct, dmg.hyperdrivePct, dmg.missilePct,
+    dmg.shieldsPct, Math.round(state.energy), dmg.engine1Pct, dmg.engine2Pct, dmg.computerPct,
+    dmg.radarPct, dmg.envPct, dmg.hullPct, dmg.hyperdrivePct, state.missilesRemaining,
     dmg.laserPct, 100,
   ]);
   const totalCost = bill.total;
-  const [shieldsAfter, powerAfter, engine1After, engine2After, computerAfter, radarAfter,
-    envAfter, hullAfter, hyperdriveAfter, missileAfter, laserAfter] = bill.after;
+  const [shieldsAfter, energyAfter, engine1After, engine2After, computerAfter, radarAfter,
+    envAfter, hullAfter, hyperdriveAfter, missilesAfter, laserAfter] = bill.after;
   dmg.shieldsPct = shieldsAfter;
-  dmg.powerPct = powerAfter;
+  state.energy = energyAfter;
   dmg.engine1Pct = engine1After;
   dmg.engine2Pct = engine2After;
   dmg.computerPct = computerAfter;
@@ -287,14 +302,20 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
   dmg.envPct = envAfter;
   dmg.hullPct = hullAfter;
   dmg.hyperdrivePct = hyperdriveAfter;
-  dmg.missilePct = missileAfter;
+  state.missilesRemaining = missilesAfter;
   dmg.laserPct = laserAfter;
 
-  // 2520-2530 each print the system and the percentage it was at before the repair.
-  let row = 4;
+  // 2520-2530 each print the system and the byte it was at before the repair, in three
+  // pieces: the name at the window's margin, `HTAB 13` and the number, `HTAB 17` and the
+  // per-cent sign. The two restock branches print `A$;` alone, so only 2520's systems get a
+  // colon. Measured off the machine's own page: columns 2, 13 and 17, first row 3.
+  let row = REPAIR_LIST_ROW;
   for (const line of bill.lines) {
-    if (!line.drew || row >= 18) continue;
-    hires.text(`${line.name}: ${Math.round(line.before)}%`, 2, row);
+    if (!line.drew || row > 13) continue;
+    const restock = line.index === 2 || line.index === 10;
+    hires.text(restock ? line.name : `${line.name}:`, 2, row);
+    hires.text(`${Math.round(line.before)}`, 13, row);
+    hires.text('%', 17, row);
     row++;
   }
 
@@ -315,6 +336,9 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
   hires.text('REPAIR SHIP', 4, 2);
   hires.hcolor(1);
 
+  // 2555: `CR = INT(CR)`, before 2560 prints it and before the comparison that follows.
+  state.credits = Math.floor(state.credits);
+
   // 2550's title, a blank PRINT and two lines, and then 2560 straight on from row 6.
   writeLines(hires, 2, 4, [
     'ALL REPAIRS ARE',
@@ -326,26 +350,35 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
     'CREDITS.',
   ]);
 
-  if (state.credits < totalCost) {
-    hires.hcolor(5);
-    writeLines(hires, 2, 12, ["YOU DON'T HAVE", 'ENOUGH CREDITS!', "LOCAL GOV'T ANGRY!"], 5);
+  // 2600 opens with its own `GOSUB 2080`, which wipes the panel - so neither refusal is
+  // appended under the bill the way the port used to append it. Both start again at row 2,
+  // 2602 with four lines and 2605 with three, and the N branch jumps straight to 2605.
+  const angry = () => {
     state.planetSurrendered = false;
     state.planets[state.planetIndex].surrendered = false;
     clearPendingConquestCollection(state, state.planetIndex);
+  };
+  if (state.credits < totalCost) {
+    drawShoreLeaveFrame(hires);
+    hires.hcolor(1);
+    writeLines(hires, 2, 2, ["YOU DON'T HAVE", 'ENOUGH CREDITS!', 'YOU HAVE 0 CREDITS',
+      'LEFT!', "I'M AFRAID YOU'VE", 'MADE THE LOCAL', 'GOVERNMENT ANGRY!']);
     state.credits = 0;
+    angry();
     glog('repair', `cost=${totalCost} FAILED - planet lost`);
   } else {
     hires.text('ARE YOU GOING TO', 2, 11);
     hires.text('PAY, SIR? (Y/N)', 2, 12);
     const yes = await getYN(ctx);
+    // 2580: only an explicit N with something to pay for refuses, because of `AND P > 0`.
     if (yes || totalCost === 0) {
       state.credits = Math.floor(state.credits - totalCost);
       glog('repair', `cost=${totalCost} credits=${state.credits}`);
     } else {
-      hires.text("LOCAL GOV'T ANGRY!", 2, 14);
-      state.planetSurrendered = false;
-      state.planets[state.planetIndex].surrendered = false;
-      clearPendingConquestCollection(state, state.planetIndex);
+      drawShoreLeaveFrame(hires);
+      hires.hcolor(1);
+      writeLines(hires, 2, 2, ["I'M AFRAID YOU'VE", 'MADE THE LOCAL', 'GOVERNMENT ANGRY!']);
+      angry();
       glog('repair', `refused payment - planet lost`);
     }
   }

@@ -159,6 +159,45 @@ await until('groundForces', 20000);
 }
 
 // --- back to flight and away -----------------------------------------------------------------
+// --- REPAIR/RESTOCK, which has a gate nothing had ever tested -----------------------------
+// 2505 is `IF PEEK(38210) = 0 OR PEEK(29469) > 22`, and 29469 is only the **low byte** of Y,
+// the way 140 stores it. So the gate is not really an altitude at all: Y 1030 has a low byte
+// of 6 and gets through, while Y 1000 has 232 and does not. 147 parks a landed ship on 20,
+// which is what the test was written for.
+{
+  const grab = () => page.evaluate(() => {
+    const s = window.__spaceVikingsState;
+    return { e: s.energy, m: s.missilesRemaining };
+  });
+  const wreck = () => page.evaluate(() => {
+    const s = window.__spaceVikingsState;
+    s.energy = 9; s.missilesRemaining = 0; s.damage.laserPct = 0; s.credits = 9000000;
+  });
+
+  await put({ y: 1000, speed: 0 });
+  await wreck();
+  await press('6');
+  await new Promise((r) => setTimeout(r, 1500));
+  const high = await grab();
+  check('REPAIR refuses at a Y whose low byte is over 22', high.m === 0 && high.e === 9,
+    `y 1000 -> low byte 232, energy ${high.e}, missiles ${high.m}`);
+  await until('groundForces', 20000);
+
+  await put({ y: 20 });
+  await wreck();
+  await press('6');
+  let done = null;
+  for (let i = 0; i < 60 && !done; i++) {
+    const v = await grab();
+    if (v.m === 100 && v.e === 63) done = v;
+    else await new Promise((r) => setTimeout(r, 300));
+  }
+  await press('Y');     // 2580's prompt
+  check('landed, REPAIR refuels to 63 and restocks to 100', !!done,
+    done ? `energy ${done.e}, missiles ${done.m}` : 'never restocked');
+  await until('groundForces', 20000);
+}
+
 await press('9');
 check('9 returns to COM', await until('com'), `scene ${await scene()}`);
 await press('5');
@@ -245,10 +284,17 @@ check('X from a radar opened in flight returns to flight', await until('cockpit'
   check('and costs two, whatever it hit', (await missiles()) === before - 2,
     `${before} -> ${await missiles()}`);
 
-  // 1560 is `DP > PEEK(38204)`, so it takes one more shot than gets there exactly.
-  for (let i = 1; i <= shots; i++) { await press(' '); await new Promise((r) => setTimeout(r, 500)); }
-  const ended = await until('ex', 20000);
-  check(`${shots + 1} hits destroy the ship and 1560 runs EX`, ended,
+  // 1560 is `DP > PEEK(38204)`, so it takes one more shot than gets there exactly. Keep
+  // firing rather than counting presses - the cockpit has a cooldown and a press inside it
+  // is simply lost, which is a property of the port's input and not of 1090.
+  let ended = false;
+  for (let i = 0; i < shots + 6 && !ended; i++) {
+    await press(' ');
+    await new Promise((r) => setTimeout(r, 700));
+    ended = (await scene()) === 'ex';
+  }
+  if (!ended) ended = await until('ex', 20000);
+  check(`about ${shots + 1} hits destroy the ship and 1560 runs EX`, ended,
     `limit ${limit}, shipVitality ${await vit()}, scene ${await scene()}`);
 }
 

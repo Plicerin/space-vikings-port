@@ -3717,6 +3717,94 @@ it.
 
 ---
 
+## REPAIR/RESTOCK, and a gate that is not an altitude
+
+One of the two screens this document listed as never captured. It is SHORE LEAVE 2500-2620,
+and the reason nothing had reached it is that it needs a state no harness had ever set up: the
+ship **on the deck of a planet**, with something broken to pay for.
+
+```
+2500 DATA SHIELD,38200,ENERGY,38199,# 1 ENGINE,38198,# 2 ENGINE,38197,COMPUTER,38196,
+     RADAR,38195,ENV. CONTROL,38194,HULL DMG.,38193,HYPERDRIVE,38190,MISSILES,38187,
+     LASER,38186,NAV. COMP.,38184
+2505 R = 7: GOSUB 2080: IF PEEK(38210) = 0 OR PEEK(29469) > 22 THEN
+     VTAB 3: HTAB 3: PRINT "YOU MUST LAND ON": HTAB 3: PRINT "PLANET FIRST.": GOTO 2099
+2510 PRINT "  REPAIR SHIP": FOR J = 1 TO 12: READ A$: READ LO
+2520 D = PEEK(LO): IF D < 100 AND J <> 10 AND J <> 2 THEN PRINT A$;":";: HTAB 13:
+     CD = INT((RND(1) * 150) * (100 - ((D / 100) * 100))): PRINT D;: HTAB 17: PRINT "%":
+     P = P + CD: POKE LO,100
+2525 IF D < 63 AND J = 2 THEN ... CD = INT((RND(1) * 200) * (100 - D1)) ... POKE LO,63
+2530 IF D < 100 AND J = 10 THEN ... CD = INT((RND(1) * 100) * (100 - PEEK(LO))) ... POKE LO,100
+2560 ... PRINT P;" CREDITS.": PRINT "YOU HAVE ";CR: PRINT "CREDITS.": IF CR < P THEN 2600
+2580 PRINT "ARE YOU GOING TO": PRINT "PAY, SIR? (Y/N) ";: GET N$:
+     IF N$ = "N" AND P > 0 THEN PRINT " ": GOTO 2600
+2600 R = 7: GOSUB 2080: IF N$ = "N" THEN 2605
+2602 PRINT "YOU DON'T HAVE": PRINT "ENOUGH CREDITS!": PRINT "YOU HAVE 0 CREDITS":
+     PRINT "LEFT!": CR = 0
+2605 PRINT "I'M AFRAID YOU'VE": PRINT "MADE THE LOCAL": PRINT "GOVERNMENT ANGRY!"
+2610 POKE 38208,0: POKE 38219 + PEEK(38209),0
+```
+
+### The gate is a low byte
+
+`29469` is `YI`, and 140 stores Y there as a lo/hi pair - so `PEEK(29469) > 22` tests **the low
+byte of Y alone**. 147 parks a landed ship on 20 and holds it there, which is plainly what the
+test was written for, but it is not what it does: Y 1030 is `$0406`, low byte 6, and gets
+through; Y 1000 is `$03E8`, low byte 232, and does not. Confirmed both ways on the machine by
+`probe_repair.mjs`, and the port now reproduces it, low byte and all. It had been testing
+`state.inOrbit`, which let a repair happen at any height at all.
+
+### Two of the twelve are not damage
+
+`38199` is the **energy** line 8 reads into `E` and the flight loop spends, and 2525 tops it up
+to 63 - that is refuelling, not repair, and it is the one entry that gets *cheaper* the emptier
+it is. `38187` is the **missile count** 1090 decrements two at a time, and 2530 restocks it to
+100. Both were pointed at `damage.powerPct` and `damage.missilePct` in the port, fields nothing
+else reads, so a paid-for repair left the ship with the same empty tank and the same empty rack
+it came in with. On the machine, with the eight broken systems `probe_repair.mjs` set up:
+
+| cell | before | after |
+| --- | --- | --- |
+| SHIELD 38200 | 40 | 100 |
+| ENERGY 38199 | 9 | **63** |
+| # 1 ENGINE 38198 | 70 | 100 |
+| # 2 ENGINE 38197 | 100 | 100, skipped by `D < 100` |
+| COMPUTER 38196 | 55 | 100 |
+| RADAR 38195 | 100 | 100, skipped |
+| ENV. CONTROL 38194 | 128 | 128, skipped - 128 is its resting value |
+| HULL DMG. 38193 | 61 | 100 |
+| HYPERDRIVE 38190 | 88 | 100 |
+| MISSILES 38187 | 0 | **100** |
+| LASER 38186 | 0 | 100 |
+| NAV. COMP. 38184 | 100 | 100, skipped |
+
+### Three pages, and the one in the middle nobody sees
+
+The list prints in three pieces - the name at the window's margin, `HTAB 13` and the byte the
+system was at **before** the repair, `HTAB 17` and the per-cent sign - and the two restock
+branches print `A$;` with no colon, where 2520 prints `A$;":"`. Measured off the machine's own
+page: columns 2, 13 and 17, first row 3. The port had been printing `NAME: 57%` as one run from
+column 2, starting a row too low.
+
+Then 2560's bill. If it cannot be paid, **2600 opens with its own `GOSUB 2080`**, which wipes
+the panel - so the refusal is not appended underneath the bill, it replaces it, seven lines
+from row 2: 2602's four and 2605's three. Saying N at 2580 goes to 2605 and gets the last three
+only. The port had appended three invented lines, `LOCAL GOV'T ANGRY!` among them, under a bill
+that stayed on screen.
+
+The bill page itself is on screen for no frames at all on either machine, because 2560 falls
+straight into 2600; it was caught here only by stopping the CPU with 2600 as the current line.
+
+2610 then takes the planet back - `POKE 38208,0: POKE 38219 + PEEK(38209),0` - on both refusal
+paths, and 2602 empties the purse. Paying jumps from 2590 to 2615 and keeps it.
+
+`repair_parity.mjs` compares the itemised list and the refusal pixel for pixel, and the bill on
+the rows that hold no RND-driven number: 0 of 53,760 differing on all three. The twelve cells
+come out as the machine's, and 2610's forfeit happens. `playthrough.mjs` flies the gate both
+ways.
+
+---
+
 ---
 
 ## RECALL, all five branches
@@ -5668,9 +5756,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **Two of SHORE LEAVE's six sub-screens.** ENLIST TROOPS and REPAIR/RESTOCK are not
-  captured; REPAIR needs the ship in atmosphere. SELL LOOT and ESTABLISH BASE came out of
-  `probe_economy.mjs`.
+- **One of SHORE LEAVE's six sub-screens.** ENLIST TROOPS is not captured. SELL LOOT and
+  ESTABLISH BASE came out of `probe_economy.mjs`, and REPAIR/RESTOCK out of
+  `probe_repair.mjs`, which lands the ship at Y 20 to get past 2505.
 - **Replaying is done.** The damage tick, the combat, COLLECT's thirteen loot draws, line
   5000's ground fire and all four of SHORE LEAVE's price screens are replayed and exact.
   Nothing RND-driven is still checked by range alone.
