@@ -83,6 +83,7 @@ export function serviceCommanderShip(state: GameState): void {
   state.damage.powerPct = 100;
   state.damage.laserOperational = true;
   state.damage.pendingUpdate = false;
+  state.shipDamaged = false;        // 2555's POKE 38393,0
   state.laserOperational = true;
   state.shieldsOn = true;
   state.condition = 'green';

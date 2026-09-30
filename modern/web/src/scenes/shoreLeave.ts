@@ -4,6 +4,7 @@ import { lootValue2400, rollArtRate, repairBill2500, baseRefusal2100,
 import { setScene, log as glog } from '../engine/gameLog';
 import { clearPendingConquestCollection } from '../engine/commander';
 import { writeLines } from '../engine/menu';
+import { drawDamageLamp } from './dmg';
 
 async function wait(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));
@@ -301,6 +302,12 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
   state.laserOperational = state.damage.laserPct >= 10;
 
   await wait(1500);
+
+  // 2545: `HCOLOR= 1: FOR J = 153 TO 157: HPLOT 262,J TO 271,J` - the same ten-by-five bar DMG
+  // lights orange, put back to green now the ship is whole. 2555 then clears the flag behind
+  // it, which is what stops STARSHIP SIMULATOR 3360 from running DMG again on the next hit.
+  drawDamageLamp(hires, 1);
+  state.shipDamaged = false;
 
   drawShoreLeaveFrame(hires);
 

@@ -221,7 +221,10 @@ export function gaugeStateFromGame(state: import('../engine/gameState').GameStat
     condition: state.condition === 'green' ? 1 : state.condition === 'blue' ? 2 : 3,
     manual: state.autopilot ? 1 : 0,
     orbit: state.atmosphere ? 1 : 0,
-    damage: state.damage.hullPct < 100 ? 1 : 0,
+    // 38393, the flag DMG sets and SHORE LEAVE 2555 clears - not the hull percentage. A hit
+    // on the radar or an engine lights this lamp without touching the hull, and a repair puts
+    // it out. GALAXY MAP 5140-5150 read the same byte.
+    damage: state.shipDamaged ? 1 : 0,
   };
 }
 

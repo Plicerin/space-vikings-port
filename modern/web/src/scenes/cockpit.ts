@@ -894,8 +894,13 @@ const enemy = spawnEnemy(state);
       clampOrientation();
       handleDiscreteInput();
 
+      // 3360: `IF PEEK(38393) = 0 THEN POKE 38393,1: PRINT "^DRUNDMG"`. **Once.** The flag
+      // stays set until SHORE LEAVE 2555 clears it on a repair, so the lamp comes on the first
+      // time anything gets through and the flight loop is not interrupted again. The port was
+      // running DMG on every hit.
       if (!next && state.damage.pendingUpdate && transitionCooldown <= 0) {
-        next = 'dmg';
+        state.damage.pendingUpdate = false;
+        if (!state.shipDamaged) next = 'dmg';
       }
       if (runNextScene()) return;
 

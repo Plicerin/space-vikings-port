@@ -5247,6 +5247,40 @@ which has **no thousands separators** - the port was formatting it with commas. 
 single PRINT of thirty-eight characters, `ADVANCED CAPABILITY-SUPERIOR TO  OURS!`, two spaces
 before OURS and all; the port had split it over two lines.
 
+### DMG, and the flag it is really about
+
+DMG is three lines, and `dmg_parity.mjs` already had them exact - 25 lit pixels on columns 263,
+265, 267, 269 and 271, nothing changed outside the lamp, and 38393 set to 1 afterwards:
+
+    10 HCOLOR= 5: FOR J = 153 TO 157: HPLOT 262,J TO 271,J: NEXT:
+       PRINT " ": PRINT "^DRUN STARSHIP SIMULATOR"
+
+So the screen was done. What was not was **the byte**, and the byte is the whole point of the
+program. Three places touch 38393 and between them they say what it means:
+
+| where | what |
+| --- | --- |
+| START 2030 | `POKE 38393,0` - a new ship |
+| STARSHIP SIMULATOR 3360 | `IF PEEK(38393) = 0 THEN POKE 38393,1: PRINT "^DRUNDMG"` |
+| SHORE LEAVE 2545, 2555 | repaint the lamp `HCOLOR= 1`, then `POKE 38393,0` |
+
+**3360 runs DMG once.** The test is on the flag, not on the hit, so the lamp comes on the first
+time anything gets through and the flight loop is not interrupted again until a repair clears it.
+The port was triggering on its own `pendingUpdate`, which every hit sets, so it bounced out to
+the DMG scene and back on every single one.
+
+Nothing in the port cleared the flag either - `shipDamaged` was written by the DMG scene and read
+by nobody - so SHORE LEAVE's repair left the lamp orange, and the panel gauge was being driven
+from `hullPct < 100` instead. That is wrong twice over: a hit on the radar or an engine sets
+38393 without touching the hull, and a repair puts the lamp out whatever the hull says. GALAXY
+MAP 5140 and 5150 read the same byte to choose that bar's colour, which is how it was pinned
+down in the first place.
+
+One detail the parity harness makes plain and the screen does not: **green and orange light the
+same five columns.** `HCOLOR= 1` and `HCOLOR= 5` differ only in the palette bit, so the lamp
+changing state is invisible to a lit-or-not comparison - which is exactly why the byte needed
+checking rather than the picture.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
