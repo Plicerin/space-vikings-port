@@ -108,6 +108,8 @@ export interface DamageResult {
   /** 3019 fired - both of 3001 and 3010's rolls came in. It flashes `RND(1) * 5` times. */
   heavyBranch: boolean;
   /** How many times 3019's loop runs: `HC = RND(1) * 5`. */ heavyFlashes: number;
+  /** 3019's per-pass delays, `X1 = (RND(1) * 40) + 10`. They draw from the same stream. */
+  flashDelays: number[];
   /** 3032 fired - 3030's roll came in. One flash and two sounds. */ lightBranch: boolean;
 }
 
@@ -125,7 +127,7 @@ export function groundFire5098(d: ShipDamage, rnd: () => number = Math.random): 
   return {
     damage: { ...d, shields },
     struck: true, absorbedByShields: true, destroyed: false,
-    heavyBranch: false, heavyFlashes: 0, lightBranch: false,
+    heavyBranch: false, heavyFlashes: 0, flashDelays: [], lightBranch: false,
   };
 }
 
@@ -141,15 +143,21 @@ export function damageTick3000(
   rnd: () => number = Math.random,
 ): DamageResult {
   const none = { struck: false, absorbedByShields: false, destroyed: false,
-    heavyBranch: false, heavyFlashes: 0, lightBranch: false };
+    heavyBranch: false, heavyFlashes: 0, flashDelays: [] as number[], lightBranch: false };
   // 3000: neither an enemy nor an atmosphere means nothing happens at all.
   if (!ctx.enemyPresent && !ctx.atmosphere) return { damage: d, ...none };
 
   // 3001 and 3010 are two separate `IF RND(1) > .4 THEN 3030`, so 3019 needs both.
   const heavyBranch = rnd() <= 0.4 && rnd() <= 0.4;
   const heavyFlashes = heavyBranch ? Math.trunc(rnd() * 5) : 0;   // 3019 `HC = RND(1) * 5`
+  // 3019's loop draws again every time round: `FOR LY = 1 TO HC: ... X1 = (RND(1) * 40) + 10:
+  // FOR J = 1 TO X1: NEXT: NEXT`. Those values only set a delay, so no predicate could have
+  // noticed them missing - but they come out of the same RND stream as everything else, and
+  // leaving them out desynchronises a replay from line 3030 onwards.
+  const flashDelays: number[] = [];
+  for (let i = 0; i < heavyFlashes; i++) flashDelays.push(Math.trunc(rnd() * 40) + 10);
   const lightBranch = rnd() <= 0.3;                               // 3030, independent
-  const flags = { heavyBranch, heavyFlashes, lightBranch };
+  const flags = { heavyBranch, heavyFlashes, flashDelays, lightBranch };
   if (!heavyBranch && !lightBranch) {                             // 3200 `IF DMG = 0`
     return { damage: d, ...none, ...flags };
   }

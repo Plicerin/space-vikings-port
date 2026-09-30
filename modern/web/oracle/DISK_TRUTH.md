@@ -3697,6 +3697,75 @@ given the seed and `$A4`.
 
 ---
 
+## Replaying the RND-driven routines
+
+With `$EFAE` bit-exact, the damage model and the combat stop needing predicates. Given the seed
+at `$00C9` and the fill byte at `$A4`, the exact value the machine drew can be recomputed, so
+the formulas can be checked on the numbers rather than on their bounds.
+
+`oracle/probe_rndreplay.mjs` and `oracle/probe_rndcombat.mjs` record, at **every** entry to
+`$EFAE` during a damaging flight and a real assault, the five seed bytes before the call, `$A4`,
+the bytes the routine writes, and the live Applesoft variables. Consecutive entries bracket one
+draw each. `oracle/replay_parity.mjs` then replays them.
+
+**`$A4` is `$00` in the running game**, not the `$FF` a freshly reset machine has. Both were
+needed: the RND harness starts from a reset and sees `$FF`, and the game sees `$00`.
+
+### The damage tick
+
+A tick past 3205's gate draws seven values in a fixed order - shields, radar, engine 1, engine 2,
+computer, laser, hull - so a window of seven consecutive calls over which all seven systems
+change is exactly one tick. Eight such windows were recorded.
+
+| | |
+| --- | --- |
+| losses predicted to the byte from the recomputed RND value | **56 of 56** |
+
+so `shields -= RND(1) * 1.1`, the five at `* 5` and the hull at `* 4`, each through
+`3380 IF J < 0 THEN J = 0` and a truncating POKE, are now confirmed on the values themselves.
+Before this the most that could be said was that shields never lost more than 1.1 and the rest
+never more than 5.
+
+**Replay found something no predicate could.** Line 3019 is
+`HC = RND(1) * 5: FOR LY = 1 TO HC: ... X1 = (RND(1) * 40) + 10: FOR J = 1 TO X1: NEXT: NEXT` -
+it draws again **every time round the loop**. Those values only set a delay, so nothing visible
+depends on them and no bound could have noticed them missing; but they come out of the same
+stream as everything else, and leaving them out desynchronises the replay from line 3030 onward.
+`damageTick3000` draws them now.
+
+### The combat
+
+A round draws eighteen values: VIC, then T2, T3 and X, then two each for T, P and M, one for TP,
+three for TR, three for ET, and one more for X because 38205 is non-zero. Where the first draw of
+a round falls in a recording is not known, so every offset is tried and the one that predicts the
+next round is taken; a wrong model fails on the first round, so there is nothing to fit. The
+boundary came out at draw 0 of every 18.
+
+| | |
+| --- | --- |
+| rounds predicted - four weapon counts and the troop total, to the unit | **12 of 12** |
+| the assault's progress, VP | to 3.3e-9 |
+
+`TR` is the one that settles the argument. 560 scales the troop loss by `T2`, and `T2` in the
+losing branch is `200 * (RND * 5)` where the port had read `200 + (RND * 5)` - a difference of up
+to five hundred. Losses of 19, 80, 12 and 34 troops, each predicted exactly from the seed, is
+that reading confirmed on the numbers.
+
+Two things the replay turned up about GROUND FORCES' own bookkeeping. **VP is never poked back**:
+line 600 writes only the four weapon bytes, so 38160 sits at whatever it was and VP lives in the
+variable alone - comparing it against the byte is meaningless, which is how the first attempt at
+this looked like twelve failures. And **4000 does not truncate VP**, so it carries a fraction from
+round to round: in Applesoft's 32-bit mantissa where the port carries a double, which is why it
+is compared to a tolerance while everything stored as a byte is exact.
+
+### What this leaves the predicates for
+
+`damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
+a recording can, and they check the gates and the rates over tens of thousands of draws. But the
+formulas themselves are no longer taken on a bound.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
@@ -3721,10 +3790,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
-- **Replaying the RND-driven routines.** `RND` itself is done and bit-exact, so the combat,
-  the damage model and the loot rolls could now be compared by replay rather than by predicate.
-  Nothing has been rewritten to do that yet, and it needs the live `$00C9` seed and `$A4` out
-  of a running game rather than the synthetic ones the RND harness uses.
+- **Replaying the rest.** The damage tick and the combat are replayed and exact. COLLECT's
+  loot rolls, SHORE LEAVE's base and weapon prices and 5000's ground fire are still checked by
+  range rather than by replay, and all three are single draws that the same method would settle.
 - **The game logic is done.** The economy, GROUND FORCES' combat, the damage model, the
   weapons and all five of RECALL's branches have been run against the disk, and there is no
   enemy AI to do. What is left of the BASIC is COLLECT's tech-1 path and two of SHORE LEAVE's
