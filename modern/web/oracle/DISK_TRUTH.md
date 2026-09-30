@@ -5133,6 +5133,39 @@ on shore leave do not. Which is exactly what GROUND FORCES 66 and 67 are for -
 location byte instead, which refuses a second landing on the planet the troops are already on
 and allows an assault from a system they were never brought to.
 
+### SUPPLY, with something in the hold
+
+SUPPLY needed no changes, and that is worth saying plainly - but the capture it was passing
+against proved less than it looked.
+
+`supply_parity.mjs` has both pages exact at 0 of 53,760 pixels. It was taken on a fresh ship,
+where all thirteen counters are zero. **Zero times ten is zero**, so that capture says nothing at
+all about the multipliers 1410 to 1490 apply when they print - platinum and gold by 10, silver by
+20, wine by 100, art works by 10 - and nothing about the columns either, because `= 0` is the
+same width whatever `HTAB 19` does with it.
+
+`supply_values_parity.mjs` pokes the thirteen bytes to a spread of one-, two- and three-digit
+values, walks to the report the way a player does, and compares both pages. They come out exact:
+30,615 against 30,615 and 30,238 against 30,238, nothing differing.
+
+What that run shows on screen is the point of doing it. Each row is three prints -
+`PRINT "* PLATINUM ";: HTAB 19: PRINT "= "; value;: HTAB 24: PRINT "POUNDS"` - and `HTAB` is
+absolute, so:
+
+    * PLATINUM        = 70 POUNDS
+    * GOLD            = 250POUNDS
+    * TITANIUM        = 255THOUSAND POUNDS
+
+A two-digit figure leaves a space before the unit and a three-digit one runs straight into it,
+because the number starts at column 20 and the unit is nailed to column 23. The same absolute
+`HTAB 19` eats a character on the longest label of all: `* ELECTRONIC PARTS` is eighteen
+characters from column 1, so its final S is at column 18 and the `=` lands on top of it. The disk
+reads **`* ELECTRONIC PART=`**, and so does the port.
+
+None of that is visible on a screen of zeros, and none of it could have been got right by
+reading the listing carelessly. It is the same thinness `status_values_parity.mjs` was written
+for: a capture of one state is a capture of one state.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
