@@ -131,6 +131,140 @@ export function groundFire5098(d: ShipDamage, rnd: () => number = Math.random): 
   };
 }
 
+// ---- 5000-5251, the bolt itself -------------------------------------------------------------
+//
+// ```
+// 5000 POKE -16300,0: X1 = (RND(5) * 260) + 10: Y1 = RND(1):
+//      IF Y1 >= .4 THEN Y1 = 10: Y2 = RND(5) * 7
+// 5045 IF Y1 < .4 THEN Y1 = 120: Y2 = RND(5) * 7: Y2 = Y2 - (Y2 * 2)
+// 5050 IF X1 > 190 THEN X2 = -7: M = 9: GOTO 5090
+// 5060 IF X1 < 91 THEN X2 = 7: M = 10: GOTO 5090
+// 5080 X2 = -2: M = 8: IF ABS(Y2) < 4 THEN Y2 = Y2 * 2
+// 5090 XDRAW M AT X1,Y1: IF RND(1) < .3 THEN GOSUB 5098: GOSUB 5200
+// 5095 XDRAW M AT X1,Y1: X1 = X1 + X2: Y1 = Y1 + Y2:
+//      IF Y1 < 10 OR Y1 > 120 OR X1 < 10 OR X1 > 270 THEN RETURN
+// 5096 GOTO 5090
+// 5200 IF PEEK(38165) <> 3 THEN RETURN
+// 5210 LX = 240: J = RND(1): IF J < .6 THEN LX = 40
+// 5230 ...HPLOT from the gun at LX to the bolt, twice, flashing...
+// 5240 IF RND(5) < .3 THEN GOSUB 5250: POP
+// 5250 ...explode at X1,Y1... J = PEEK(38207) - 1: IF J > -1 THEN POKE 38207,J
+// ```
+//
+// What the port had instead was a fighter squadron: bolts spawned only in space, from the enemy
+// ship's screen position, with an invented `vy = 3 + RND * 4` and clamps, destroyed by a
+// continuous per-frame chance, and damaging nothing. None of that is on the disk.
+//
+// Four things worth being exact about.
+//
+// - **Both GOSUBs at 5090 sit inside the same THEN**, so 5200's return fire happens only on a
+//   step that hit. A bolt that never hits is never shot at.
+// - **`RND(5)` is `RND(1)`.** Applesoft's RND advances the stream for any positive argument;
+//   only zero repeats the last value and only a negative one reseeds. Replayed as an advance,
+//   every draw agrees.
+// - **5240's kill ends the bolt.** `GOSUB 5250: POP` throws away 5000's return address and
+//   5251 jumps to 1090, so destroying the battery abandons the rest of the flight.
+// - **38207 is the planet's ground batteries**, not its ships: 190 and 192 will not fire
+//   without one, 5250 takes one off, EX line 56 halves them when you bombard from orbit, and
+//   GROUND FORCES 172 checks them before it will land troops.
+
+/** 5090 `IF RND(1) < .3`, tested once for every step the bolt takes. */
+export const GROUND_BOLT_HIT_CHANCE = 0.3;
+/** 5240 `IF RND(5) < .3`, tested only on a step that hit and only at red alert. */
+export const GROUND_BATTERY_KILL_CHANCE = 0.3;
+/** 5210 `LX = 240: J = RND(1): IF J < .6 THEN LX = 40` - which gun answers. */
+export const RETURN_FIRE_GUN = { left: 40, right: 240, leftChance: 0.6 } as const;
+/** 5095's bounds. Leaving them returns from 5000. */
+export const GROUND_BOLT_BOX = { xMin: 10, xMax: 270, yMin: 10, yMax: 120 } as const;
+
+export interface GroundBolt {
+  /** X1 and Y1, the coordinates 5090 XDRAWs at. */
+  x: number;
+  y: number;
+  /** X2 and Y2, added once per step by 5095. */
+  vx: number;
+  vy: number;
+  /** M - the shape XDRAWn, 8, 9 or 10, picked from X1 at 5050-5080. */
+  shape: number;
+}
+
+/**
+ * 5000-5080. Three draws: where it crosses the screen, which edge it comes from, how steeply.
+ *
+ * Both edges draw for Y2, so a bolt always costs three.
+ */
+export function spawnGroundBolt5000(rnd: () => number = Math.random): GroundBolt {
+  const x = rnd() * 260 + 10;              // 5000 `X1 = (RND(5) * 260) + 10`
+  const fromTop = rnd() >= 0.4;            // 5000 `Y1 = RND(1)`
+  let y: number;
+  let vy: number;
+  if (fromTop) {
+    y = 10;                                // 5000: in at the top, heading down
+    vy = rnd() * 7;
+  } else {
+    y = 120;                               // 5045: in at the bottom, heading up
+    const t = rnd() * 7;
+    vy = t - t * 2;                        // its own way of writing -t
+  }
+
+  let vx: number;
+  let shape: number;
+  if (x > 190) { vx = -7; shape = 9; }         // 5050
+  else if (x < 91) { vx = 7; shape = 10; }     // 5060
+  else {
+    vx = -2; shape = 8;                        // 5080, and only here
+    if (Math.abs(vy) < 4) vy = vy * 2;
+  }
+  return { x, y, vx, vy, shape };
+}
+
+/** 5095, which advances the bolt and then tests it. */
+export function stepGroundBolt5095(b: GroundBolt): GroundBolt {
+  return { ...b, x: b.x + b.vx, y: b.y + b.vy };
+}
+
+/** 5095's test. A spent bolt returns from 5000 without being drawn again. */
+export function groundBoltSpent5095(b: GroundBolt): boolean {
+  return b.y < GROUND_BOLT_BOX.yMin || b.y > GROUND_BOLT_BOX.yMax
+    || b.x < GROUND_BOLT_BOX.xMin || b.x > GROUND_BOLT_BOX.xMax;
+}
+
+export interface GroundBoltStep {
+  /** 5090's roll came in, so 5098 ran. */
+  hit: boolean;
+  /** Shields after 5098, everything else untouched - 3207 returns. */
+  damage: ShipDamage;
+  /** 5200-5230: which gun fired back, or null when the ship is not at red alert. */
+  returnFire: { gunX: number } | null;
+  /** 5240: 5250 ran, so a battery is gone and the bolt is abandoned. */
+  batteryDestroyed: boolean;
+}
+
+/**
+ * One pass of 5090, with 5098 and 5200 behind it.
+ *
+ * `condition` is 38165 - 1 green, 2 blue, 3 red - and 5200 returns at once unless it is 3.
+ * `batteries` is 38207; 5250's `IF J > -1` is what stops it going below zero.
+ */
+export function groundBoltStep5090(
+  d: ShipDamage,
+  ctx: { condition: number; batteries: number },
+  rnd: () => number = Math.random,
+): GroundBoltStep {
+  const none = { damage: d, returnFire: null, batteryDestroyed: false };
+  if (rnd() >= GROUND_BOLT_HIT_CHANCE) return { hit: false, ...none };   // 5090
+
+  // 5098 `GOSUB 4110 ... L = 7: GOSUB 3205: L = 0` - shields, and 3207 returns.
+  const { damage } = groundFire5098(d, rnd);
+
+  if (ctx.condition !== 3) return { hit: true, damage, returnFire: null, batteryDestroyed: false };
+  const gunX = rnd() < RETURN_FIRE_GUN.leftChance                        // 5210
+    ? RETURN_FIRE_GUN.left : RETURN_FIRE_GUN.right;
+  // 5240. 5250 decrements 38207 and POPs, so this also ends the bolt.
+  const batteryDestroyed = rnd() < GROUND_BATTERY_KILL_CHANCE && ctx.batteries > 0;
+  return { hit: true, damage, returnFire: { gunX }, batteryDestroyed };
+}
+
 /**
  * One call of 3000.
  *

@@ -130,8 +130,11 @@ export class GameState {
   get defenseTech(): number {
     return this.planets[this.planetIndex]?.defense ?? 0;
   }
-  /** Enemy ship count at current planet — PEEK(38207)=$954F.
-   * Decremented on enemy destruction (EX.bas:56 halves it). */
+  /** The planet's ground batteries — PEEK(38207)=$954F. Not its ships: STARSHIP SIMULATOR
+   * 190 and 192 will not throw a bolt up from the surface without one, 5250 takes one off
+   * when the ship's guns answer a hit, EX line 56 halves them when you bombard from orbit,
+   * and GROUND FORCES 172 checks them before it will land troops.
+   */
   enemyShips = 0;
   /** Laser system operational — PEEK(38186)=$952A. 0 = inoperable.
    * Checked before laser fire (STARSHIP_SIM:1502). */
@@ -139,8 +142,11 @@ export class GameState {
   /** Missile mode flag — PEEK(38202)=$955A. 1 = missile, 0 = laser.
    * When 1, fire button (line 185→1500→1501) redirects to missile (1000). */
   missileMode = false;
-  /** Anti-fighter turret status — PEEK(38165)=$950D. Value 3 = active.
-   * Enemy fire from planet (line 5200) only triggers if this is 3. */
+  /** 38165 is the ship's condition, not a turret: STATUS 1290-1294 prints it as GREEN, BLUE
+   * or RED for 1, 2 and 3, and GALAXY MAP 5060-5070 colours the readout from the same byte.
+   * STARSHIP SIMULATOR 5200 returns unless it is 3, so the guns answer ground fire only at
+   * red alert. `condition` above is the same byte; this mirror of it is kept because ai.ts
+   * sets both together, and the ground-fire code reads `condition`. */
   antiFighterTurrets = 0;
   /** Enemy I.D. shape table loaded flag. Set when BLOAD SHIP # J loads
    * enemy shape data for display in cockpit and radar. */

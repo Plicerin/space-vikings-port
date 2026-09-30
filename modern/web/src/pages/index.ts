@@ -11,7 +11,9 @@ import { soundGen9276, laser92D1, expl9276 } from '../engine/diskSound';
 import { lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS } from '../engine/diskEconomy';
 import { combatRound550, truncate4000 } from '../engine/diskCombat';
 import { damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS,
-  UNDAMAGED_SYSTEMS } from '../engine/diskDamage';
+  UNDAMAGED_SYSTEMS, spawnGroundBolt5000, stepGroundBolt5095, groundBoltSpent5095,
+  groundBoltStep5090, damageTickRuns190, GROUND_FIRE_CHANCE, GROUND_BOLT_HIT_CHANCE,
+  GROUND_BATTERY_KILL_CHANCE, RETURN_FIRE_GUN, GROUND_BOLT_BOX } from '../engine/diskDamage';
 import { fireLaser1500, fireMissile1000, storeIfUnder255, missileHits1050,
   groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE } from '../engine/diskWeapons';
 import { rndEFAE, rndSequence, facValue, RND_MULTIPLIER, RND_ADDEND } from '../engine/diskRnd';
@@ -124,6 +126,9 @@ function boot(): void {
     lootValue2400, baseCost2170, weaponCost3060, LOOT_RATES, WEAPONS,
     combatRound550, truncate4000,
     damageTick3000, groundFire5098, TICK_DAMAGE_CHANCE, DAMAGED_SYSTEMS, UNDAMAGED_SYSTEMS,
+    spawnGroundBolt5000, stepGroundBolt5095, groundBoltSpent5095, groundBoltStep5090,
+    damageTickRuns190, GROUND_FIRE_CHANCE, GROUND_BOLT_HIT_CHANCE,
+    GROUND_BATTERY_KILL_CHANCE, RETURN_FIRE_GUN, GROUND_BOLT_BOX,
     fireLaser1500, fireMissile1000, storeIfUnder255, missileHits1050,
     groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE,
     rndEFAE, rndSequence, facValue, RND_MULTIPLIER, RND_ADDEND };

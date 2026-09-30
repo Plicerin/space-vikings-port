@@ -3799,6 +3799,93 @@ and the port's flag models it correctly.
 The port's `awardLoot` already transcribed all of this - both bugs included - and the replay
 confirms it on the values.
 
+### Line 5000's ground fire
+
+A battery on the surface throws a bolt up at the ship. Reaching it is line 190 or 192 - the
+damage tick, then `IF RND(1) < .5 AND PEEK(38207) > 0 THEN GOSUB 5000`, at .5 in atmosphere and
+.6 inside the box near the planet.
+
+`oracle/probe_rndground.mjs` records **the executing line number** with every draw, out of
+Applesoft's `CURLIN` at `$75/$76`. That turns attribution from an inference into a reading, and
+it corrected the first attempt at once: the obvious tell for where a bolt starts is X1 moving,
+and X1 is the wrong one, because 5095 advances X1 at every step of the flight and not only at
+5000's setup.
+
+With the line numbers the recording reads straight off:
+
+| line | draws | what it is |
+| --- | --- | --- |
+| 190 / 192 | 119 / 67 | the gate before 5000, one per pass |
+| 3001 / 3010 / 3030 | 186 / 64 / 186 | the tick's three gates |
+| 3019 | 67 | the heavy branch's flashes and delays |
+| 3205 | 201 | shields - 166 from the tick, 35 from ground fire |
+| 3230 / 3260 / 3270 | 24 / 24 / 96 | the rest of the ship, only when 3205 falls through |
+| 5000 / 5045 | 26 / 10 | a bolt's three setup draws |
+| 5090 | 112 | one per step of a bolt, the 30% hit |
+| 5210 / 5240 | 35 / 35 | the return fire, and whether it kills the battery |
+
+Every count checks against another: 119 + 67 = 186 = the tick calls at 3001; 3270 is exactly four
+draws for each of 3260's; 64/186 is 3001's .4; 35 of 112 steps is 5090's .3. The 26 and 10 give
+12 bolts whichever way they are read.
+
+`replay_parity.mjs` then drives **the port's own** `spawnGroundBolt5000` and `groundBoltStep5090`
+with an `rnd` that hands back the machine's recomputed draws in order, so what is tested is the
+shipped code rather than a second copy of the formulas in the harness. How many draws each call
+takes is checked too, against the run of line numbers - which is what would catch a routine
+drawing the right values in the wrong order or the wrong number of times.
+
+| | |
+| --- | --- |
+| X1, the edge, Y2 with 5080's doubling, X2 and the shape | **12 of 12 bolts** |
+| draws a bolt costs to set up | **12 of 12** |
+| 5090's hit, by whether 3205 followed it | **112 of 112 steps** |
+| 5098's shields loss | **35 of 35** |
+| 5200 running only inside 5090's THEN | **35 of 35** |
+| 5240 taking a battery off 38207 | **35 of 35** |
+| draws a step of the bolt takes | **112 of 112** |
+
+Four things the reading settles.
+
+- **Ground fire can only touch the shields.** 5098 is `L = 7: GOSUB 3205: L = 0`, and 3207 is
+  `IF L = 7 THEN RETURN`. It enters the damage routine one line past 3200's `IF DMG = 0`, takes
+  `RND(1) * 1.1` off 38200, and returns - never the hull, the engines, the radar, the computer
+  or the laser, whatever the shields are down to.
+- **Both GOSUBs at 5090 are in the same THEN**, so the ship's return fire at 5200 happens only on
+  a step that hit. A bolt that never hits is never shot at.
+- **5240's kill ends the bolt.** `GOSUB 5250: POP` throws away 5000's return address and 5251
+  jumps to 1090, so destroying the battery abandons the rest of the flight. It is also why the
+  batteries go quickly: 12 bolts took all twelve of them off 38207 in the recording.
+- **`RND(5)` is `RND(1)`.** Applesoft advances the stream for any positive argument; only zero
+  repeats the last value and only a negative one reseeds. Replayed as an advance, every draw
+  agrees, so 5000's `RND(5)` and 5240's are ordinary draws.
+
+Two addresses named correctly as a result. **38165 is the ship's condition**, which STATUS
+1290-1294 prints as GREEN, BLUE or RED for 1, 2 and 3 and GALAXY MAP 5060-5070 colours from -
+so 5200's return fire happens only at red alert. The port had called it an anti-fighter turret.
+And **38207 is the planet's ground batteries**, not its ships: 190 and 192 will not fire without
+one, 5250 takes one off, EX line 56 halves them when you bombard from orbit, and GROUND FORCES
+172 checks them before it will land troops.
+
+The step rate is measured, not chosen. The cycle counter at consecutive 5090 draws puts one pass
+of 5090-5096 at 88,046 cycles, **0.086 s, or 11.6 steps a second**. It matters because 5090 rolls
+for a hit exactly once per step, so the step rate is the damage rate - which is why the port
+advances a bolt in discrete steps rather than continuously by `dt`.
+
+### What the port had instead
+
+Nothing called ground fire at all: `groundFire5098` had no caller outside the debug bridge. In
+its place was a fighter squadron with no basis on the disk - bolts spawned only in space and
+never in atmosphere, placed at the enemy ship's screen position with an invented spread and
+clamps and `vy = 3 + RND * 4`, shooting at the player, destroyed by a continuous per-frame chance
+or by flying a missile or a laser at them, and taking a ship off `enemyShips`. The disk has none
+of that: X1 is uniform across 10..270, the bolt enters at y 10 or y 120, only the ship's own
+return fire at 5200 can destroy the battery behind it, and the only thing it can do to you is
+take shields off.
+
+`cockpit.ts` now runs the bolt as 5000-5096 has it, and a 40-second flight over a hostile planet
+gives 20 hits, 6 batteries destroyed - 5240's 30% - with the hull, radar, engines, computer and
+laser all still at 100.
+
 ### What this leaves the predicates for
 
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
@@ -3831,10 +3918,9 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
-- **Replaying the rest.** The damage tick, the combat and COLLECT's thirteen loot draws are
-  replayed and exact. SHORE LEAVE's base and weapon prices and 5000's ground fire are still
-  checked by range rather than by replay, and both are single draws that the same method would
-  settle.
+- **Replaying the rest.** The damage tick, the combat, COLLECT's thirteen loot draws and line
+  5000's ground fire are replayed and exact. SHORE LEAVE's base and weapon prices are the last
+  thing still checked by range rather than by replay.
 - **The game logic is done.** The economy, GROUND FORCES' combat, the damage model, the
   weapons and all five of RECALL's branches have been run against the disk, and there is no
   enemy AI to do. What is left of the BASIC is COLLECT's tech-1 path and two of SHORE LEAVE's

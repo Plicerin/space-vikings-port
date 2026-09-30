@@ -1,6 +1,7 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { fireLaser1500 } from '../engine/diskWeapons';
-import { damageTick3000 } from '../engine/diskDamage';
+import { damageTick3000, spawnGroundBolt5000, stepGroundBolt5095, groundBoltSpent5095,
+  groundBoltStep5090, damageTickRuns190 } from '../engine/diskDamage';
 import { GameState } from '../engine/gameState';
 import {
   Camera, forwardVector, makeStarfield, project, Star, v3, v3add, v3sub,
@@ -110,13 +111,31 @@ interface LaserBolt {
   age: number;
 }
 
-interface EnemyFighter {
+/**
+ * A bolt from one of the planet's ground batteries - STARSHIP SIMULATOR 5000-5096.
+ *
+ * The port had these as a fighter squadron, which the disk does not have: 5000 is thrown up
+ * from the surface, gated on 38207 having a battery left, and 5250 takes one off when the
+ * ship's guns answer it. `shapeIdx` is M, the shape 5090 XDRAWs - 9 for a bolt that came in
+ * past x 190, 10 for one below 91, 8 for the middle of the screen.
+ */
+interface GroundBoltState {
   screenX: number; screenY: number;
   vx: number; vy: number;
   shapeIdx: number;
-  alive: boolean;
-  firing: boolean;
+  /** Paces 5095, which the disk runs at 11.6 steps a second - measured off the machine. */
+  stepTimer: number;
+  /** 5230, drawn for a moment after a hit while the ship is at red alert. */
+  returnFireTimer: number;
+  returnFireGunX: number;
 }
+
+/**
+ * How long one pass of 5090-5096 takes on the disk: 88,046 cycles at 1.0205 MHz, the median
+ * gap between consecutive 5090 draws in `oracle/captured/replay/ground.json`. It matters
+ * because 5090 rolls for a hit exactly once per step, so the step rate is the damage rate.
+ */
+const GROUND_BOLT_STEP_SECONDS = 0.086;
 
 interface DamageFlash {
   timer: number;
@@ -247,7 +266,7 @@ const enemy = spawnEnemy(state);
 
   const projectiles: Projectile[] = [];
   const laserBolts: LaserBolt[] = [];
-  const fighters: EnemyFighter[] = [];
+  const groundBolts: GroundBoltState[] = [];
   const flashes: DamageFlash[] = [];
   let surrenderMsgTimer = 0;
   let destructionPending = false;
@@ -299,8 +318,8 @@ const enemy = spawnEnemy(state);
     function checkDebugFighters() {
       if (!seededDebugFighters && isCockpitDebugFlag(HOSTILE_DEBUG_FLAG)) {
         seededDebugFighters = true;
-        spawnFighter(118, 48, true);
-        spawnFighter(162, 82, true);
+        spawnGroundBolt();
+        spawnGroundBolt();
       }
     }
 
@@ -497,16 +516,20 @@ const enemy = spawnEnemy(state);
     function updateEnemyAI(dt: number) {
       if (destructionPending || state.planetSurrendered
         || (!enemy.alive && !state.atmosphere)) return;
-      const nearPlanet = state.atmosphere
-        || (state.x > -3500 && state.x < 4500
-          && state.y > -3000 && state.y < 3000
-          && state.z > -6000 && state.z < 2000);
-      if (!nearPlanet) return;
-      if (!state.atmosphere && Math.random() < 0.5 * dt) {
-        spawnFighter(enemyScreenX, enemyScreenY, enemyVisible);
-      }
+      // 190 and 192. In atmosphere the tick runs every pass and ground fire follows it at .5;
+      // in space both need the ship inside the box near the planet, and the gate is .6. The
+      // port had this the wrong way round - it fired only in space, and never in air.
+      const runs = damageTickRuns190(
+        { x: state.x, y: state.y, z: state.z },
+        { surrendered: state.planetSurrendered, atmosphere: state.atmosphere },
+      );
+      if (!runs.tick) return;
+      const nearPlanet = true;
       if (Math.random() < 2 * dt) {
         enemyAttack(nearPlanet);
+        // `IF RND(1) < .5 AND PEEK(38207) > 0 THEN GOSUB 5000` - one bolt, right after the
+        // tick, and only while the planet still has a battery standing.
+        if (Math.random() < runs.groundFireChance && state.enemyShips > 0) spawnGroundBolt();
       }
     }
 
@@ -517,26 +540,10 @@ const enemy = spawnEnemy(state);
         p.y += p.vy * dt * FRAME_DT_SCALE;
         p.z += p.vz * dt * FRAME_DT_SCALE;
         p.age += dt;
-        let hitFighter = false;
 
-        if (!state.atmosphere && fighters.length > 0) {
-          const pp = project(cam, v3(p.x, p.y, p.z));
-          if (pp.visible && pp.y >= 0 && pp.y < 124) {
-            for (let j = fighters.length - 1; j >= 0; j--) {
-              const f = fighters[j];
-              if (Math.abs(pp.x - f.screenX) < 6 && Math.abs(pp.y - f.screenY) < 6) {
-                onFighterDestroyed(j);
-                fighters.splice(j, 1);
-                hitFighter = true;
-                break;
-              }
-            }
-          }
-        }
-        if (hitFighter) {
-          projectiles.splice(i, 1);
-          continue;
-        }
+        // A missile cannot shoot a bolt down. 5250 is reached only from 5240, inside the
+        // ship's own return fire at 5200 - nothing in the original tests a projectile
+        // against a bolt, so the collision test the port had here is gone.
 
         if (!state.atmosphere && enemy.alive) {
           const dx = p.x - enemy.pos.x;
@@ -559,45 +566,61 @@ const enemy = spawnEnemy(state);
       }
     }
 
-    function updateFighters(dt: number) {
-      for (let i = fighters.length - 1; i >= 0; i--) {
-        const f = fighters[i];
-        if (!f.alive) { fighters.splice(i, 1); continue; }
-        f.screenX += f.vx * dt * FRAME_DT_SCALE;
-        f.screenY += f.vy * dt * FRAME_DT_SCALE;
-        if (f.screenY < 10 || f.screenY > 120
-            || f.screenX < 10 || f.screenX > 270) {
-          fighters.splice(i, 1);
-          continue;
-        }
-        if (state.antiFighterTurrets === 3 && Math.random() < dt * 3) {
-          onFighterDestroyed(i);
-          fighters.splice(i, 1);
-          continue;
-        }
+    /**
+     * 5090-5096, one discrete step at a time.
+     *
+     * The step has to be discrete because 5090 rolls for a hit exactly once per pass, so
+     * moving the bolt continuously would change how often it can hit. A hit is 5098, which
+     * enters the damage routine at 3205 with L = 7 and so takes shields and nothing else -
+     * never the hull, the engines, the radar, the computer or the laser.
+     */
+    function updateGroundBolts(dt: number) {
+      for (let i = groundBolts.length - 1; i >= 0; i--) {
+        const f = groundBolts[i];
+        if (f.returnFireTimer > 0) f.returnFireTimer -= dt;
+        f.stepTimer += dt;
+        if (f.stepTimer < GROUND_BOLT_STEP_SECONDS) continue;
+        f.stepTimer -= GROUND_BOLT_STEP_SECONDS;
 
-        if (Math.random() < dt * 2) {
-          f.firing = true;
-          const spreadX = (Math.random() - 0.5) * 28;
-          const spreadY = (Math.random() - 0.5) * 16;
-          laserBolts.push({
-            x1: f.screenX, y1: f.screenY,
-            x2: 140 + spreadX, y2: 60 + spreadY,
-            age: 0.1,
-          });
+        const d = state.damage;
+        const step = groundBoltStep5090(
+          { shields: d.shieldsPct, radar: d.radarPct, engine1: d.engine1Pct,
+            engine2: d.engine2Pct, computer: d.computerPct, laser: d.laserPct, hull: d.hullPct },
+          // 38165 is the condition: 1 green, 2 blue, 3 red. 5200 returns unless it is red.
+          { condition: state.condition === 'red' ? 3 : state.condition === 'blue' ? 2 : 1,
+            batteries: state.enemyShips },
+        );
+
+        if (step.hit) {
+          d.shieldsPct = step.damage.shields;
           audio.beep(1200, 30);
-
-          // The original has no per-bolt hit on the player: nothing in STARSHIP SIMULATOR
-          // tests whether an enemy's shot reaches you. Damage is the periodic tick at 3000,
-          // gated by 38205 or 38210, and ground fire, which 5098 sends into 3205 alone with
-          // L = 7 so it can only touch the shields. The flash stays; the invented
-          // `shields -= 0.5 + rnd * 2` and `hull -= rnd * 3` are gone.
-          const dx = f.screenX - 140;
-          const dy = f.screenY - 60;
-          if (Math.sqrt(dx * dx + dy * dy) < 50) flashes.push({ timer: 0.08, type: 'hit' });
-        } else {
-          f.firing = false;
+          flashes.push({ timer: 0.08, type: 'hit' });
+          glog('groundFire', 'shields=' + d.shieldsPct.toFixed(0));
+          if (!d.pendingUpdate) d.pendingUpdate = true;
         }
+        if (step.returnFire) {
+          // 5230 `HPLOT LX - 20,123 TO X1 - 3,Y1 + 3` and the same at LX + 20, X1 + 3.
+          f.returnFireTimer = 0.12;
+          f.returnFireGunX = step.returnFire.gunX;
+          laserBolts.push({ x1: step.returnFire.gunX - 20, y1: 123,
+            x2: f.screenX - 3, y2: f.screenY + 3, age: 0.1 });
+          laserBolts.push({ x1: step.returnFire.gunX + 20, y1: 123,
+            x2: f.screenX + 3, y2: f.screenY + 3, age: 0.1 });
+          audio.beep(700, 25);
+        }
+        if (step.batteryDestroyed) {
+          // 5250's POP throws away 5000's return address, so the bolt goes no further.
+          onGroundBatteryDestroyed();
+          groundBolts.splice(i, 1);
+          continue;
+        }
+
+        // 5095: advance, then test. A spent bolt returns from 5000 without being drawn again.
+        const moved = stepGroundBolt5095(
+          { x: f.screenX, y: f.screenY, vx: f.vx, vy: f.vy, shape: f.shapeIdx });
+        f.screenX = moved.x;
+        f.screenY = moved.y;
+        if (groundBoltSpent5095(moved)) { groundBolts.splice(i, 1); continue; }
       }
     }
 
@@ -636,7 +659,7 @@ const enemy = spawnEnemy(state);
         const overlay: VectorOverlayData = {
           projectiles: projectiles.map(p => ({ x: p.x, y: p.y, z: p.z })),
           laserBolts: laserBolts.map(b => ({ x1: b.x1, y1: b.y1, x2: b.x2, y2: b.y2, age: b.age })),
-          fighters: fighters.map(f => ({ screenX: f.screenX, screenY: f.screenY, shapeIdx: f.shapeIdx })),
+          fighters: groundBolts.map(f => ({ screenX: f.screenX, screenY: f.screenY, shapeIdx: f.shapeIdx })),
           flashes: flashes.map(fl => ({ timer: fl.timer, type: fl.type })),
           surrenderMsgTimer,
           enemyAlive: enemy.alive,
@@ -674,7 +697,7 @@ const enemy = spawnEnemy(state);
       renderTargetReticle();
       renderProjectiles(cam);
       renderLaserBolts();
-      renderFighters();
+      renderGroundBolts();
       renderFlashes();
       renderSurrenderMessage();
       drawHUD(hires, state, pitchRad, headingRad, prevHeading, prevPitch, dt, showControls, panelShapes);
@@ -777,11 +800,11 @@ const enemy = spawnEnemy(state);
       }
     }
 
-    function renderFighters() {
-      // The sprite branch here read ship-N.json, which is not a shape table; the line
-      // fallback below is what the port actually has for fighters.
+    function renderGroundBolts() {
+      // The sprite branch here read ship-N.json, which is not a shape table; the lines below
+      // stand in for 5090's `XDRAW M AT X1,Y1`.
 
-      for (const f of fighters) {
+      for (const f of groundBolts) {
         const fx = Math.round(f.screenX);
         const fy = Math.round(f.screenY);
 
@@ -844,7 +867,7 @@ const enemy = spawnEnemy(state);
       updateEnemyAI(dt);
       updateProjectiles(dt, cam);
       updateLaserBolts(dt);
-      updateFighters(dt);
+      updateGroundBolts(dt);
       updateFlashes(dt);
       updateSurrenderTimer(dt);
       checkEnemyDestruction();
@@ -907,17 +930,9 @@ const enemy = spawnEnemy(state);
       // 1535 and 1540 run on every shot. The original has no aiming for the laser at all -
       // no screen-space test, no range test - so this is unconditional.
       onLaserHit();
-      const laserDidHit = !state.atmosphere && enemy.alive;
-      if (!state.atmosphere && !laserDidHit) {
-        for (let i = fighters.length - 1; i >= 0; i--) {
-          const f = fighters[i];
-          if (Math.abs(f.screenX - 140) < 40 && Math.abs(f.screenY - 65) < 30) {
-            onFighterDestroyed(i);
-            fighters.splice(i, 1);
-            break;
-          }
-        }
-      }
+      // 1500-1540 has no screen-space test of any kind, and a ground battery is only ever
+      // destroyed by 5240 inside the ship's own return fire. Firing the laser at a bolt does
+      // nothing, so the box test the port had here is gone.
 
   // Planet surface bombardment (STARSHIP_SIM:1535-1550)
   if (state.atmosphere) {
@@ -1062,44 +1077,23 @@ function onLaserHit() {
     if (!d.pendingUpdate) d.pendingUpdate = true;
   }
 
-    function spawnFighter(originX: number, originY: number, originValid: boolean) {
-      // STARSHIP_SIM:5000-5096
-      const useOrigin = originValid && Number.isFinite(originX) && Number.isFinite(originY);
-      let screenX = Math.random() * 260 + 10;
-      let screenY: number;
-      let vy: number;
-      if (useOrigin) {
-        screenX = originX + (Math.random() - 0.5) * 100;
-        screenY = Math.random() >= 0.4 ? originY - 50 + Math.random() * 20 : originY + 50 - Math.random() * 20;
-        screenX = clamp(screenX, 12, 268);
-        screenY = clamp(screenY, 12, 118);
-        vy = 3 + Math.random() * 4;
-      } else {
-        if (Math.random() >= 0.4) {
-          screenY = 10;
-          vy = Math.random() * 7;
-        } else {
-          screenY = 120;
-          vy = -(Math.random() * 7);
-        }
-      }
-
-      let vx: number;
-      let shapeIdx: number;
-      if (screenX > 190) { vx = -7; shapeIdx = 9; }
-      else if (screenX < 91) { vx = 7; shapeIdx = 10; }
-      else { vx = -2; shapeIdx = 8; if (Math.abs(vy) < 4) vy *= 2; }
-
-      fighters.push({
-        screenX, screenY, vx, vy,
-        shapeIdx,
-        alive: true,
-        firing: false,
+    /**
+     * 5000-5080. Three draws and nothing else: where it crosses, which edge, how steeply.
+     *
+     * There is no origin to spawn from. The port used to place these at the enemy ship's
+     * screen position with an invented spread and clamps; the disk puts X1 anywhere in
+     * 10..270 and brings the bolt in at y 10 or y 120.
+     */
+    function spawnGroundBolt() {
+      const b = spawnGroundBolt5000();
+      groundBolts.push({
+        screenX: b.x, screenY: b.y, vx: b.vx, vy: b.vy, shapeIdx: b.shape,
+        stepTimer: 0, returnFireTimer: 0, returnFireGunX: 0,
       });
     }
 
-    function onFighterDestroyed(idx: number) {
-      // STARSHIP_SIM:5250
+    /** 5250, which takes a battery off 38207 and abandons the rest of the bolt's flight. */
+    function onGroundBatteryDestroyed() {
       flashes.push({ timer: 0.15, type: 'hit' });
       audio.beep(500, 50);
       state.enemyShips = Math.max(0, state.enemyShips - 1);

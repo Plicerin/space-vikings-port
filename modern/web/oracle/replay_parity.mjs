@@ -240,7 +240,137 @@ if (fs.existsSync(lootFile)) {
   }
 }
 
-const total = bad + (combatBad ?? 0) + (lootBad ?? 0);
+// ---- line 5000's ground fire --------------------------------------------------------------
+//
+// probe_rndground.mjs records the executing line number with every draw, so each one is
+// attributed to the line that made it rather than guessed at. X1 was the obvious tell and it is
+// the wrong one: 5095 advances X1 at every step of the bolt, not only at 5000's setup.
+//
+// This drives the port's own `spawnGroundBolt5000` and `groundBoltStep5090` with an `rnd` that
+// hands back the machine's recomputed draws in order, so it tests the shipped code and not a
+// second copy of the formulas. How many draws each call takes is itself checked, against the run
+// of line numbers the machine recorded - which is what catches a routine that draws the right
+// values in the wrong order or the wrong number of times.
+const groundFile = 'captured/replay/ground.json';
+let groundBad = null;
+if (fs.existsSync(groundFile)) {
+  const G = JSON.parse(fs.readFileSync(groundFile, 'utf8'));
+  const C = G.calls;
+  const SHIELDS = G.watch.indexOf(38200);
+  const BATTERIES = G.watch.indexOf(38207);
+  const COND = G.watch.indexOf(38165);
+  // What 5098 and 5200 add behind a 5090 draw. 5090 itself is not in the list: consecutive
+  // steps of one bolt are consecutive 5090 draws, so including it would run them together.
+  const STEP_LINES = [3205, 5210, 5240];
+
+  // A bolt is a run of 5000/5045 draws; a step is a 5090 draw and whatever followed it.
+  const boltStarts = C.map((c, i) => (c.line === 5000 && (i === 0 || C[i - 1].line !== 5000) ? i : -1))
+    .filter((i) => i >= 0);
+  const runLength = (i, lines) => {
+    let n = 0;
+    while (C[i + n] && lines.includes(C[i + n].line)) n++;
+    return n;
+  };
+
+  const b4 = await chromium.launch({ headless: true });
+  const p4 = await b4.newPage();
+  await p4.goto(PORT_URL, { waitUntil: 'load' });
+  await p4.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.spawnGroundBolt5000),
+    null, { timeout: 30000 });
+
+  const out = await p4.evaluate(({ calls, boltStarts, stepIdx }) => {
+    const sv = window.__spaceVikings;
+    // The machine's own draws, recomputed from the seed each call had.
+    const drawn = calls.map((c) => sv.rndEFAE(c.seed, c.a4).value);
+    /** An rnd that replays the stream from `at`, counting what gets taken. */
+    const from = (at) => {
+      let k = at;
+      const f = () => drawn[k++];
+      f.used = () => k - at;
+      return f;
+    };
+    const bolts = boltStarts.map((i) => {
+      const rnd = from(i);
+      const b = sv.spawnGroundBolt5000(rnd);
+      return { i, b, used: rnd.used() };
+    });
+    const steps = stepIdx.map((s) => {
+      const rnd = from(s.i);
+      const r = sv.groundBoltStep5090(s.damage, s.ctx, rnd);
+      return { i: s.i, r, used: rnd.used() };
+    });
+    return { drawn, bolts, steps };
+  }, {
+    calls: C.map((c) => ({ seed: c.seed, a4: c.a4 })),
+    boltStarts,
+    stepIdx: C.map((c, i) => (c.line === 5090 ? {
+      i,
+      // the ship as it stood at that step, so the shields comparison is against the real byte
+      damage: {
+        shields: C[i].bytes[SHIELDS], radar: 200, engine1: 200,
+        engine2: 200, computer: 200, laser: 200, hull: 200,
+      },
+      ctx: { condition: C[i].bytes[COND], batteries: C[i].bytes[BATTERIES] },
+    } : null)).filter(Boolean),
+  });
+  await b4.close();
+
+  const near = (a, b) => a !== null && b !== null && Math.abs(a - b) <= 1e-4 * Math.max(1, Math.abs(b));
+  groundBad = 0;
+  const checks = { X1: [0, 0], edge: [0, 0], Y2: [0, 0], X2: [0, 0], shape: [0, 0],
+    setupDraws: [0, 0], hit: [0, 0], shields: [0, 0], returnFire: [0, 0], battery: [0, 0],
+    stepDraws: [0, 0] };
+  const tally = (k, ok) => { checks[k][1]++; if (ok) checks[k][0]++; else groundBad++; };
+
+  for (const { i, b, used } of out.bolts) {
+    if (i + 3 >= C.length) continue;
+    // 5000's three draws, read back from the variables at the first step
+    tally('X1', near(C[i + 1].vars.X1, b.x));
+    // which line made the Y2 draw is the machine's own answer to `IF Y1 >= .4`
+    tally('edge', C[i + 2].line === (b.y === 10 ? 5000 : 5045));
+    tally('Y2', near(C[i + 3].vars.Y2, b.vy));
+    tally('X2', C[i + 3].vars.X2 === b.vx);
+    tally('shape', C[i + 3].vars.M === b.shape);
+    tally('setupDraws', used === runLength(i, [5000, 5045]));
+  }
+
+  for (const { i, r, used } of out.steps) {
+    // 5090's hit shows up as a 3205 draw right behind it, and 5200 is inside the same THEN
+    tally('hit', r.hit === (C[i + 1] && C[i + 1].line === 3205));
+    tally('stepDraws', used === 1 + runLength(i + 1, STEP_LINES));
+    if (!r.hit || !C[i + 1] || C[i + 1].line !== 3205) continue;
+    const after = C[i + 2] ? C[i + 2].bytes[SHIELDS] : null;
+    if (after !== null) tally('shields', r.damage.shields === after);
+    tally('returnFire', (r.returnFire !== null) === (!!C[i + 2] && C[i + 2].line === 5210));
+    const kIdx = C.findIndex((c, k) => k > i && c.line === 5240);
+    if (r.returnFire && kIdx > 0 && kIdx <= i + 3 && C[kIdx + 1]) {
+      const before = C[kIdx].bytes[BATTERIES];
+      tally('battery', C[kIdx + 1].bytes[BATTERIES]
+        === (r.batteryDestroyed && before > 0 ? before - 1 : before));
+    }
+  }
+
+  console.log('');
+  console.log(`line 5000's ground fire: ${out.bolts.length} bolts, ${out.steps.length} steps, ` +
+    `${C.filter((c) => c.line === 5210).length} hits that drew return fire, ` +
+    `${C.filter((c) => c.line === 3205).length - C.filter((c) => c.line === 5210).length}` +
+    ` of 3205's draws from the tick instead`);
+  const LABEL = {
+    X1: "5000's X1 across the screen", edge: 'which edge the bolt comes from',
+    Y2: "Y2, including 5080's doubling", X2: "5050-5080's horizontal step",
+    shape: 'the shape XDRAWn, 8, 9 or 10', setupDraws: 'draws a bolt costs to set up',
+    hit: "5090's 30% hit, by what followed it", shields: '5098 - shields and nothing else',
+    returnFire: '5200 only inside 5090\'s THEN', battery: '5240 - a battery off 38207',
+    stepDraws: 'draws a step of the bolt takes',
+  };
+  for (const k of Object.keys(checks)) {
+    const [good, n] = checks[k];
+    console.log(`  ${LABEL[k].padEnd(38)} ${String(good).padStart(4)} of ${String(n).padStart(4)}` +
+      `${good === n ? '' : '   DIFFERS'}`);
+  }
+}
+
+const total = bad + (combatBad ?? 0) + (lootBad ?? 0) + (groundBad ?? 0);
 console.log('');
 console.log(total === 0 ? 'replay: clean' : `replay: ${total} differ`);
 process.exit(total === 0 ? 0 : 1);
