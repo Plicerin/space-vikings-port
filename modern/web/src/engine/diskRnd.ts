@@ -33,22 +33,14 @@
  * `$AC` is a fifth mantissa byte - the guard - which the arithmetic keeps and the store rounds
  * away, half up, through the carry chain at `$E8C6`.
  *
- * **This is not finished, and should not be used as though it were.** Measured against the
- * machine by `oracle/probe_rnd.mjs` and `oracle/rnd_parity.mjs`, it reproduces between 30 and
- * 708 consecutive calls depending on the seed and then diverges. The divergence is pinned to
- * one place: `fmultE97F`'s guard byte comes out one too low whenever a multiplier byte is zero
- * and `$E9B2 JMP $E8DA` takes the whole-byte shortcut. Everything after it - the add's carry,
- * the byte swap, the round at the store - follows from that bit, which is why the symptom is
- * the top mantissa byte being off by one.
+ * Verified against the machine by `oracle/probe_rnd.mjs` and `oracle/rnd_parity.mjs`: the seed
+ * is read back after every call and compared byte for byte, from several starting seeds, and
+ * every byte of every call agrees.
  *
- * What is left to read is the shortcut. `$E8DA` shifts one byte and falls into `$E8F0`, the
- * shared shift-right entry - `ADC #$08 / BMI / BEQ / SBC #$08 / TAY / LDA $AC / BCS $E911` -
- * and entering that with A = 0 does not plainly stop after eight bits. Until that is settled,
- * nothing should depend on this for replay.
- *
- * Everything else here is verified stage by stage against the machine for real calls: the
- * constants, the exponent arithmetic, the alignment with its `$A4` fill, the carry-out shift,
- * the byte swap, the guard byte taking the old exponent, and the round at the store.
+ * Two things have to be right that are easy to miss. `$A4` is what the shifts fill from and
+ * nothing sets it. And the length of FMULT's whole-byte shortcut depends on the carry it is
+ * entered with - eight bits when set, nine when clear - which chains from byte to byte and
+ * starts from `$EA0E`'s exponent add.
  */
 
 /** `$EFA6`, the multiplier: 11879546.40625. */
@@ -134,9 +126,23 @@ export function normalizeE82E(f: Fac): Fac {
  */
 export function fmultE97F(fac: Fac, arg: Fac, shiftIn = 0): Fac {
   if (fac.exp === 0 || arg.exp === 0) return { exp: 0, m: 0n, sign: 0 };
-  const exp = arg.exp + fac.exp - 0x80;                      // $EA13 and $EA1D
-  if (exp <= 0) return { exp: 0, m: 0n, sign: 0 };
-  if (exp > 0xff) return { exp: 0xff, m: M40, sign: fac.sign ^ arg.sign };
+
+  // $EA0E adds the exponents and leaves a carry the multiply loop then depends on:
+  //
+  //   $EA12  CLC / ADC $9D / BCC $EA1B / BMI (overflow) / CLC / .byte $2C
+  //   $EA1B  BPL (underflow)
+  //   $EA1D  ADC #$80 / STA $9D
+  //
+  // The `.byte $2C` is `BIT abs`, swallowing the `BPL` so the carry-set path skips it. Either
+  // way `ADC #$80` runs with the carry clear, so it comes out **set exactly when the sum of
+  // the two exponents is under $100** - and that is what decides whether the whole-byte
+  // shortcut below runs for eight bits or nine. Measured at $E9B0 on three seeds: 0, 0 and 1,
+  // which is what this predicts.
+  const sum = arg.exp + fac.exp;
+  const exp = sum - 0x80;
+  if (sum < 0x80) return { exp: 0, m: 0n, sign: 0 };         // $EA1B BPL - underflow to zero
+  if (sum >= 0x180) throw new RangeError('?OVERFLOW ERROR');  // $EA17 BMI - Applesoft errors out
+  const carryIn = sum < 0x100 ? 1 : 0;
   const argMant = (arg.m >> 8n) & 0xffffffffn;               // ARG keeps four bytes
   const fill = BigInt(shiftIn & 0xff);
 
@@ -145,27 +151,40 @@ export function fmultE97F(fac: Fac, arg: Fac, shiftIn = 0): Fac {
   let acc = 0n;
   const bytes = [fac.m & 0xffn, (fac.m >> 8n) & 0xffn, (fac.m >> 16n) & 0xffn,
     (fac.m >> 24n) & 0xffn, (fac.m >> 32n) & 0xffn];
+  // The shortcut's length depends on the carry it is entered with, so the carry has to be
+  // carried between bytes. `$E9E2 RTS` is reached with the sentinel's last bit in it, so a
+  // normal byte leaves it **set**; `$E911 CLC / RTS` means a shortcut leaves it **clear**.
+  let carry = carryIn & 1;
   for (let bi = 0; bi < 5; bi++) {
     const b = bytes[bi];
-    // $E9B0 BNE / JMP $E8DA: a zero byte skips the eight rounds and shifts a whole byte - and
-    // what it shifts IN is $A4, not zero. `$E8EC LDY $A4 / STY $01,X`. The accumulator is
-    // treated as signed and $A4 is the sign extension, but nothing in FMULT sets it, so it is
-    // whatever the interpreter last left there. With a clean mantissa - 0x80000000, four zero
-    // bytes - four of these run in a row, and $A4 of $FF against $00 changes the answer.
+    // $E9B0 BNE / JMP $E8DA: a zero byte skips the eight rounds. $E8DC-$E8EE shift one whole
+    // byte, filling the top from $A4 - not zero - and moving the old low byte into $AC.
     if (b === 0n && bi < 4) {
       acc = ((acc >> 8n) | (fill << 32n)) & M40;
+      // Then `$E8F0 ADC #$08 / BMI / BEQ / SBC #$08 / TAY / LDA $AC / BCS $E911`. Entered with
+      // the carry SET that arithmetic leaves Y at 0 and the BCS exits: eight bits exactly.
+      // Entered CLEAR it leaves Y at $FF, the BCS falls through, and `INY / BNE` runs the bit
+      // loop once - a ninth bit. $E8FD's rotate sign-extends the top byte and shifts the four
+      // bytes down; the guard is only ever in A (`$E8F9 LDA $AC`, never stored back), so it
+      // does not move.
+      if (carry === 0) {
+        const top = (acc >> 8n) & 0xffffffffn;
+        acc = (((top >> 1n) | (top & 0x80000000n)) << 8n) | (acc & 0xffn);
+      }
+      carry = 0;
       continue;
     }
     for (let bit = 0; bit < 8; bit++) {
       const set = ((b >> BigInt(bit)) & 1n) === 1n;
-      let carry = 0n;
+      let c = 0n;
       if (set) {
         const top = ((acc >> 8n) & 0xffffffffn) + argMant;   // $E9BB-$E9D2
-        carry = (top >> 32n) & 1n;
+        c = (top >> 32n) & 1n;
         acc = ((top & 0xffffffffn) << 8n) | (acc & 0xffn);
       }
-      acc = ((acc >> 1n) | (carry << 39n)) & M40;            // $E9D4-$E9DC
+      acc = ((acc >> 1n) | (c << 39n)) & M40;                // $E9D4-$E9DC
     }
+    carry = 1;
   }
   return normalizeE82E({ exp, m: acc, sign: (fac.sign ^ arg.sign) & 0x80 });
 }

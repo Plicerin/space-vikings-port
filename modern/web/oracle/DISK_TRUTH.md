@@ -3602,13 +3602,10 @@ identically in all five captures, and the comparison is over rows 0-183.
 
 ---
 
-## Applesoft's RND - read, most of it verified, not finished
+## Applesoft's RND
 
 `$EFAE` is what every `RND(1)` in the game goes through, and without it nothing RND-driven can
-be replayed. It is read now, and most of it is verified against the machine. It is **not**
-finished: the transcription in `diskRnd.ts` reproduces between 30 and 708 consecutive calls
-depending on the seed and then diverges. That is recorded here rather than dressed up, and
-`oracle/rnd_parity.mjs` prints INCOMPLETE rather than passing.
+be replayed. It is transcribed in `diskRnd.ts` and it agrees with the machine byte for byte.
 
 ```
 $EFAE  JSR $EB82                          ; the sign of FAC
@@ -3625,35 +3622,31 @@ $EFE0  JSR $E82E                           ; normalise
 $EFE3  LDX #$C9 / LDY #$00 / JMP $EB2B     ; round, store over the seed, return it
 ```
 
-The constants at `$EFA6` and `$EFAA` are the well-known pair. Three things about the rest are
-less often said, and all three are confirmed stage by stage against real calls.
+The float is five bytes: an excess-128 exponent and a 32-bit mantissa. In memory bit 7 of the
+first mantissa byte is the sign and the leading 1 is implied (`$EB43 LDA $A2 / ORA #$7F /
+AND $9E`); in FAC the sign sits at `$A2` and the mantissa's top bit is explicit. `$AC` is a
+fifth mantissa byte - the guard - which the arithmetic keeps and the store rounds away, half up
+through the carry chain at `$E8C6`.
+
+### Five things it is easy to get wrong
 
 **`$EFD8` feeds the old exponent into the guard byte.** A byte with nothing to do with the
-mantissa is shifted into it by the normalise and then rounded in by the store. Leaving it out
-gives a different sequence within a handful of calls.
+mantissa is shifted into it by the normalise and then rounded in by the store. Deliberate
+mixing; leaving it out gives a different sequence within a handful of calls.
 
 **`$A4` is a hidden operand of both FMULT and FADD.** The shift-right routine fills from it -
 `$E8EC LDY $A4 / STY $01,X` - and **nothing in either routine sets it**. It is the sign
 extension for a shift and the caller is supposed to have it right; RND's callers do not touch
-it, so it is whatever the interpreter last left there. `$FF` in every capture taken here. It is
-not ignorable: aligning the tiny addend against a large FAC shifts five bytes of `$FF` into the
-top of it and the add then carries where it otherwise would not, which changes the exponent and
-every byte after it.
+it, so it is whatever the interpreter last left there. `$FF` in every capture taken here.
+Aligning the tiny addend against a large FAC shifts five bytes of `$FF` into the top of it and
+the add then carries where it otherwise would not.
 
 **`$E7EE CMP #$F9 / BMI $E7B9` is not a bail.** It reads like "give up if the operands are more
 than seven apart", and taking it that way makes FADD drop the addend entirely. `$E7B9` is
-`JSR $E8F0`, the whole-byte shift, and it carries straight on into the add. Reading it wrongly
-was what made the first attempt diverge on call zero.
+`JSR $E8F0`, the whole-byte shift, and it carries straight on into the add.
 
-### Where it stops
-
-`fmultE97F`'s guard byte comes out one too low whenever a multiplier byte is zero and
-`$E9B2 JMP $E8DA` takes the whole-byte shortcut. For the seed `80 69 8b 1e ce` the machine's
-accumulator is `a5 5d d5 68 01` and the transcription gives `a5 5d d5 68 00`; everything after
-that - the add's carry, the byte swap, the round - follows from the one bit, which is why the
-symptom is the top mantissa byte off by one rather than the low bit it started as.
-
-What is left to read is the shortcut. `$E8DA` shifts one byte and falls into `$E8F0`:
+**FMULT's whole-byte shortcut is eight bits or nine, depending on the carry it is entered
+with.** A zero multiplier byte goes to `$E9B2 JMP $E8DA`, which shifts one byte and falls into
 
 ```
 $E8F0  ADC #$08 / BMI $E8DC / BEQ $E8DC
@@ -3661,22 +3654,46 @@ $E8F6  SBC #$08 / TAY / LDA $AC / BCS $E911
 $E8FD  ASL $01,X / BCC / INC $01,X / ROR x5 / INY / BNE $E8FD
 ```
 
-Entering that with A = 0 does not plainly stop after eight bits, and the sign-extending rotate
-at `$E8FD` may contribute a bit the plain byte shift does not. That is the remaining unknown.
+With the carry **set**, that arithmetic leaves Y at 0 and the `BCS` exits: eight bits. With it
+**clear**, Y comes out `$FF`, the `BCS` falls through, and `INY / BNE` runs the bit loop exactly
+once - a ninth bit. And the guard byte does not move on that extra pass, because it only ever
+lives in A (`$E8F9 LDA $AC`, never stored back). A normal byte leaves the carry set, since
+`$E9E2 RTS` is reached with the sentinel's last bit in it; the shortcut leaves it clear, because
+`$E911` is `CLC / RTS`. So it chains from byte to byte.
 
-### What is measured
+**And the carry the chain starts from is not a constant - it comes out of the exponent add.**
 
-| | result |
-| --- | --- |
-| consecutive calls reproduced, seed `80 00 00 00 00` | 499 |
-| seed `81 49 0f da a2` | 708 |
-| seed `01 00 00 00 01` | 30 |
-| stage-by-stage agreement on a single call | exact, including the `$A4` fill and the carry |
+```
+$EA12  CLC / ADC $9D / BCC $EA1B / BMI (overflow) / CLC / .byte $2C
+$EA1B  BPL (underflow)
+$EA1D  ADC #$80 / STA $9D
+```
 
-Two of the five seeds tried never return at all: `ff 00 00 ff ff` and `fe 7f ff ff ff` overflow
-on the first multiply and Applesoft takes its error exit instead. The first of those is what
-`$00C9` happens to hold after a reset, which is uninitialised RAM rather than a seed the
-interpreter would ever start from.
+The `.byte $2C` is `BIT abs`, swallowing the `BPL` so the carry-set path skips it; either way
+`ADC #$80` runs with the carry clear. So it comes out **set exactly when the two exponents sum
+to under `$100`**. Measured at `$E9B0` for three seeds - 0, 0 and 1 - which is what that
+predicts, and deriving it rather than passing it in is what closed the last gap.
+
+The same add gives the over- and underflow bounds: the exponent is `sum - $80`, valid while
+`$80 <= sum < $180`. Below that the result is zero; above it Applesoft takes its error exit,
+which is why two of the five seeds tried never return at all. One of those, `ff 00 00 ff ff`, is
+what `$00C9` happens to hold after a reset - uninitialised RAM rather than a seed the
+interpreter would start from.
+
+### Checked
+
+`oracle/probe_rnd.mjs` calls `$EFAE` on the machine and reads the five seed bytes back after
+every call; `oracle/rnd_parity.mjs` runs `diskRnd.ts` from the same seeds.
+
+| seed | calls | carry at `$E9B0` | |
+| --- | --- | --- | --- |
+| `80 00 00 00 00` | 6000 | 0 | every byte of every call agrees |
+| `81 49 0f da a2` | 6000 | 0 | every byte of every call agrees |
+| `01 00 00 00 01` | 6000 | 1 | every byte of every call agrees |
+
+18000 calls, bit-exact. So anything RND-driven can now be replayed rather than checked by
+predicate - the combat, the damage model, COLLECT's loot rolls, the base and weapon prices -
+given the seed and `$A4`.
 
 ---
 
@@ -3704,11 +3721,10 @@ is what is genuinely not known, roughly in order of how much it matters.
 - **Where a new game's energy comes from.** 38199 reads 63 on a fresh ship and no BASIC
   program POKEs it, so the opening value arrives with a BLOAD. Which file, and what else
   rides along in it, has not been traced.
-- **The last bit of Applesoft's RND.** Read, and verified stage by stage for real calls, but
-  the transcription still diverges after 30 to 708 consecutive values. The whole of the gap is
-  FMULT's guard byte on the `$E9B2 JMP $E8DA` whole-byte shortcut; the section above says what
-  is left to read. Until it is closed, the combat and the damage model stay checked by
-  predicate rather than by replay.
+- **Replaying the RND-driven routines.** `RND` itself is done and bit-exact, so the combat,
+  the damage model and the loot rolls could now be compared by replay rather than by predicate.
+  Nothing has been rewritten to do that yet, and it needs the live `$00C9` seed and `$A4` out
+  of a running game rather than the synthetic ones the RND harness uses.
 - **The game logic is done.** The economy, GROUND FORCES' combat, the damage model, the
   weapons and all five of RECALL's branches have been run against the disk, and there is no
   enemy AI to do. What is left of the BASIC is COLLECT's tech-1 path and two of SHORE LEAVE's

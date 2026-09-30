@@ -36,15 +36,21 @@ const got = await page.evaluate(({ jobs, mult, add }) => {
     && JSON.stringify(sv.RND_ADDEND) === JSON.stringify(add);
   return {
     constantsOk: ok,
+    // The carry entering the first multiplier byte is derived from $EA0E's exponent add inside
+    // fmultE97F, so there is nothing to pass in and nothing to choose between.
     seqs: jobs.map((j) => {
-      let s = j.seed.slice();
-      const out = [];
-      for (let i = 0; i < j.n; i++) { const r = sv.rndEFAE(s, j.shiftIn); s = r.seed; out.push(s); }
-      return out;
+      const run = () => {
+        let s = j.seed.slice();
+        const out = [];
+        for (let i = 0; i < j.n; i++) { const r = sv.rndEFAE(s, j.shiftIn); s = r.seed; out.push(s); }
+        return out;
+      };
+      return { measured: run() };
     }),
   };
 }, {
-  jobs: runs.map((r) => ({ seed: r.seed, n: r.values.length, shiftIn: r.shiftIn ?? 0 })),
+  jobs: runs.map((r) => ({ seed: r.seed, n: r.values.length, shiftIn: r.shiftIn ?? 0,
+    carry: r.firstCarry ?? 0 })),
   mult: [0x98, 0x35, 0x44, 0x7a, 0x68], add: [0x68, 0x28, 0xb1, 0x46, 0x20],
 });
 await browser.close();
@@ -54,16 +60,19 @@ const hx = (b) => b.map((v) => v.toString(16).padStart(2, '0')).join(' ');
 let fail = 0;
 if (!got.constantsOk) { fail++; console.log('  the constants at $EFA6 and $EFAA do not match'); }
 
-console.log(`  seed                 calls   first mismatch`);
+console.log(`  seed                 calls   carry   first mismatch`);
+const firstBad = (want, have) => {
+  for (let k = 0; k < want.length; k++) if (want[k].join(',') !== have[k].join(',')) return k;
+  return -1;
+};
 for (let i = 0; i < runs.length; i++) {
   const want = runs[i].values;
-  const have = got.seqs[i];
-  let bad = -1;
-  for (let k = 0; k < want.length; k++) {
-    if (want[k].join(',') !== have[k].join(',')) { bad = k; break; }
-  }
+  // The probe measured this at $E9B0; fmultE97F derives it. They should agree.
+  const carry = runs[i].firstCarry ?? 0;
+  const have = got.seqs[i].measured;
+  const bad = firstBad(want, have);
   if (bad >= 0) fail++;
-  console.log(`  ${hx(runs[i].seed)}   ${String(want.length).padStart(5)}   ` +
+  console.log(`  ${hx(runs[i].seed)}   ${String(want.length).padStart(5)}   carry ${carry}   ` +
     (bad < 0 ? 'none - every byte of every call agrees'
       : `call ${bad}: machine ${hx(want[bad])}, port ${hx(have[bad])}`));
 }
@@ -80,11 +89,8 @@ if (fail === 0) {
   console.log('RND parity: clean - every byte of every call agrees');
 } else {
   const best = Math.min(...runs.map((r, i) => {
-    const have = got.seqs[i];
-    for (let k = 0; k < r.values.length; k++) {
-      if (r.values[k].join(',') !== have[k].join(',')) return k;
-    }
-    return r.values.length;
+    const k = firstBad(r.values, got.seqs[i].measured);
+    return k === -1 ? r.values.length : k;
   }));
   console.log(`RND: INCOMPLETE - ${fail} of ${runs.length} seeds diverge, the earliest after ` +
     `${best} consecutive calls. See the head of this file for where the missing bit is.`);

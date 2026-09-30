@@ -30,7 +30,7 @@ for (const seed of SEEDS) {
     cpu.write(0x0300, 0x4C); cpu.write(0x0301, 0x00); cpu.write(0x0302, 0x03);
     const seed = ${JSON.stringify(seed)};
     for (let i = 0; i < 5; i++) cpu.write(0x00C9 + i, seed[i]);
-    const out = []; let shiftIn = null;
+    const out = []; let shiftIn = null; let firstCarry = null;
     for (let n = 0; n < ${N}; n++) {
       // FAC = 1.0, so SIGN comes back positive and $EFAE takes the ordinary path.
       cpu.write(0x9D, 0x81); cpu.write(0x9E, 0x80);
@@ -39,17 +39,27 @@ for (const seed of SEEDS) {
       // $A4 is what $E8DA shifts into the accumulator when a multiplier byte is zero, and
       // nothing in FMULT sets it - so record it, because the answer depends on it.
       if (n === 0) shiftIn = cpu.read(0xA4);
+      // The carry entering FMULT's first multiplier byte, at $E994's JSR $E9B0, decides how
+      // long the whole-byte shortcut is: set gives eight bits, clear gives nine. It comes out
+      // of $EA0E and the listing does not settle it, so measure it.
+      let sawE9B0 = false;
       const st = cpu.getState();
       st.sp = 0xF0; st.pc = 0xEFAE;
       cpu.setState(st);
       cpu.write(0x01F1, 0xFF); cpu.write(0x01F2, 0x02);
       let k = 0;
-      while (cpu.getPC() !== 0x0300 && k < 200000) { cpu.stepCycles(1); k++; }
+      while (cpu.getPC() !== 0x0300 && k < 200000) {
+        if (!sawE9B0 && cpu.getPC() === 0xE9B0) {
+          sawE9B0 = true;
+          if (n === 0) firstCarry = cpu.getState().s & 1;
+        }
+        cpu.stepCycles(1); k++;
+      }
       if (k >= 200000) return JSON.stringify({ failedAt: n, values: out });
       out.push([cpu.read(0x00C9), cpu.read(0x00CA), cpu.read(0x00CB),
         cpu.read(0x00CC), cpu.read(0x00CD)]);
     }
-    return JSON.stringify({ values: out, shiftIn });
+    return JSON.stringify({ values: out, shiftIn, firstCarry });
   })()`));
   if (r.failedAt !== undefined) {
     console.log(`  seed ${seed.map((b) => b.toString(16).padStart(2, '0')).join(' ')}: ` +
@@ -68,9 +78,9 @@ for (const seed of SEEDS) {
   const mean = vs.reduce((a, b) => a + b, 0) / vs.length;
   console.log(`  seed ${seed.map((b) => b.toString(16).padStart(2, '0')).join(' ')}: ` +
     `${r.values.length} values, ${inRange ? 'all in [0,1)' : 'SOME OUT OF [0,1)'}, ` +
-    `mean ${mean.toFixed(5)}, $A4 = $${(r.shiftIn ?? 0).toString(16)}`);
+    `mean ${mean.toFixed(5)}, $A4 = $${(r.shiftIn ?? 0).toString(16)}, carry ${r.firstCarry}`);
   console.log(`    first three: ${vs.slice(0, 3).map((v) => v.toFixed(9)).join('  ')}`);
-  runs.push({ seed, values: r.values, shiftIn: r.shiftIn });
+  runs.push({ seed, values: r.values, shiftIn: r.shiftIn, firstCarry: r.firstCarry });
 }
 await a2.close();
 
