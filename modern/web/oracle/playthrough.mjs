@@ -288,14 +288,20 @@ check('X from a radar opened in flight returns to flight', await until('cockpit'
   check('and costs two, whatever it hit', (await missiles()) === before - 2,
     `${before} -> ${await missiles()}`);
 
-  // 1560 is `DP > PEEK(38204)`, so it takes one more shot than gets there exactly. Keep
-  // firing rather than counting presses - the cockpit has a cooldown and a press inside it
-  // is simply lost, which is a property of the port's input and not of 1090.
+  // 1560 is `DP > PEEK(38204)`, so it takes one more shot than gets there exactly. The rate
+  // is the machine's - one shot a pass, and a firing pass is 6.69 s for a missile - so this
+  // waits for each shot to land rather than pressing on a timer.
   let ended = false;
-  for (let i = 0; i < shots + 6 && !ended; i++) {
+  for (let i = 0; i < shots + 3 && !ended; i++) {
+    const was = await vit();
     await press(' ');
-    await new Promise((r) => setTimeout(r, 700));
-    ended = (await scene()) === 'ex';
+    const t0 = Date.now();
+    for (;;) {
+      if ((await scene()) === 'ex') { ended = true; break; }
+      if ((await vit()) !== was) break;
+      if (Date.now() - t0 > 12000) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
   }
   if (!ended) ended = await until('ex', 20000);
   check(`about ${shots + 1} hits destroy the ship and 1560 runs EX`, ended,

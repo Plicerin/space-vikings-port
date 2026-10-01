@@ -4252,6 +4252,46 @@ panel open and arriving in COM.
 
 ---
 
+## How fast you can fire, measured
+
+`FIRE_COOLDOWN_SECONDS` was 0.45 and was nobody's measurement. The disk has no cooldown at
+all - `185 IF PEEK(-16287) > 127 THEN GOSUB 1500` is tested **once a pass** of the main loop,
+so holding the button gives one shot a pass, and a pass that fires is a long one: 1000-1090
+walks the missile's sixteen steps with two XDRAWs apiece, and 1505-1530 draws three beams
+through `CALL LA`.
+
+`probe_firerate.mjs` holds the paddle button down and watches the two cells a shot moves -
+38187, which 1090 takes two from, and 38160, which 1535 adds to:
+
+```
+missiles   38187 fell by two every 400, 402, 401, 402, 400 frames   6.69 s
+laser      38160 rose every 355, 359, 359, 359 frames               5.99 s
+                 and once 488, the pass that also took 192's damage tick
+```
+
+So **6.69 seconds a missile and 5.99 a laser**, against the port's 0.45 - about fifteen times
+too fast, on the thing combat is made of. For comparison the quiet pass is 2.55 s, so a firing
+pass is more than twice an ordinary one.
+
+The port fires at the measured rate now, per weapon. `fastFire` in the QOL panel puts 0.45
+back, because a six-second trigger is a hard thing to play with and the switchboard is exactly
+where that belongs. `firerate_parity.mjs` drives both: off gives 6.65, 6.70, 6.73 s against the
+machine's 6.69; on gives 0.40, 0.52, 0.45, 0.45.
+
+### A full day of a stale dev server
+
+Chasing this cost more than it should have, and the reason is worth writing down. The switch
+read `true` and the rate stayed slow, over and over, in the browser pane - and the explanation
+was that the Vite server had been up for twenty-two hours and the tab for nine, and the tab was
+running **stale modules**. The tell was a `console.log` printing from a diagnostic that had
+already been deleted from the source, with the same floating-point value every time.
+
+The harnesses were right throughout, because Playwright opens a fresh context for every run.
+So: when the game in the pane disagrees with a harness, suspect the pane first, and restart the
+server before believing anything measured in it.
+
+---
+
 ---
 
 ## RECALL, all five branches

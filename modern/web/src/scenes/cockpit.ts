@@ -48,6 +48,7 @@ import {
 } from '../engine/commander';
 import type { Shape } from '../engine/shapeTable';
 import { VectorRenderer, type VectorOverlayData } from '../engine/vectorRenderer';
+import { qolOn } from '../engine/qol';
 
 // The original's stars are not random. PLANET # 0, BLOADed to $7300 by START line 100, is
 // 195 fixed points from offset 36 on - the same bytecode the ship models use, every record
@@ -84,7 +85,33 @@ const FRAME_DT_SCALE = 0.72;
  */
 const BASIC_SIMULATOR_TICK_SECONDS = 2.55;
 const TURN_RATE = 0.9;
-const FIRE_COOLDOWN_SECONDS = 0.45;
+/**
+ * How often you can fire, which on the disk is not a cooldown at all.
+ *
+ * `185 IF PEEK(-16287) > 127 THEN GOSUB 1500` is tested **once a pass** of the main loop, so
+ * holding the button gives one shot per pass - and a pass that fires is much longer than a
+ * quiet one, because 1000-1090 walks the missile's sixteen steps and 1505-1530 draws the three
+ * beams. Measured with the button held down, `oracle/probe_firerate.mjs`:
+ *
+ *   missiles  38187 fell by two every 400, 402, 401, 402, 400 frames  - 6.69 s
+ *   laser     38160 rose every 355, 359, 359, 359 frames              - 5.99 s
+ *                   (and once 488, the pass that also took 192's damage tick)
+ *
+ * This had been 0.45 s for both, which is nobody's measurement and about fifteen times too
+ * fast. The quiet pass is 2.55 s - `BASIC_SIMULATOR_TICK_SECONDS` below - and a firing pass is
+ * more than twice that.
+ *
+ * `fastFire` in the QOL panel puts the old 0.45 back for anyone who wants it.
+ */
+const MISSILE_FIRE_SECONDS = 6.69;
+const LASER_FIRE_SECONDS = 5.99;
+const FAST_FIRE_SECONDS = 0.45;
+
+/** What one shot costs now, which depends on the weapon and on the QOL switch. */
+function fireIntervalFor(weapon: 'missile' | 'laser'): number {
+  if (qolOn('fastFire')) return FAST_FIRE_SECONDS;
+  return weapon === 'missile' ? MISSILE_FIRE_SECONDS : LASER_FIRE_SECONDS;
+}
 const SHIP_SCALE_MIN = 0.02;
 const SHIP_SCALE_MAX = 2.0;
 const SHIP_TARGET_MIN_PX = 8;
@@ -403,7 +430,7 @@ const enemy = spawnEnemy(state);
       pitchRad += aiIn.dPitch * dt;
       if (aiIn.speed !== undefined) state.speed = aiIn.speed;
       if (aiIn.fire && fireCooldown <= 0) {
-        fireCooldown = FIRE_COOLDOWN_SECONDS;
+        fireCooldown = fireIntervalFor(state.weaponMode === 'missile' ? 'missile' : 'laser');
         if (state.weaponMode === 'missile') fireMissile();
         else fireLaser();
       }
@@ -492,7 +519,7 @@ const enemy = spawnEnemy(state);
           vectorRenderer.hide();
         }
       } else if (ch === ' ' && fireCooldown <= 0) {
-        fireCooldown = FIRE_COOLDOWN_SECONDS;
+        fireCooldown = fireIntervalFor(state.weaponMode === 'missile' ? 'missile' : 'laser');
         if (state.weaponMode === 'missile') {
           fireMissile();
         } else {
@@ -726,7 +753,8 @@ const enemy = spawnEnemy(state);
           state,
           pitchRad,
           headingRad,
-          state.weaponMode === 'laser' && fireCooldown > FIRE_COOLDOWN_SECONDS - 0.12,
+          state.weaponMode === 'laser'
+            && fireCooldown > fireIntervalFor('laser') - 0.12,
           bombardmentSourceBitmap,
           bombardmentSourceBounds,
         );

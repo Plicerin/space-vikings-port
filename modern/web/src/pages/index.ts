@@ -54,6 +54,7 @@ import { shapeDemoScene } from '../scenes/shapeDemo';
 import { shipDebugScene } from '../scenes/shipDebug';
 import { shipVectorDebugScene } from '../scenes/shipVectorDebug';
 import { mountQolPanel } from '../engine/qolPanel';
+import { qolOn, setQol, QOL_FEATURES } from '../engine/qol';
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 function boot(): void {
@@ -139,7 +140,8 @@ function boot(): void {
     fireLaser1500, fireMissile1000, storeIfUnder255, missileHits1050,
     missileFlight1000, missileHit1000, MISSILE_FLIGHT, MISSILE_BOX,
     groundBatteryDestroyed5250, ENEMY_POSITION, LASER, MISSILE,
-    rndEFAE, rndSequence, facValue, RND_MULTIPLIER, RND_ADDEND };
+    rndEFAE, rndSequence, facValue, RND_MULTIPLIER, RND_ADDEND,
+    qolOn, setQol, QOL_FEATURES };
 
   // Wire up the "COPY GAME LOG" button.
   initCopyButton();

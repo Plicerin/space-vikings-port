@@ -17,7 +17,8 @@
 export type QolKey =
   | 'crtSmoothing'
   | 'crtBloom'
-  | 'crtScanlines';
+  | 'crtScanlines'
+  | 'fastFire';
 
 export interface QolFeature {
   key: QolKey;
@@ -47,6 +48,12 @@ export const QOL_FEATURES: readonly QolFeature[] = [
     label: 'Scanlines',
     group: 'Picture',
     note: 'A dark line every other row of the display.',
+  },
+  {
+    key: 'fastFire',
+    label: 'Fast fire',
+    group: 'Play',
+    note: 'Lets you fire about every half-second. The machine takes a whole pass of its main loop to fire, measured at 6.7 seconds for a missile and 6.0 for the laser.',
   },
 ];
 
