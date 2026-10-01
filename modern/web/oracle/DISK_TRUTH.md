@@ -4046,6 +4046,41 @@ then compares: the signal looked like it meant "ready" and meant something else.
 
 ---
 
+## The readout row, and a harness that painted its own page
+
+Playing through COM's computer menu turned up what looked like a clean defect: on the machine's
+SUPPLY capture the bottom row carries only the `X Y Z XHDNG YHDNG` labels, and in the port it
+carries `350 100 -3320` as well. 233 pixels, all on text row 24.
+
+It was not a defect, and the way it was settled is worth keeping.
+
+`supply_parity.mjs` could not have seen it either way, because **it composed the page it then
+compared** - `drawInstruments`, the needles, then `drawSupplyPage1` into a canvas of its own.
+SUPPLY fills only rows 0 to 123 and leaves the panel standing from whatever drew it last, so
+the panel is half of what that screen is, and a harness that paints its own cannot test it. It
+drives the game now: a new game, C to COM, 1 to the computer, 5 to SUPPLY.
+
+Driven, it reported the 233 pixels. The question was then which side was wrong, and the answer
+is neither: **whether those numbers are on the page is not a property of SUPPLY**. Line 155
+prints them every pass, and the simulator draws into one hi-res page while the other is
+displayed, so what COM inherits depends on which pass you left flight in. Measured both ways on
+the machine, same route each time:
+
+- press C as soon as the simulator is up, and the row reaches SUPPLY with **20** pixels on it;
+- fly for twenty seconds first, and it reaches SUPPLY with **254**.
+
+Both are the machine. The port's 253 is the second of them.
+
+What *is* a property of the game is what the galaxy map does to that row, and the port follows
+it to the pixel - 250 in flight and through COM, **152** on the map, **20** from there on, and
+it never comes back until flight. The disk's own route capture shows the same three numbers.
+
+So the row is excluded here, as `transition_parity` already excludes it everywhere, and the
+reason is written down in both places. With it out, both SUPPLY pages agree on all 53,760
+pixels with the scene actually driven.
+
+---
+
 ---
 
 ## RECALL, all five branches
