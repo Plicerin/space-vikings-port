@@ -4110,12 +4110,23 @@ The rest paint, and they divide three ways.
 
 Most of that last group is covered anyway, because `transition_parity` drives COM, the
 computer submenu, the directory, the galaxy map, STATUS, SUPPLY, RADAR, the ship id, GROUND
-FORCES, CRYOGENICS and END along a real route. The ones it never reaches are **ORBIT, RECALL
-and COLLECT**, and of those `orbit_parity` now flies there the way 158 does - into the
-atmosphere, then `Y > 4000` - instead of composing. Driven, ORBIT's own rows 0 to 125 are
-exact, 0 of 35,280. What is left below is the live readout row and the bank and pitch needles,
-both of which depend on which hi-res page the flight loop had flipped to, which is what the
-harness's own comment had said all along.
+FORCES, CRYOGENICS and END along a real route. The ones it never reached were **ORBIT, RECALL
+and COLLECT**, and all three are driven now.
+
+- **ORBIT** is flown to the way 158 does it - into the atmosphere, then `Y > 4000`. Its own
+  rows 0 to 125 are exact, 0 of 35,280. What is left below is the live readout row and the
+  bank and pitch needles, both of which depend on which hi-res page the flight loop had
+  flipped to, which is what the harness's own comment had said all along.
+- **RECALL** had the deepest replay of the lot - panel, needles, COM, GROUND FORCES' line 12
+  clear, then the box. It walks it now, C to COM and 2 to GROUND FORCES, and presses 2 five
+  times with the troops put where each branch needs them. All five exact, 0 differing on each,
+  and what 38166 becomes is read back out of the game rather than claimed by the logic that
+  drew the screen.
+- **COLLECT** was drawing its band into a blank canvas, which could not tell whether the scene
+  draws it at all, nor whether it lands on the battle screen with the inverse flag GROUND
+  FORCES leaves set. The assault is fought for real now - 1 on the ground forces menu, with a
+  force that will take the planet and three retries because the battle is RND - and the band
+  is read off the page COLLECT leaves. 0 of 8,960 differing.
 
 ### Seventeen of them could not fail
 

@@ -1,8 +1,10 @@
 // The port's RECALL against the original's, all five branches.
 //
 // RECALL draws over COM's screen by way of GROUND FORCES, which has already blanked rows
-// 1-12, so the comparison replays that chain: panel, lamps, needles, COM with its line 8
-// erase, then GROUND FORCES' line 12 clear, then RECALL's box and message.
+// 1-12. That chain used to be replayed here by hand - panel, lamps, needles, COM, GROUND
+// FORCES' clear, then RECALL's box - which tests the drawing and not the screen. It is walked
+// for real now: a new game, C to COM, 2 to GROUND FORCES, and 2 again for each of the five
+// branches, with the troops put where that branch needs them first.
 //
 // `captured/recall/branches.json` has all five, run on the disk by probe_recallbranches.mjs -
 // 2005 needed Applesoft's own `TR` zeroed mid-startup, because it is read off the MISC FILE
@@ -13,9 +15,6 @@ import fs from 'fs';
 
 const PORT_URL = process.env.PORT_URL || 'http://localhost:4545/';
 const branches = JSON.parse(fs.readFileSync('captured/recall/branches.json', 'utf8'));
-const comGolden = JSON.parse(fs.readFileSync('captured/com/readouts.json', 'utf8'));
-const tableJson = JSON.parse(fs.readFileSync('../public/data/shapes/shape-table.json', 'utf8'));
-const comBytes = comGolden.healthy.bytes;
 const cases = branches.branches.filter((b) => b.screen);
 
 const browser = await chromium.launch({ headless: true });
@@ -26,33 +25,76 @@ await page.goto(PORT_URL, { waitUntil: 'load' });
 await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.drawRecall), null, { timeout: 30000 })
   .catch(() => { throw new Error('the port did not expose drawRecall - is the dev server running at ' + PORT_URL + '?'); });
 
-const shots = await page.evaluate(({ tj, bytes, jobs }) => {
+const shots = await page.evaluate(async ({ jobs }) => {
   const sv = window.__spaceVikings;
-  const shapes = sv.decodeShapeTableJson(tj);
-  return jobs.map((j) => {
-    const c = document.createElement('canvas');
-    c.width = 560; c.height = 384;
-    const h = new sv.Hires(c);
-    h.hgr();
-    sv.drawInstruments(h);
-    sv.drawPanelNeedles(h, shapes, { bank: 0, pitch: 0, speed: 120, energy: bytes['38199'] });
-    sv.drawComMainScreen(h, bytes, shapes);
-    // GROUND FORCES line 12, run from line 65 on the way out: rows 1-12, columns 1-18.
-    h.hcolor(1);
-    for (let r = 2; r <= 13; r++) h.text(' '.repeat(18), 2, r);
-    const r = sv.recallMessage(j.inputs);
-    sv.drawRecall(h, r.lines);
-    return { on: Array.from(h.snapshot().on), line: r.line, newLocation: r.newLocation };
-  });
+  const press = (k) => {
+    const code = /^[0-9]$/.test(k) ? 'Digit' + k : k === ' ' ? 'Space' : 'Key' + k.toUpperCase();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: k, code, bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: k, code, bubbles: true }));
+  };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const sceneNow = () => {
+    const l = window.__gameLog.getLog();
+    return l.length ? l[l.length - 1].scene : '?';
+  };
+  // A scene change costs its disk load and the old screen stays up for it, so these wait on
+  // the scene and not on the clock.
+  const arrive = async (want, ms = 25000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if (sceneNow().toLowerCase() === want.toLowerCase()) return true;
+      await sleep(60);
+    }
+    return false;
+  };
+
+  press('N');
+  if (!await arrive('cockpit', 35000)) throw new Error('no cockpit');
+  await sleep(1200);
+
+  const out = [];
+  for (const j of jobs) {
+    if (sceneNow().toLowerCase() !== 'groundforces') {
+      if (sceneNow().toLowerCase() !== 'com') { press('C'); if (!await arrive('com')) throw new Error('no COM'); }
+      await sleep(400);
+      press('2');
+      if (!await arrive('groundForces')) throw new Error('no GROUND FORCES');
+    }
+    await sleep(400);
+
+    const st = window.__spaceVikingsState;
+    st.planetIndex = j.planet;
+    st.forces.troopPlanetIndex = j.troopPlanet;
+    st.forces.troops = j.troops;
+    st.forces.troopLocation = j.location;
+    const before = st.forces.troopLocation;
+
+    press('2');
+    if (!await arrive('recall', 25000)) throw new Error('RECALL never ran');
+    await sleep(500);
+    const on = Array.from(sv.hires.snapshot().on);
+    const r = sv.recallMessage({
+      planet: j.planet, troopPlanet: j.troopPlanet, troops: j.troops, location: j.location,
+    });
+    // 2050 chains straight on to GROUND FORCES, so the message is only up for as long as that
+    // load takes. Wait for it before setting the next branch up.
+    await arrive('groundForces', 25000);
+    await sleep(300);
+    out.push({
+      on, line: r.line, newLocation: r.newLocation, before,
+      locationAfter: window.__spaceVikingsState.forces.troopLocation,
+    });
+  }
+  return out;
 }, {
-  tj: tableJson, bytes: comBytes,
+  // `recallMessage` only ever compares the planet with the troops' planet, so what matters is
+  // whether they are the same - the disk's 1 and 2 become the port's 0 and 1.
   jobs: cases.map((b) => ({
-    inputs: {
-      planet: b.before['38209'], troopPlanet: b.before['38158'],
-      // 2005 is the one the disk reached with TR at zero; the rest ran with the file's 2000.
-      troops: b.line === 2005 ? 0 : 2000,
-      location: b.before['38166'],
-    },
+    planet: 0,
+    troopPlanet: b.before['38209'] === b.before['38158'] ? 0 : 1,
+    // 2005 is the one the disk reached with TR at zero; the rest ran with the file's 2000.
+    troops: b.line === 2005 ? 0 : 2000,
+    location: b.before['38166'],
   })),
 });
 await browser.close();
@@ -82,8 +124,9 @@ for (let i = 0; i < cases.length; i++) {
     if (diskOn[k] !== portOn[k]) diff++;
   }
   // The port's own branch choice, and what it says 38166 becomes, against what the disk did.
-  const pokes = s.newLocation !== null;
-  const expectAfter = pokes ? s.newLocation : b.before['38166'];
+  // What 38166 became, taken from the game after the scene ran rather than from what the
+  // logic said it would do.
+  const expectAfter = s.locationAfter;
   const branchOk = s.line === b.line;
   const pokeOk = expectAfter === b.after;
   if (diff !== 0 || !branchOk || !pokeOk) fail++;

@@ -4,6 +4,12 @@
 // and inherits $3CD = 255 from there, so it is inverse. Everything else on the captured page
 // is the battle screen underneath, whose numbers are RND-driven, so the comparison is scoped
 // to the band.
+//
+// The band used to be drawn into a blank canvas here, which tests `drawCollectMessage` and not
+// COLLECT: it could not tell whether the scene draws it, nor whether it lands on the battle
+// screen with the inverse flag GROUND FORCES left set. The assault is fought for real now -
+// C to COM, 2 to GROUND FORCES, 1 to attack - and the band is read off the page COLLECT
+// actually leaves.
 import { HGR_W, HGR_H, toPng } from './hgr.mjs';
 import { chromium } from 'playwright';
 import fs from 'fs';
@@ -19,17 +25,62 @@ const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(PORT_URL, { waitUntil: 'load' });
-await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.drawCollectMessage), null, { timeout: 30000 })
+await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikingsState), null, { timeout: 30000 })
   .catch(() => { throw new Error('the port did not expose drawCollectMessage - is the dev server running at ' + PORT_URL + '?'); });
 
-const shot = await page.evaluate(({ tech }) => {
+const shot = await page.evaluate(async ({ tech }) => {
   const sv = window.__spaceVikings;
-  const c = document.createElement('canvas');
-  c.width = 560; c.height = 384;
-  const h = new sv.Hires(c);
-  h.hgr();
-  sv.drawCollectMessage(h, tech);
-  return Array.from(h.snapshot().on);
+  const press = (k) => {
+    const code = /^[0-9]$/.test(k) ? 'Digit' + k : k === ' ' ? 'Space' : 'Key' + k.toUpperCase();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: k, code, bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: k, code, bubbles: true }));
+  };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const sceneNow = () => {
+    const l = window.__gameLog.getLog();
+    return l.length ? l[l.length - 1].scene : '?';
+  };
+  const arrive = async (want, ms = 25000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if (sceneNow().toLowerCase() === want.toLowerCase()) return true;
+      await sleep(80);
+    }
+    return false;
+  };
+
+  press('N');
+  if (!await arrive('cockpit', 35000)) throw new Error('no cockpit');
+  await sleep(1200);
+
+  // The assault is RND-driven and can be lost, so it is set up to be winnable and retried.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const st = window.__spaceVikingsState;
+    // The planet the capture was taken on, and a force that will take it.
+    st.planets[st.planetIndex].defense = tech;
+    st.planets[st.planetIndex].surrendered = false;
+    st.planetSurrendered = false;
+    st.credits = 60000;
+    st.forces.troops = 20000;
+    st.forces.troopLocation = 0;
+    st.forces.troopPlanetIndex = st.planetIndex;
+
+    if (sceneNow().toLowerCase() !== 'groundforces') {
+      if (sceneNow().toLowerCase() !== 'com') { press('C'); if (!await arrive('com')) throw new Error('no COM'); }
+      await sleep(400);
+      press('2');
+      if (!await arrive('groundForces')) throw new Error('no GROUND FORCES');
+    }
+    await sleep(400);
+    press('1');
+    if (await arrive('collect', 120000)) {
+      await sleep(600);
+      return Array.from(sv.hires.snapshot().on);
+    }
+    // Lost, or bounced back: let it settle and go round again.
+    await sleep(2000);
+  }
+  throw new Error('the assault never reached COLLECT in four attempts');
 }, { tech: golden.tech });
 await browser.close();
 for (const e of errors.slice(0, 3)) console.log('page error:', e);
