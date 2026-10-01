@@ -218,7 +218,16 @@ const shipKind = state.shipKind;
 const effectiveShipKind: 0 | 1 | 3 | 4 = (shipKind as number) === 2 ? 3 : shipKind;
 const displayShipKind: 0 | 1 | 3 | 4 = effectiveShipKind >= 1 ? effectiveShipKind : 0;
 let assetsReadyPromise: Promise<void> = Promise.resolve();
-if (displayShipKind >= 1) {
+{
+  // The star table is `START 100`'s `BLOAD PLANET # 0,A$7300` and it happens for every game,
+  // whatever is or is not in orbit. Only the enemy's own model is chosen by 240 and 250 -
+  // DEBRIS when the planet is armed and the ship is gone, `SHIP # J` otherwise.
+  //
+  // This whole block used to sit behind `if (displayShipKind >= 1)`, so a planet with no
+  // enemy on it got no stars and no ground wireframe either: an empty sky in open space and
+  // an empty box in the air. Reachable two ways - fly on after EX has destroyed the ship, or
+  // load a saved game, where 38205 is in the sixteen-byte gap END never writes - and found
+  // the second way.
   assetsReadyPromise = (async () => {
     // planet-N.json is not loaded any more. Its "shapes" came from running an Apple
     // shape-table decoder over 3D vector data - ship-1.json declares offsets
@@ -242,6 +251,8 @@ if (displayShipKind >= 1) {
       const json = await loader.json<{ bytes: number[] }>(`data/shapes/planet-${n}-ground.json`);
       groundOps = parseShipBytecode(json.bytes);
     } catch { /* no ground for this planet */ }
+    // 230-250: the enemy's model, and only it, depends on there being an enemy.
+    if (displayShipKind >= 1) {
     try {
       const json = await loader.json<{ bytes: number[] }>(`data/shapes/ship-${displayShipKind}-bytecode.json`);
       enemyBytecodeOps = parseShipBytecode(json.bytes);
@@ -264,6 +275,7 @@ if (displayShipKind >= 1) {
           state.enemyShapeLoaded = true;
         }
       } catch { /* source-state fallback is optional */ }
+    }
     }
     assetsReady = true;
   })();

@@ -3926,9 +3926,60 @@ and 204 sets 38391 to 77 and 38392 to the planet. (The three BSAVEs do not compl
 oracle, so the block boundaries are read from the BSAVE arguments and the files' own lengths on
 the image rather than from a write.)
 
-202 also has a second effect that lasts the rest of the session: `38219 + PEEK(38209)` is the
-conquered flag GALAXY MAP 3066 reads and SHORE LEAVE 1550 sets, so saving writes the heading
-byte over planet 0's.
+202 lands on 38219, which looks like it should matter - `38219 + P` is the conquered flag
+GALAXY MAP 3066 reads and SHORE LEAVE 1550 sets - but the disk numbers its planets 1 to 20,
+so 38219 is slot 0 and nothing ever reads it. The write is inert. (It is worth saying plainly
+because the port's `planets[i]` is the disk's planet `i + 1`: `planets[0]` is Sol at **38220**,
+inside PLANET FILE and saved like the rest.)
+
+### What START does with it
+
+```
+190 BV% = -7000 ... POKE ZI ... BV% = 700 ... POKE XI ... BV% = 200 ... POKE YI
+195 POKE H1,0
+200 IF G$ = "N" THEN GOSUB 2000
+210 IF G$ = "O" THEN GOSUB 3000
+220 POKE 38823,PEEK(38392): POKE 38824,0: CALL 38825
+224 IF G$ = "N" THEN GOTO 230
+225 POKE 29467,PEEK(38211) ... POKE 29475,PEEK(38219)
+```
+
+190 and 195 put every game, new or old, at X 700, Y 200, Z -7000, heading 0. 220 then pulls
+planet `PEEK(38392)`'s record out of P/F - `CALL 38825` with `38824 = 0` is MEM TRANSFER A's
+read, and END 210 did the matching write with `38824 = 1` - and 225 copies the nine saved
+cells back over the position for an old game.
+
+So the mechanism is complete, and it works perfectly **for as long as the machine stays on**.
+Across a power cycle 38211-38219 has nothing behind it, and 225 restores whatever RAM holds.
+38209 is not restored at all: the record transfer does not carry it, which H/D shows plainly -
+line 25 does the transfer and line 26 pokes 38209 separately.
+
+### The port
+
+`diskSave.ts` models the blocks rather than the fields: `SHIP'S DATA` and MISC FILE's three
+numbers go into the payload, `PLANET FILE` and `P/F` go in per planet - all twenty of them,
+Sol included - and the gap itself is a module-level holder that is never written to storage. Save and continue in the same tab and the ship is where it
+was; reload the page first and it comes back at 190 and 195's position with no enemy, no
+batteries, the surrender and atmosphere flags clear and the planet unrestored.
+
+### And a sky with no stars in it
+
+Loading a game turned up a second bug, in the flight view rather than the save. START loads
+the star table at line 100 - `BLOAD PLANET # 0,A$7300` - for every game, unconditionally, and
+240 and 250 choose the **enemy's** model separately: DEBRIS when the planet is armed and the
+ship is gone, `SHIP # J` otherwise. The two have nothing to do with each other.
+
+In the port the whole asset load, star table and ground wireframe included, sat behind
+`if (displayShipKind >= 1)`. A planet with no enemy on it therefore had no stars in space and
+an empty box in the air. It is reachable two ways - fly on after EX has destroyed the ship, or
+load a saved game, where 38205 is in the sixteen-byte gap END never writes - and it was the
+second that showed it: the loaded game came up at START 190's position looking at nothing at
+all. Only the enemy's own model is behind the guard now.
+
+END's option 1 had been printing `GAME SAVED.` and writing nothing at all - there was no
+`setItem` anywhere in the source - so START's `O`, which was otherwise complete, could only
+ever answer `THERE IS NO GAME SAVED`. `save_parity.mjs` has fifteen checks over a save and a
+load across a page reload, including everything the gap is supposed to lose.
 
 ### `SHIP'S DATA` is not on the disk at all
 

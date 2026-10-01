@@ -1,5 +1,6 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
+import { buildSave, writeSave, stashGap } from '../engine/diskSave';
 
 /**
  * END, the save/quit menu - END.bas.
@@ -83,8 +84,29 @@ export async function endScene(ctx: SceneContext, scenes: SceneManager): Promise
     if (c !== '1' && c !== '2' && c !== '3') continue;
 
     if (c === '1') {
-      // 190
+      // 190: `IF PEEK(38210) = 1 THEN "YOU MUST BE IN ORBIT TO SAVE GAME" ... RETURN`. The
+      // message says orbit; the test is only that we are out of the atmosphere.
       drawEndSaveResult(hires, state.atmosphere);
+      if (!state.atmosphere) {
+        // 200 and 202 copy the nine position and attitude cells out of 29467-29475 into
+        // 38211-38219, which is the sixteen-byte gap between SHIP'S DATA and PLANET FILE -
+        // so they are kept for as long as the page is open and never written to storage,
+        // exactly as they are never written to disk.
+        stashGap({
+          x: state.x, y: state.y, z: state.z,
+          heading: state.heading, pitch: state.pitch,
+          planetIndex: state.planetIndex,
+        });
+        // 202 lands on 38219, and `38219 + P` is the conquered flag GALAXY MAP 3066 reads -
+        // but the disk numbers its planets 1 to 20, so 38219 is slot 0 and nothing ever reads
+        // it. The port's `planets[i]` is the disk's planet `i + 1`, which puts `planets[0]` at
+        // 38220, so this write has no planet behind it on either side. It is left out rather
+        // than aimed at `planets[0]`, which would be the disk's planet 1 - Sol.
+        // 204
+        state.savedGameSentinel = 77;
+        // 210's three BSAVEs.
+        writeSave(buildSave(state));
+      }
       glog('end', state.atmosphere ? 'cannot save in atmosphere' : 'game saved');
       await new Promise((r) => setTimeout(r, 2000));
       continue;
