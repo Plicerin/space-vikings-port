@@ -1,5 +1,6 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { log as glog } from '../engine/gameLog';
+import { GROUNDED_SINCE_LANDING } from '../engine/gameState';
 import { clearPendingConquestCollection } from '../engine/commander';
 import { EXTRACTED_ARRIVAL_STATE_BY_PLANET, getFallbackArrivalState } from '../engine/extractedOriginalData';
 
@@ -118,6 +119,18 @@ export async function hyperdriveScene(ctx: SceneContext, scenes: SceneManager): 
   // GROUND FORCES 66 and 67 turn you away at the far end.
   if (state.forces.troopLocation === 0 || state.forces.troopLocation === 3) {
     state.forces.troopPlanetIndex = state.navDestination;
+  }
+
+  // H/D 12 and 13: `IF PEEK(38170) = 17 THEN PL = PEEK(38203): LP = 7: PL = PL - 1:
+  // IF PL < 0 THEN PL = 0` and `IF LP = 7 THEN POKE 38203,PL: POKE 38170,0`. The crew has been
+  // on the ground since GROUND FORCES 14 set the flag, and jumping without stopping for shore
+  // leave costs a point of morale. The floor is 0, not 1.
+  if (state.crewGrounded === GROUNDED_SINCE_LANDING) {
+    const before = state.forces.morale;
+    const after = Math.max(0, before - 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    state.forces.morale = after;
+    state.crewGrounded = 0;
+    glog('hyperdrive', `jumped with the crew grounded: morale ${before} -> ${after}`);
   }
 
   state.planetIndex = state.navDestination;

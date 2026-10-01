@@ -6647,6 +6647,68 @@ sides, and getting the port's side wrong looks exactly like a finding until you 
 
 ---
 
+## The crew's shore leave, and what a jump without it costs
+
+The last seven cells `shipdata_parity` could not see past - zero in a new game on both sides -
+were followed up by asking the listings what writes them rather than by capturing a mid-game
+state. Six are dead: **38161** is only ever written to 0, by H/D 93; **38189** and **38191** are
+written and never read, by INSTRUMENTS 210 and START 1000; **38162**, **38168** and **38169**
+appear nowhere in any of the 23 programs.
+
+The seventh is a mechanic, and the port did not have it.
+
+```
+GROUND FORCES 14  IF PEEK(29469) = 20 AND PEEK(29470) = 0 AND PEEK(38170) = 0
+                  THEN POKE 38170,17
+SHORE LEAVE 2087  POKE 38170,70
+H/D 12            ... IF PEEK(38170) = 17 THEN PL = PEEK(38203):LP = 7:
+                  PL = PL - 1: IF PL < 0 THEN PL = 0
+H/D 13            IF LP = 7 THEN POKE 38203,PL: POKE 38170,0
+```
+
+**Land your troops and then jump without stopping for shore leave, and the crew loses a point
+of morale.** 29469 and 29470 are Y's two bytes, so GROUND FORCES' test is that the ship is on
+the ground; from there the flag is 17 until something clears it. SHORE LEAVE's 2087 is the
+thing that does, and note where it sits - after 2085 asks whether to pay and **before** 2088
+branches on the answer. The crew got their leave either way. They just did not get paid for it.
+
+Measured rather than read, in `probe_morale.mjs`:
+
+| 38170 in | morale in | morale out | 38170 out |
+| --- | --- | --- | --- |
+| 17 | 4 | **3** | 0 |
+| 70 | 4 | 4 | 70 |
+| 0 | 4 | 4 | 0 |
+| 17 | 1 | **0** | 0 |
+| 17 | 0 | 0 | 0 |
+
+### The floor is 0, and three places disagreed about it
+
+The fourth row is the one worth having measured. Four things move morale and they do not agree:
+
+- **SHORE LEAVE 2088**, not paying: `M - 2` with `IF M < 1 THEN M = 1`. Floors at 1.
+- **SHORE LEAVE 2093**, paying: `M + 1` with a ceiling of 6.
+- **GROUND FORCES 1120/1121**, a retreat: `M - 1`, written back `IF M > -1`, so **0 is written**.
+- **H/D 12**, this: `PL - 1` with `IF PL < 0 THEN PL = 0`. Floors at 0.
+
+The port floored every one of them at 1, which quietly made retreating at morale 1 free. STATUS
+has no case for 0 either - 1350 to 1360 test 1 to 6 - so it prints the label as blank, which
+`MORALE[0] = ''` in `status.ts` already did without anything being able to reach it.
+
+### The first measurement was wrong, and the machine said so
+
+`probe_morale.mjs` sent all five jumps to planet 5. H/D line 1 is `IF PEEK(38209) =
+PEEK(38163) OR PEEK(38163) = 0 THEN RUN STARSHIP SIMULATOR`, so after the first one the ship
+was already there and the other four returned without running any of this. Read at face value
+that said the penalty stops firing below morale 1 - a plausible, tidy, wrong answer. The probe
+now alternates destinations and asserts the ship actually moved.
+
+`morale_parity.mjs` plays all of it in the port: the five jumps through the H key, the landing
+through COM's 2, and both answers to the shore-leave question. Seven checks, and they fail -
+three of them - with the penalty switched off.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows

@@ -1,0 +1,46 @@
+{
+ "source": "H/D 12 and 13 on the machine, driven by poking 38170 and 38203 and pressing H",
+ "addresses": {
+  "morale": 38203,
+  "groundedFlag": 38170,
+  "destination": 38163
+ },
+ "jumps": [
+  {
+   "flagBefore": 17,
+   "moraleBefore": 4,
+   "morale": 3,
+   "flag": 0,
+   "planet": 5
+  },
+  {
+   "flagBefore": 70,
+   "moraleBefore": 4,
+   "morale": 4,
+   "flag": 70,
+   "planet": 7
+  },
+  {
+   "flagBefore": 0,
+   "moraleBefore": 4,
+   "morale": 4,
+   "flag": 0,
+   "planet": 5
+  },
+  {
+   "flagBefore": 17,
+   "moraleBefore": 1,
+   "morale": 0,
+   "flag": 0,
+   "planet": 7
+  },
+  {
+   "flagBefore": 17,
+   "moraleBefore": 0,
+   "morale": 0,
+   "flag": 0,
+   "planet": 5
+  }
+ ],
+ "groundForcesSetsFlag": 17
+}

@@ -5,6 +5,7 @@ import { drawOptions, drawPrompt, getChoice, writeLines, clearLines } from '../e
 import { drawComMainScreen, comStatusBytes } from './com';
 import type { ShapeTable } from '../engine/shapeTable';
 import { setScene, log as glog } from '../engine/gameLog';
+import { GROUNDED_SINCE_LANDING } from '../engine/gameState';
 import { chooseCommanderScene, isCurrentPlanetConquered, markPlanetConquered } from '../engine/commander';
 import type { GameState } from '../engine/gameState';
 
@@ -113,6 +114,15 @@ export async function groundForcesScene(
 ): Promise<void> {
   const { hires, state, input, audio, loader } = ctx;
   setScene('groundForces');
+
+  // 14: `IF PEEK(29469) = 20 AND PEEK(29470) = 0 AND PEEK(38170) = 0 THEN POKE 38170,17`.
+  // 29469 and 29470 are Y's two bytes, so the test is that Y is exactly 20 - the ship on the
+  // ground. From here on the crew counts as put ashore, and H/D 12 charges a point of morale
+  // for jumping away without stopping for leave. SHORE LEAVE 2087 is what takes it back off.
+  if (state.y === 20 && state.crewGrounded === 0) {
+    state.crewGrounded = GROUNDED_SINCE_LANDING;
+    glog('groundForces', 'crew ashore; a jump without leave now costs morale');
+  }
 
   // COM's line 8 erase needs the shape table; without it the two needle tracks stay.
   let shapes: ShapeTable | null = null;
@@ -475,11 +485,13 @@ async function attackPlanet(ctx: SceneContext, scenes: SceneManager): Promise<vo
         state.planets[state.planetIndex].groundAssaultFailed = true;
         state.forces.troopLocation = 0;
         state.forces.troops = Math.round(troops) + troopsLeft;
+        // 1120 takes one off and 1121 writes it back `IF M > -1`, so **0 is written**. This
+        // floored at 1, which quietly made a retreat at morale 1 free.
         let m = state.forces.morale - 1;
-        if (m < 1) m = 1;
+        if (m < 0) m = 0;
         state.pendingGroundForcesDefeatPlanet = state.planetIndex;
         state.pendingGroundForcesNeedsRecovery = true;
-        state.forces.morale = m as 1 | 2 | 3 | 4 | 5 | 6;
+        state.forces.morale = m as 0 | 1 | 2 | 3 | 4 | 5 | 6;
         hires.hcolor(5);
         band();
         say(['GROUND FORCES RETREATING, SIR!', 'PLANET NOT SECURED!']);

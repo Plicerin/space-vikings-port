@@ -47,6 +47,10 @@ export interface DamageState {
   pendingUpdate: boolean;
 }
 
+/** 38170's two non-zero values: GROUND FORCES 14 writes one, SHORE LEAVE 2087 the other. */
+export const GROUNDED_SINCE_LANDING = 17;
+export const ASHORE_ON_LEAVE = 70;
+
 export class GameState {
   // ---------------------------------------------------------------------
   // Position / velocity
@@ -216,6 +220,21 @@ export class GameState {
   // World / progression
   // ---------------------------------------------------------------------
 
+  /**
+   * 38170: whether the crew has been put ashore and not had leave since.
+   *
+   * Three values and three programs. GROUND FORCES 14 sets it to **17** on arriving at the
+   * screen with the ship landed - `IF PEEK(29469) = 20 AND PEEK(29470) = 0 AND PEEK(38170) = 0
+   * THEN POKE 38170,17`. SHORE LEAVE 2087 sets it to **70**, before the pay-them question, so
+   * taking leave at all is what counts and not whether you paid. H/D 12 reads it: at 17 the
+   * crew loses a point of morale on the jump and 13 clears it to 0.
+   *
+   * Land your troops and then jump without giving the crew leave, and it costs you. Measured
+   * on the machine in `probe_morale.mjs` - with the flag at 17 a jump took morale 4 to 3 and
+   * the flag to 0, at 70 it took neither, and from 1 it went to 0, not to 1.
+   */
+  crewGrounded = 0;
+
   /** Current planet index 0..19 ($9541 = 38209). 0 = Sol. */
   planetIndex = 0;
   /** ENEMY ship type at current planet — PEEK(38205)=$953D. 0=no enemy,
@@ -295,7 +314,19 @@ export class GameState {
     troopLocation: 3 as 0 | 1 | 2 | 3,
     /** Morale 1..6: AWFUL, POOR, SO-SO, FAIR, GOOD, EXCELLENT! (PEEK 38203).
      * Initial 6 (EXCELLENT) per START.bas:2030. */
-    morale: 6 as 1 | 2 | 3 | 4 | 5 | 6,
+    /**
+     * 38203. **0 is reachable**, and the port used to floor everything at 1.
+     *
+     * Four things move it and they do not agree on a floor. SHORE LEAVE 2088 takes 2 off for
+     * not paying with `IF M < 1 THEN M = 1`; 2093 adds 1 with a ceiling of 6; GROUND FORCES
+     * 1120 takes 1 off on a retreat and 1121 writes it back `IF M > -1`, so 0 is written; and
+     * H/D 12 takes 1 off with `IF PL < 0 THEN PL = 0`. So refusing shore leave cannot take you
+     * below 1, and a retreat or a jump can take you to 0.
+     *
+     * STATUS has no case for 0 - 1350 to 1360 test 1 to 6 - so it prints the label as blank,
+     * which `MORALE[0] = ''` in `status.ts` already did.
+     */
+    morale: 6 as 0 | 1 | 2 | 3 | 4 | 5 | 6,
     /** Currently engaged in surface battle. */
     inGroundBattle: false,
     /** Which planet the troops are deployed on (-1 = on board ship).

@@ -1,4 +1,5 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
+import { ASHORE_ON_LEAVE } from '../engine/gameState';
 import { lootValue2400, rollArtRate, repairBill2500, repairAvailable2505,
   baseRefusal2100, baseCost2170 } from '../engine/diskEconomy';
 import { setScene, log as glog } from '../engine/gameLog';
@@ -166,6 +167,11 @@ async function shoreLeavePay(ctx: SceneContext, scenes: SceneManager): Promise<v
   drawShoreLeavePay(hires, { troops: pay, credits: state.credits });
 
   const yes = await getYN(ctx);
+
+  // 2087: `POKE 38170,70`, and note where it sits - after 2085's question and before 2088's
+  // branch on the answer. Taking shore leave at all is what clears the crew's grounded state,
+  // whether or not you paid them; H/D 12 only charges for a 17.
+  state.crewGrounded = ASHORE_ON_LEAVE;
 
   if (!yes) {
     let m = state.forces.morale - 2;
