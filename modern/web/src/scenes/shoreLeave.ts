@@ -3,7 +3,7 @@ import { lootValue2400, rollArtRate, repairBill2500, repairAvailable2505,
   baseRefusal2100, baseCost2170 } from '../engine/diskEconomy';
 import { setScene, log as glog } from '../engine/gameLog';
 import { clearPendingConquestCollection } from '../engine/commander';
-import { writeLines } from '../engine/menu';
+import { writeLines, clearLines } from '../engine/menu';
 import { drawDamageLamp } from './dmg';
 
 async function wait(ms: number): Promise<void> {
@@ -464,60 +464,92 @@ async function buyWeapons(ctx: SceneContext): Promise<void> {
 }
 
 async function enlistTroops(ctx: SceneContext, scenes: SceneManager): Promise<void> {
-  const { hires, state, input } = ctx;
+  const { hires, state } = ctx;
 
-  drawShoreLeaveFrame(hires);
+  // 2200-2300 is not one screen and one answer, which is how this used to read it. There are
+  // two loops in it, and `probe_enlist.mjs` walked both on the machine:
+  //
+  //   2281 IF EN > CR THEN ...blank 10 to 13... VTAB 9: GOTO 2270
+  //   2285 IF TR + EN > 20000 THEN ...TOO MANY TROOPS... POKE 38389,0: GOTO 2200
+  //
+  // An answer the purse cannot cover puts the question back and asks again - the machine's
+  // re-asked page is its first page to the pixel - and an answer that would burst the 20000
+  // ceiling starts the whole screen over with the trip's one enlistment handed back.
+  for (;;) {
+    drawShoreLeaveFrame(hires);
 
-  hires.hcolor(3);
-  hires.text('ENLIST TROOPS', 2, 2);   // 2200: no leading space
-  hires.hcolor(1);
+    hires.hcolor(3);
+    hires.text('ENLIST TROOPS', 2, 2);   // 2200: no leading space
+    hires.hcolor(1);
 
-  // 2210 is tested before 2240, so a second visit is turned away whether or not the planet
-  // has surrendered - and 2220 sets the flag before any of the rest of the screen runs.
-  if (state.enlistedThisTrip) {
-    hires.text('ONE TIME PER TRIP.', 2, 4);
-    await commanderWait(ctx, 2500);   // 2099
-    return scenes.run('groundForces');
-  }
-  state.enlistedThisTrip = true;                    // 2220
+    // 2210 is tested before 2240, so a second visit is turned away whether or not the planet
+    // has surrendered - and 2220 sets the flag before any of the rest of the screen runs.
+    if (state.enlistedThisTrip) {
+      hires.text('ONE TIME PER TRIP.', 2, 4);
+      break;
+    }
+    state.enlistedThisTrip = true;                    // 2220
 
-  if (!state.planetSurrendered) {
-    writeLines(hires, 2, 4, ["THE PLANET HAS NOT", 'SURRENDERED YET!!']);
-    await commanderWait(ctx, 2500);   // 2099
-    return scenes.run('groundForces');
-  }
+    if (!state.planetSurrendered) {
+      writeLines(hires, 2, 4, ['THE PLANET HAS NOT', 'SURRENDERED YET!!']);
+      break;
+    }
 
-  writeLines(hires, 2, 4, [
-    'EACH NEW TROOP',
-    'MUST BE PAID ONE',
-    'CREDIT IN ADVANCE.',
-    `YOU HAVE ${Math.floor(state.credits)}`,
-    'CREDITS, SIR.',
-    `TROOPS= ${state.forces.troops}`,
-    'HOW MANY TROOPS',
-    'DO YOU WANT TO',
-    'ENLIST?',
-  ]);
+    writeLines(hires, 2, 4, [
+      'EACH NEW TROOP',
+      'MUST BE PAID ONE',
+      'CREDIT IN ADVANCE.',
+      `YOU HAVE ${Math.floor(state.credits)}`,
+      'CREDITS, SIR.',
+      `TROOPS= ${state.forces.troops}`,
+      'HOW MANY TROOPS',
+      'DO YOU WANT TO',
+      'ENLIST?',
+    ]);
 
-  const en = await readNumber(ctx, 2, 13);
+    // 2275 to 2281: keep asking until the answer is one the purse can cover.
+    let en = 0;
+    for (;;) {
+      en = await readNumber(ctx, 2, 13);
+      // 2275 ends `VTAB 13: HTAB 2: PRINT "       "`, so the digits that were typed are wiped
+      // the moment they are read. The port had been leaving them on the line.
+      clearLines(hires, 2, 13, 7, 1);
+      if (en <= state.credits) break;
+      // 2280 blanks rows 10, 11 and 12 before it prints, so the question goes away rather
+      // than being written over - row 12's `ENLIST?` is gone on the machine's page.
+      clearLines(hires, 2, 10, 18, 3);
+      writeLines(hires, 2, 10, ["YOU DON'T HAVE", `${en} CREDITS!`]);
+      await wait(2000);
+      // 2281 blanks 10 to 13 and goes to 2270, which rewrites the count and the question.
+      clearLines(hires, 2, 10, 18, 4);
+      writeLines(hires, 2, 9, [
+        `TROOPS= ${state.forces.troops}`,
+        'HOW MANY TROOPS',
+        'DO YOU WANT TO',
+        'ENLIST?',
+      ]);
+    }
 
-  if (en > state.credits) {
-    // 2280's `VTAB 10`
-    writeLines(hires, 2, 10, ["YOU DON'T HAVE", `${en} CREDITS!`]);
-    await wait(2000);
-  } else if (state.forces.troops + en > 20000) {
-    hires.text('TOO MANY TROOPS.  ', 2, 12);   // 2285's `VTAB 12: HTAB 2`
-    // 2285 `POKE 38389,0: GOTO 2200` - asking for an impossible number costs nothing, so the
-    // trip's one enlistment is handed back. 2280's "you don't have the credits" does not.
-    state.enlistedThisTrip = false;
-    await wait(2000);
-  } else {
-    state.forces.troops = Math.min(20000, state.forces.troops + en);
+    if (state.forces.troops + en > 20000) {
+      // `clearLines` leaves HCOLOR on 0, so this has to put it back before it draws or the
+      // message goes down in black and the row simply looks blank.
+      hires.hcolor(1);
+      hires.text('TOO MANY TROOPS.  ', 2, 12);   // 2285's `VTAB 12: HTAB 2`
+      await wait(2000);
+      // `POKE 38389,0: GOTO 2200` - asking for an impossible number costs nothing, so the
+      // trip's one enlistment is handed back and the screen starts again. 2280's refusal
+      // does not do this. Measured: 38389 is 0 afterwards and the program is at 2200.
+      state.enlistedThisTrip = false;
+      continue;
+    }
+
+    state.forces.troops += en;
     state.credits = Math.floor(state.credits - en);
     glog('enlist', `troops=+${en} credits=${state.credits}`);
     // 2290 `TR = TR + EN: CR = CR - EN: GOSUB 3000` - paying the troops is what takes you to
     // the weapons, and 3060's prices are drawn there.
     await buyWeapons(ctx);
+    break;
   }
 
   await commanderWait(ctx, 2500);   // 2099

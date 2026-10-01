@@ -3805,6 +3805,57 @@ ways.
 
 ---
 
+## ENLIST TROOPS, which is two loops and not one question
+
+The last screen this document listed as never captured, and the reason it reads oddly in the
+port's history is that it is not one screen with one answer. There are two loops in it.
+
+```
+2200 R = 7: GOSUB 2080: PRINT "ENLIST TROOPS": PRINT
+2210 IF PEEK(38389) = 1 THEN PRINT "ONE TIME PER TRIP.": GOTO 2099
+2220 POKE 38389,1
+2240 IF PEEK(38208) = 0 THEN PRINT "THE PLANET HAS NOT": PRINT "SURRENDERED YET!!": GOTO 2099
+2250 PRINT "EACH NEW TROOP": PRINT "MUST BE PAID ONE": PRINT "CREDIT IN ADVANCE."
+2260 PRINT "YOU HAVE ";CR: PRINT "CREDITS, SIR."
+2270 PRINT "TROOPS= ";TR: VTAB 10: PRINT "HOW MANY TROOPS": PRINT "DO YOU WANT TO":
+     PRINT "ENLIST?";
+2275 J = 0: V = 13: H = 2: GOSUB 5000: EN = CC: VTAB 13: HTAB 2: PRINT "       "
+2280 IF EN > CR THEN ...blank 10, 11, 12... VTAB 10: PRINT "YOU DON'T HAVE":
+     PRINT EN;" CREDITS!": FOR J = 1 TO 3000: NEXT
+2281 IF EN > CR THEN ...blank 10 to 13... VTAB 9: GOTO 2270
+2285 IF TR + EN > 20000 THEN VTAB 12: HTAB 2: PRINT "TOO MANY TROOPS.  ":
+     FOR O = 1 TO 2000: NEXT: POKE 38389,0: GOTO 2200
+2290 TR = TR + EN: CR = CR - EN: GOSUB 3000
+```
+
+- **2281 goes back to 2270.** An answer the purse cannot cover is not an ending: the refusal
+  stands for three thousand empty iterations, the rows are blanked, and the question is asked
+  again. The machine's re-asked page is its first page to the pixel.
+- **2285 goes back to 2200**, and pokes `38389` back to 0 on the way. Asking for a number that
+  would burst the twenty-thousand ceiling costs nothing - the trip's one enlistment is handed
+  back and the whole screen starts over. 2280's refusal does not do that, so running out of
+  money does spend the trip.
+- **2275 wipes what was typed**: `VTAB 13: HTAB 2: PRINT "       "` the moment `GOSUB 5000`
+  returns. The port had been leaving the digits on the line.
+- **2290 is the only `GOSUB 3000` on the disk.** Paying the troops is what opens BUY WEAPONS;
+  it is not a menu entry of its own.
+
+`probe_enlist.mjs` answers the question three times on the machine - unaffordable, impossible,
+then one that works - and captures the page at each stop: the prompt, 2280's refusal, the
+re-asked question, `TOO MANY TROOPS.` and BUY WEAPONS' first page, which only 2290 reaches.
+`enlist_parity.mjs` drives the port through the same three answers: all five pages 0 of 53,760
+differing, and the sums come out as the machine's - 10000 credits and 2000 troops in, 9900 and
+19600 out after enlisting a hundred into an army of 19500.
+
+Two of the captures needed a second attempt, both for reasons worth writing down. 3060 opens
+with the `NEXT` of 3020's own `FOR J = 0 TO 3`, so stopping there catches BUY WEAPONS after a
+single line - the same trap as REPAIR's 2540 and the EX burst's line 30. And 2080 leaves
+`SPEED= 127`, so 2285's message is typed out a character at a time: a short step after the
+line went current caught three of them, leaving the page reading `TOOIST?` where `ENLIST?` had
+been. Both stops now wait for the page to stop changing.
+
+---
+
 ---
 
 ## RECALL, all five branches
@@ -5756,9 +5807,10 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **One of SHORE LEAVE's six sub-screens.** ENLIST TROOPS is not captured. SELL LOOT and
-  ESTABLISH BASE came out of `probe_economy.mjs`, and REPAIR/RESTOCK out of
-  `probe_repair.mjs`, which lands the ship at Y 20 to get past 2505.
+- **SHORE LEAVE is done.** SELL LOOT and ESTABLISH BASE came out of `probe_economy.mjs`,
+  REPAIR/RESTOCK out of `probe_repair.mjs`, which lands the ship at Y 20 to get past 2505,
+  and ENLIST TROOPS - with BUY WEAPONS behind it - out of `probe_enlist.mjs`. What is left
+  unreached anywhere in the game is COLLECT's tech-1 path.
 - **Replaying is done.** The damage tick, the combat, COLLECT's thirteen loot draws, line
   5000's ground fire and all four of SHORE LEAVE's price screens are replayed and exact.
   Nothing RND-driven is still checked by range alone.
