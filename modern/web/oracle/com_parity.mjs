@@ -86,6 +86,8 @@ for (let k = 0; k < diskOn.length; k++) {
   else if (portOn[k]) { onlyPort++; perRow[(k / HGR_W) | 0]++; }
 }
 const differing = onlyDisk + onlyPort;
+// Hoisted so the verdict at the end can see it: the broken-ship page is compared inside a block.
+let diff2 = 0;
 console.log('whole page:');
 console.log(`disk: ${diskLit} lit pixels, drawn on ${golden.drawnOn}, x ${golden.minX}-${golden.maxX}, y ${golden.minY}-${golden.maxY}`);
 console.log(`port: ${portLit} lit pixels`);
@@ -134,7 +136,8 @@ if (fs.existsSync('captured/com/readouts.json')) {
   const bDisk = new Uint8Array(HGR_W * HGR_H);
   for (const [x, y] of ro.broken.points) bDisk[y * HGR_W + x] = 1;
   const bPort = Uint8Array.from(brokenShot);
-  let bd = 0, bp = 0, diff2 = 0;
+  let bd = 0, bp = 0;
+  diff2 = 0;
   for (let y = 0; y <= COM_AREA_BOTTOM; y++) for (let x = 0; x < HGR_W; x++) {
     const k = y * HGR_W + x;
     if (bDisk[k]) bd++;
@@ -147,3 +150,11 @@ if (fs.existsSync('captured/com/readouts.json')) {
   console.log(`  disk ${bd} lit, port ${bp} lit`);
   console.log(`  ${diff2} of ${px2} differ  (${(100 * (1 - diff2 / px2)).toFixed(2)}% agree)`);
 }
+
+// COM's page is drawn from state and nothing in it is RND-driven, so both the fresh ship and
+// the broken one have to be exact over the area COM owns.
+console.log('');
+const comOk = differing === 0 && diff2 === 0;
+console.log(comOk ? 'com parity: both pages exact'
+  : `com parity: ${differing} differ on the fresh ship, ${diff2} with four systems broken`);
+process.exit(comOk && errors.length === 0 ? 0 : 1);

@@ -191,3 +191,9 @@ differences span x ${minX}-${maxX};  ${inBoxes} of ${c.differing} are inside the
 
 console.log(`
 wrote ${OUT}/disk.png, port.png, diff.png`);
+
+// The panel is static once INSTRUMENTS has drawn it. The best-agreeing frame has to be exact.
+console.log('');
+console.log(c.differing === 0 ? 'frame parity: the panel is exact'
+  : `frame parity: ${c.differing} pixels differ`);
+process.exit(c.differing === 0 ? 0 : 1);

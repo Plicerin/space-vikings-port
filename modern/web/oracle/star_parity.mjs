@@ -83,3 +83,10 @@ for (let i = 0; i < states.length; i++) {
 }
 console.log(`\nmean agreement over ${n} states: ${(100 * sumAgree / n).toFixed(1)}%`);
 console.log(`mean within one pixel: ${(100 * sumNear / n).toFixed(1)}%`);
+
+// Twelve cameras through the same star table. Nothing RND, so every one has to agree outright.
+console.log('');
+const starOk = n > 0 && sumAgree / n === 1;
+console.log(starOk ? `star parity: all ${n} states exact`
+  : `star parity: mean agreement ${(100 * sumAgree / n).toFixed(2)}% over ${n} states`);
+process.exit(starOk && errors.length === 0 ? 0 : 1);

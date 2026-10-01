@@ -4124,9 +4124,40 @@ harness's own comment had said all along.
 report and exited 0 whatever was in it. Every "43 of 43 passed" in this file counted those as
 passes on the strength of the script not having thrown.
 
-`orbit` and `supply` have verdicts now. The other fifteen still need one, and it is not purely
-mechanical: for the RND-driven ones the criterion is not "zero differ" but the structural
-checks they already print, so each needs its own.
+All of them have one now, and it was not mechanical - each had to be given the criterion it
+was actually testing:
+
+- **exact, whole page**: `com` (fresh ship and four systems broken), `end`, `shoreleave`,
+  `status`, `frame`, `groundforces` (and every pixel of its battle layout lit on the disk too).
+- **exact, over the rows the screen owns**: `shipid` (rows 0-15 for all four ships; the panel
+  below is the flight page it inherits, and whether its needles are on it depends on the
+  hi-res flip), `orbit` (rows 0-125), `supply` (both pages, less the live readout row).
+- **exact, every state**: `ground` and `star` over twelve, `ship` over eleven - these print a
+  mean agreement, and the criterion is that the mean is 100%, not that it is high.
+- **exact, arithmetic**: `project6000`, all 261 samples and all 293 calls of a live render.
+- **the lamp and nothing else**: `dmg` - no cell missing, none extra, nothing changed outside
+  it, and 2545's green landing on the same cells.
+- **a range, because the original is RND**: `hd` and `sx`. The streaks and the burst differ
+  from themselves run to run, so what is required is that the disk's own count falls inside
+  twelve runs of the port's - and beside it the parts that *are* exact: the message row for
+  S/X, and for H/D the jump's D1, the energy it costs, the `|Z| >= 7000` line 70 retries for
+  and the visited flag.
+- **a range and a rate**: `collect` - the band is exact, and every commodity the machine
+  awarded is inside the rate its tech allows, which is what `replay_parity` pins exactly.
+
+Checked by breaking one on purpose: `end_parity` with its criterion inverted exits 1.
+
+Giving them teeth turned `playthrough` red straight away, and on a real difference rather than
+a harness one: its first missile was being fired into the gap between a scene being logged and
+that scene having loaded its assets, and the keypress was **dropped**. On the machine it would
+not be. DOS has the drive during a `RUN`, and a key pressed while it loads sits in the keyboard
+latch at $C000 until the new program reads it - the Apple loses a keystroke only when a second
+one arrives before the first is read. The port drops anything pressed before the scene is
+listening.
+
+The harness now waits for the ship model before it fires, which is the last thing that load
+does. The difference itself is still there and is worth closing: a single pending key held
+across a scene change would do it, which is what the hardware does.
 
 ---
 

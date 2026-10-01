@@ -71,3 +71,10 @@ const d = new Uint8Array(diskOn.length);
 for (let k = 0; k < d.length; k++) d[k] = diskOn[k] === portOn[k] ? 0 : 1;
 fs.writeFileSync('captured/end/diff.png', toPng(d, { colour: [255, 0, 0] }));
 console.log('wrote captured/end/port.png and diff.png');
+
+// END blanks rows 0-15 and draws its menu there; the panel below comes from the chain. Both
+// are deterministic, so the whole page has to be exact.
+console.log('');
+console.log(diff === 0 ? 'end parity: the whole page is exact'
+  : `end parity: ${diff} pixels differ`);
+process.exit(diff === 0 && errors.length === 0 ? 0 : 1);

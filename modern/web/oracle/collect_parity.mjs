@@ -86,3 +86,12 @@ fs.mkdirSync('captured/collect', { recursive: true });
 fs.writeFileSync('captured/collect/port.png', toPng(portOn));
 console.log('');
 console.log('wrote captured/collect/port.png');
+
+// Two separate claims: the band COLLECT writes is exact, and every commodity the machine
+// awarded is inside the rate its tech allows. The loot itself is RND-driven, so the second is
+// a range and not an equality - that is what `replay_parity` pins exactly.
+console.log('');
+const collectOk = onlyDisk === 0 && onlyPort === 0 && ok;
+console.log(collectOk ? "collect parity: the band is exact and every gain is within its rate"
+  : `collect parity: ${onlyDisk + onlyPort} pixels differ, gains within their rates: ${ok}`);
+process.exit(collectOk && errors.length === 0 ? 0 : 1);

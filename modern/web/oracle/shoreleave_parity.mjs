@@ -51,11 +51,13 @@ const shots = await page.evaluate(({ tj, bytes, n, p, loc }) => {
 await browser.close();
 for (const e of errors.slice(0, 3)) console.log('page error:', e);
 
+let worstDiff = 0;
 for (const name of ['cryogenics', 'pay']) {
   const diskOn = new Uint8Array(HGR_W * HGR_H);
   for (const [x, y] of golden[name].points) diskOn[y * HGR_W + x] = 1;
   const portOn = Uint8Array.from(shots[name]);
   let diskLit = 0, portLit = 0, both = 0, onlyDisk = 0, onlyPort = 0;
+  void both;
   const perRow = new Uint16Array(HGR_H);
   for (let k = 0; k < diskOn.length; k++) {
     if (diskOn[k]) diskLit++;
@@ -65,6 +67,7 @@ for (const name of ['cryogenics', 'pay']) {
     else if (portOn[k]) { onlyPort++; perRow[(k / HGR_W) | 0]++; }
   }
   const diff = onlyDisk + onlyPort;
+  worstDiff = Math.max(worstDiff, diff);
   console.log(`${name}:`);
   console.log(`  disk ${diskLit} lit, port ${portLit} lit, ${both} in both`);
   console.log(`  ${diff} of ${diskOn.length} differ  (${(100 * (1 - diff / diskOn.length)).toFixed(3)}% agree)`);
@@ -79,3 +82,10 @@ for (const name of ['cryogenics', 'pay']) {
   fs.writeFileSync(`captured/shoreleave/${name}-diff.png`, toPng(d, { colour: [255, 0, 0] }));
 }
 console.log('wrote captured/shoreleave/*-port.png and *-diff.png');
+
+// Both of SHORE LEAVE's captured pages are drawn from state with nothing RND in them, so both
+// have to be exact.
+console.log('');
+console.log(worstDiff === 0 ? 'shoreleave parity: every page exact'
+  : `shoreleave parity: ${worstDiff} pixels differ at worst`);
+process.exit(worstDiff === 0 && errors.length === 0 ? 0 : 1);

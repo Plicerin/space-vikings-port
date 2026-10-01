@@ -101,3 +101,15 @@ fs.mkdirSync('captured/hd', { recursive: true });
 fs.writeFileSync('captured/hd/port.png', toPng(Uint8Array.from(runs[0])));
 console.log('');
 console.log('wrote captured/hd/port.png');
+
+// Line 20 draws 175 lines to `RND(1) * 279, RND(1) * 125`, so the streaks are a range and not
+// a picture: what is required is that the disk's own count falls inside twelve runs of the
+// port's. The jump's arithmetic beside it is exact - D1, the energy it costs, the |Z| >= 7000
+// line 70 retries for, and the visited flag.
+console.log('');
+const cost = golden.before.energy - golden.after.energy;
+const hdOk = inRange && cost === d1 && Math.abs(golden.after.z) >= 7000 && golden.visited === 1;
+console.log(hdOk ? "hd parity: the streaks are in range and the jump's arithmetic is exact"
+  : `hd parity: streaks in range ${inRange}, energy cost ${cost} against D1 ${d1}, `
+    + `Z ${golden.after.z}, visited ${golden.visited}`);
+process.exit(hdOk && errors.length === 0 ? 0 : 1);

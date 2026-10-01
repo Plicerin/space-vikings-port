@@ -78,3 +78,15 @@ console.log(`the dark area on the disk spans x ${minX}-${maxX}, y ${minY}-${maxY
 fs.mkdirSync('captured/sx', { recursive: true });
 fs.writeFileSync('captured/sx/port.png', toPng(Uint8Array.from(runs[0].on)));
 console.log('wrote captured/sx/port.png');
+
+// The burst is RND-driven - line 20 again - so the lit count is a range, and what has to be
+// exact is the message: line 40 prints at VTAB 22, and the rows either side of it stay solid
+// white on both.
+console.log('');
+const dark = (row) => rowDark(Uint8Array.from(runs[0].on), row);
+const sxOk = diskLit >= counts[0] && diskLit <= counts[counts.length - 1]
+  && dark(21) === rowDark(diskOn, 21) && dark(20) === 0 && dark(22) === 0;
+console.log(sxOk ? "sx parity: the count is in range and line 40's row is exact"
+  : `sx parity: disk ${diskLit} against ${counts[0]}-${counts[counts.length - 1]}, `
+    + `row 21 dark ${dark(21)} against ${rowDark(diskOn, 21)}`);
+process.exit(sxOk && errors.length === 0 ? 0 : 1);

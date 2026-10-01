@@ -69,6 +69,8 @@ region(124, HGR_H - 1, 'the panel below');
 console.log('');
 
 let diff = 0;
+// Hoisted for the verdict: the battle layout is counted inside a block.
+let want = 0, have = 0;
 const perRow = new Uint16Array(HGR_H);
 for (let k = 0; k < diskOn.length; k++) {
   if (diskOn[k] !== portOn[k]) { diff++; perRow[(k / HGR_W) | 0]++; }
@@ -108,7 +110,7 @@ if (golden.battle) {
   const bDisk = new Uint8Array(HGR_W * HGR_H);
   for (const [x, y] of golden.battle.points) bDisk[y * HGR_W + x] = 1;
   const layOn = Uint8Array.from(lay);
-  let want = 0, have = 0;
+  want = 0; have = 0;
   const miss = [];
   for (let k = 0; k < layOn.length; k++) {
     if (!layOn[k]) continue;
@@ -121,3 +123,11 @@ if (golden.battle) {
   console.log(`  the port plots ${want} pixels; ${have} of them are lit on the disk too  (${(100 * have / want).toFixed(2)}%)`);
   if (miss.length) console.log(`    first misses: ${miss.join(' ')}`);
 }
+
+// The menu page is drawn from state and has to be exact, and every pixel the port plots for
+// the battle screen has to be lit on the disk too.
+console.log('');
+const gfOk = diff === 0 && want > 0 && have === want;
+console.log(gfOk ? 'groundforces parity: the page is exact and the battle layout lands on the disk'
+  : `groundforces parity: ${diff} pixels differ, battle layout ${have} of ${want}`);
+process.exit(gfOk && errors.length === 0 ? 0 : 1);

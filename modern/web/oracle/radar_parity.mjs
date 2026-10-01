@@ -125,3 +125,13 @@ for (let k = 0; k < diff.length; k++) diff[k] = diskOn[k] === fullOn[k] ? 0 : 1;
 fs.writeFileSync('captured/radar/diff.png', toPng(diff, { colour: [255, 0, 0] }));
 console.log('');
 console.log('wrote captured/radar/port.png and diff.png');
+
+// Three separate claims, all exact: the reticle is plain HPLOT line work, the view is the
+// display list `CALL 24576` walks at a camera captured with it, and RADAR never touches the
+// panel below.
+console.log('');
+const radarOk = have === want && both === diskLit && portLit === diskLit && pdiff === 0;
+console.log(radarOk ? 'radar parity: reticle, view and panel all exact'
+  : `radar parity: reticle ${have}/${want}, view ${both}/${diskLit} on the same pixel, `
+    + `panel ${pdiff} differing`);
+process.exit(radarOk && errors.length === 0 ? 0 : 1);

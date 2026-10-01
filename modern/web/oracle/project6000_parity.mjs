@@ -56,3 +56,10 @@ if (fs.existsSync('captured/project6000/calls.json')) {
   console.log('');
   console.log(`against a live render's own calls: ${ok2} of ${calls.calls.length} match`);
 }
+
+// $68A1 is arithmetic: every sample and every call of a live render has to come out the same.
+console.log('');
+const projOk = ok === golden.samples.length;
+console.log(projOk ? `project6000 parity: all ${ok} samples match`
+  : `project6000 parity: ${ok} of ${golden.samples.length} samples match`);
+process.exit(projOk ? 0 : 1);

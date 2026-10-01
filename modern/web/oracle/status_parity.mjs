@@ -62,6 +62,7 @@ for (const e of errors.slice(0, 3)) console.log('page error:', e);
 
 fs.mkdirSync('captured/status', { recursive: true });
 const REPORT_BOTTOM = 123;
+let worstDiff = 0;
 for (const name of ['screen1', 'screen2']) {
   const diskOn = new Uint8Array(HGR_W * HGR_H);
   for (const [x, y] of golden[name].points) diskOn[y * HGR_W + x] = 1;
@@ -82,6 +83,8 @@ for (const name of ['screen1', 'screen2']) {
   };
   const r = region(0, REPORT_BOTTOM);
   const panel = region(REPORT_BOTTOM + 1, HGR_H - 1);
+  worstDiff = Math.max(worstDiff,
+    r.onlyDisk + r.onlyPort + panel.onlyDisk + panel.onlyPort);
   console.log(`${name}, the report itself (rows 0-${REPORT_BOTTOM}):`);
   console.log(`  disk ${r.diskLit} lit, port ${r.portLit} lit, ${r.both} in both`);
   console.log(`  ${r.onlyDisk + r.onlyPort} of ${r.px} differ  (${(100 * r.agree).toFixed(2)}% agree)`);
@@ -103,3 +106,9 @@ for (const name of ['screen1', 'screen2']) {
   fs.writeFileSync(`captured/status/${name}-diff.png`, toPng(diff, { colour: [255, 0, 0] }));
 }
 console.log('wrote captured/status/*-port.png and *-diff.png');
+
+// STATUS prints from state - the report and the panel both - so every page has to be exact.
+console.log('');
+console.log(worstDiff === 0 ? 'status parity: every page exact'
+  : `status parity: ${worstDiff} pixels differ at worst`);
+process.exit(worstDiff === 0 && errors.length === 0 ? 0 : 1);

@@ -140,3 +140,11 @@ console.log(`the port's ship is on average ${(sumTall / n).toFixed(2)}x as tall 
 console.log('');
 console.log("Width is no longer handed over, so a matching width is a result too.");
 console.log(`wrote ${n} port render(s) to captured/ship/port/`);
+
+// The ship models at eleven attitudes. Exact, and the height ratio is reported with them
+// because it was once the thing that was wrong.
+console.log('');
+const shipOk = n > 0 && sumAgree / n === 1;
+console.log(shipOk ? `ship parity: all ${n} states exact`
+  : `ship parity: mean agreement ${(100 * sumAgree / n).toFixed(2)}% over ${n} states`);
+process.exit(shipOk && errors.length === 0 ? 0 : 1);

@@ -69,3 +69,12 @@ fs.mkdirSync('captured/dmg', { recursive: true });
 fs.writeFileSync('captured/dmg/port.png', toPng(orange));
 console.log('');
 console.log('wrote captured/dmg/port.png');
+
+// The lamp is ten by five and fixed, DMG clears nothing, and 2545 paints the same cells
+// green. All three are exact statements, so all three are required.
+console.log('');
+const dmgOk = missing.length === 0 && extra.length === 0 && outside === 0
+  && green.size === port.size && [...green].every((k) => port.has(k));
+console.log(dmgOk ? 'dmg parity: the lamp is exact and nothing else moved'
+  : `dmg parity: ${missing.length} missing, ${extra.length} extra, ${outside} outside the lamp`);
+process.exit(dmgOk && errors.length === 0 ? 0 : 1);

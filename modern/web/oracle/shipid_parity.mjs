@@ -81,3 +81,11 @@ for (const k of KINDS) {
 console.log('');
 console.log(allExact ? 'all four exact' : 'not all exact');
 console.log('wrote captured/shipid/*-port.png and *-diff.png');
+
+// The four identification screens blank rows 0-15 and draw everything themselves, so those
+// rows are exact. The panel below is the flight page they inherit, and whether its needles are
+// on it depends on the hi-res page the flight loop had flipped to - reported, not required.
+console.log('');
+console.log(allExact ? 'shipid parity: all four exact over rows 0-15'
+  : 'shipid parity: not all four are exact');
+process.exit(allExact && errors.length === 0 ? 0 : 1);

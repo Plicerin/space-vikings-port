@@ -84,3 +84,11 @@ for (let i = 0; i < states.length; i++) {
 }
 console.log(`\nmean agreement over ${n} states: ${(100 * sumAgree / n).toFixed(1)}%`);
 console.log(`mean within one pixel: ${(100 * sumNear / n).toFixed(1)}%`);
+
+// Twelve states of the ground wireframe, each the disk's own display list through the port's
+// renderer. Nothing here is RND, so every state has to agree outright.
+console.log('');
+const groundOk = n > 0 && sumAgree / n === 1;
+console.log(groundOk ? `ground parity: all ${n} states exact`
+  : `ground parity: mean agreement ${(100 * sumAgree / n).toFixed(2)}% over ${n} states`);
+process.exit(groundOk && errors.length === 0 ? 0 : 1);
