@@ -6707,6 +6707,28 @@ now alternates destinations and asserts the ship actually moved.
 through COM's 2, and both answers to the shore-leave question. Seven checks, and they fail -
 three of them - with the penalty switched off.
 
+### The harness passed twice on its own and failed in the suite
+
+Worth recording as its own lesson, because it is the worst way for a check to behave and it
+would have shipped green. Two bugs, both in the harness:
+
+- **It pressed `1` to pick the pay-the-troops screen.** That does nothing. SHORE LEAVE's five
+  screens are chosen by `state.shoreLeaveMode`, and it is GROUND FORCES option **3** that sets
+  it to 0. The second pass therefore ran whatever mode the first had left behind.
+- **It called `scenes.run('shoreLeave')` with the previous scene still alive**, blocked on a
+  key. `Input` models `$C000`: one latch, and the first reader wins. So the scene left behind
+  ate the answer meant for this one, which is what `SHORE LEAVE never took the Y` turned out to
+  be once the first bug was fixed.
+
+Neither showed up alone because the timing is different there. Under the suite the whole machine
+is loaded - `gamepad_check` goes from 26 s to 66 s - and fixed sleeps that were comfortably long
+stop being long enough.
+
+It plays the chain a player would now, `C`, `2`, `3`, on a fresh page per answer, and waits for
+the `pay=` log line instead of sleeping past it. The rule it should have followed from the
+start: **drive the game, wait for a signal, and never start a scene on top of one that is still
+reading keys.**
+
 ---
 
 ## Open questions

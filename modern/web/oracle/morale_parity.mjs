@@ -109,29 +109,69 @@ const landed = await page.evaluate(async () => {
 check('GROUND FORCES line 14 sets it, landed at Y 20',
   landed === golden.groundForcesSetsFlag, `port gives ${landed}, machine ${golden.groundForcesSetsFlag}`);
 
-// 2087 sits before the pay-them branch, so answering N still clears the grounded state - the
-// crew got their leave either way, they just did not get paid for it.
-const afterLeave = await page.evaluate(async () => {
-  const h = window.__h;
-  const s = window.__spaceVikingsState;
-  const out = {};
-  for (const answer of ['Y', 'N']) {
-    Object.assign(s, { crewGrounded: 17, atmosphere: 1, y: 20, credits: 99999 });
+/**
+ * One shore-leave answer, played from a fresh page.
+ *
+ * Two things this got wrong first. It pressed '1' to pick the pay-them screen, which does
+ * nothing - SHORE LEAVE's five screens are chosen by `state.shoreLeaveMode`, and GROUND FORCES
+ * option **3** is the one that sets it to 0 - so the second pass ran whatever mode the first
+ * had left behind. And it called `scenes.run('shoreLeave')` with the cockpit still running:
+ * `Input` models $C000, one latch and first reader wins, so the scene left behind ate the
+ * answer meant for this one. Both showed up as "passes on its own, fails in the suite", which
+ * is the worst way for a check to behave.
+ *
+ * So this plays the chain the way a player would - C, 2, 3 - on a page of its own.
+ */
+async function shoreLeaveAnswer(page, answer) {
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikingsState),
+    null, { timeout: 30000 });
+  await page.evaluate(HELPERS);
+  return page.evaluate(async (ans) => {
+    const h = window.__h;
+    h.key('N');
+    if (!await h.arrive('cockpit')) throw new Error('no cockpit');
+    await h.sleep(1500);
+
+    const s = window.__spaceVikingsState;
+    Object.assign(s, {
+      crewGrounded: 17, atmosphere: 1, y: 20, credits: 99999, planetSurrendered: true,
+    });
     s.forces.morale = 4;
     s.planets[s.planetIndex].surrendered = true;
-    s.planetSurrendered = true;
     await h.sleep(300);
-    window.__spaceVikings.scenes.run('shoreLeave');
+
+    h.key('C');
+    if (!await h.arrive('com')) throw new Error('no COM');
+    await h.sleep(500);
+    h.key('2');
+    if (!await h.arrive('groundForces')) throw new Error('no GROUND FORCES');
+    await h.sleep(700);
+    const from = window.__gameLog.getLog().length;
+    h.key('3');                              // 3 is the pay-the-troops screen
     if (!await h.arrive('shoreLeave')) throw new Error('no SHORE LEAVE');
-    await h.sleep(1200);
-    h.key('1');                            // SHORE LEAVE's pay-the-troops option
-    await h.sleep(1500);
-    h.key(answer);
-    await h.sleep(1500);
-    out[answer] = s.crewGrounded;
-  }
-  return out;
-});
+    h.key(ans);
+
+    // `pay=` is logged straight after the answer is taken, so it is the signal that the
+    // question was asked and answered rather than skipped.
+    const t0 = Date.now();
+    while (Date.now() - t0 < 20000) {
+      if (window.__gameLog.getLog().slice(from)
+        .some((l) => l.event === 'shoreLeave' && (l.detail || '').startsWith('pay='))) {
+        return s.crewGrounded;
+      }
+      await h.sleep(60);
+    }
+    throw new Error(`SHORE LEAVE never took the ${ans}`);
+  }, answer);
+}
+
+// 2087 sits before the pay-them branch, so answering N still clears the grounded state - the
+// crew got their leave either way, they just did not get paid for it.
+const afterLeave = {
+  Y: await shoreLeaveAnswer(page, 'Y'),
+  N: await shoreLeaveAnswer(page, 'N'),
+};
 check('SHORE LEAVE 2087 clears it whether or not you pay',
   afterLeave.Y === 70 && afterLeave.N === 70,
   `paid ${afterLeave.Y}, refused ${afterLeave.N}`);
