@@ -4182,6 +4182,43 @@ a guess, and the thing it stands in for is already a measured constant.
 
 ---
 
+## The galaxy map's star pick could not be reached by playing
+
+`map_pick_parity` has had 3210 through 3320 exact for a while - the black `DRAW` that leaves a
+hole, 3230's hit test, and the three lines of readout - and all of it was unreachable in the
+game.
+
+3130 is the paddle button, and the port stands in for the paddles with keys: I, J, K and M
+move the cursor, Return picks. The test for Return was `k === 13`, and `Input` hands back the
+Apple's own encoding, where Return is **$8D**. So it never matched. Pressing Return on the map
+did nothing at all, and nothing noticed, because the harness reaches `starUnderCursor` by
+calling it.
+
+`com.ts` had the same test written correctly - `(k & 0x7f) === 13` - which is what this is now.
+Played: the cursor onto Luyten and Return gives
+
+```
+         GALAXY MAP
+STAR SYSTEM : LUYTEN
+LOC. : 22 14 19 : DISTANCE = 8 L/Y
+DO YOU WISH FURTHER INFORMATION?
+```
+
+over the top of `--PRESS SPACE TO RETURN--`, which is what 3250's `VTAB 21` does to it. Sol is
+15, 15, 15 and Luyten is 22, 14, 19, so 3310's `SQR(49 + 1 + 16)` is 8.12 and 3320 prints 8.
+
+### One thing seen on the way that is not yet verified
+
+Answering `Y` runs COM - `3260 IF AN$ = "Y" THEN POKE 38388,P: POKE 38149,8: RUN COM` - and
+unlike 3125 it does **not** go through INSTRUMENTS. COM's output therefore lands in the text
+window GALAXY MAP left at rows 19 to 23, and the port shows `READY` printed over the map's own
+caption, reading `READYGALAXY MAP`, with the star readout still underneath. That is what the
+inherited window should do, and the same reasoning already explained the caption surviving on
+the other path - but this particular page has never been captured from the machine, so it is
+recorded here as plausible rather than checked.
+
+---
+
 ---
 
 ## RECALL, all five branches

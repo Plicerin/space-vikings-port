@@ -320,7 +320,12 @@ export async function galaxyMapScene(ctx: SceneContext, scenes: SceneManager): P
         continue;
       }
 
-      if (k === 13) {
+      // 3130 is the paddle button, and this is its stand-in. It has to mask the high bit:
+      // `Input` hands back the Apple's own encoding, where Return is $8D, so a bare `k === 13`
+      // never matched and the whole star-pick path - 3210 through 3320, which
+      // `map_pick_parity` tests by calling into it directly - could not be reached by playing.
+      // `com.ts` had this right already.
+      if ((k & 0x7f) === 13) {
         eraseGalaxyCursor3210(hires, shapes, px, py);   // 3210
         const p = starUnderCursor(d.stars, px, py);
         hires.hcolor(5);

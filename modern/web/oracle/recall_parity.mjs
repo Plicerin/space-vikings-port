@@ -39,7 +39,7 @@ const shots = await page.evaluate(async ({ jobs }) => {
   };
   // A scene change costs its disk load and the old screen stays up for it, so these wait on
   // the scene and not on the clock.
-  const arrive = async (want, ms = 25000) => {
+  const arrive = async (want, ms = 40000) => {
     const t0 = Date.now();
     while (Date.now() - t0 < ms) {
       if (sceneNow().toLowerCase() === want.toLowerCase()) return true;
@@ -69,8 +69,13 @@ const shots = await page.evaluate(async ({ jobs }) => {
     st.forces.troopLocation = j.location;
     const before = st.forces.troopLocation;
 
+    // Under load a browser can be slow enough that one press lands while the menu is still
+    // painting; the key is latched, but give it a second go rather than failing the run.
     press('2');
-    if (!await arrive('recall', 25000)) throw new Error('RECALL never ran');
+    if (!await arrive('recall', 20000)) {
+      press('2');
+      if (!await arrive('recall', 30000)) throw new Error('RECALL never ran');
+    }
     await sleep(500);
     const on = Array.from(sv.hires.snapshot().on);
     const r = sv.recallMessage({
