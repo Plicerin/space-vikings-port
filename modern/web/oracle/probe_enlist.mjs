@@ -194,6 +194,36 @@ const v1 = await vars();
 console.log('  after enlisting 100: CR ' + v1.CR + ', TR ' + v1.TR);
 await keep('buyweapons', "3020's first page, which only 2290 can reach");
 
+// --- 3070's own refusal, which is a loop too ----------------------------------------------
+// `IF B < 0 OR B > 255 THEN VTAB 11: PRINT 17sp: VTAB 11: SPEED= 90: PRINT "BUY 255 MAX.  ":
+//  SPEED= 255: PRINT "          ": GOTO 3070` - back to 3070, **not** to 3060, so the price
+// that was rolled stays rolled. There is no delay loop: SPEED= 90 is what holds it on screen.
+const settle = () => a2.ev(`(() => {
+  const cpu = window.M.cpu;
+  let prev = -1, still = 0;
+  for (let i = 0; i < 60; i++) {
+    cpu.stepCycles(50000);
+    let h = 0;
+    for (let a = 0x2000; a < 0x4000; a += 7) h = (h * 31 + cpu.read(a)) | 0;
+    if (h === prev) { if (++still >= 4) break; } else still = 0;
+    prev = h;
+  }
+  return 'settled';
+})()`);
+await typeIn('300');
+await settle();
+// `SPEED= 90` prints a character at a time and the page stands still between characters, so
+// "settled" is not the end of the message - this lands somewhere inside it, and the message
+// row is scored out of the comparison for that reason. What the page is kept for is the rest
+// of it, and above all row 12: the refused number is still on the line, because 3070 wipes it
+// only once the message has been typed.
+await keep('max255', "3070's refusal, caught part-way through its SPEED= 90 print");
+const priceLine = await a2.ev('(() => { const c = window.M.cpu; let h = 0; '
+  + 'for (let a = 0x2000; a < 0x4000; a++) h = (h * 31 + c.read(a)) | 0; return h; })()');
+if (await runTo(5000, 900000) !== 'at') { await a2.close(); throw new Error('3070 did not ask again'); }
+await keep('reprice', '3070 asked again - the same price, the typed number wiped');
+void priceLine;
+
 if (a2.errors.length) console.log('page errors:', a2.errors.slice(0, 3));
 await a2.close();
 

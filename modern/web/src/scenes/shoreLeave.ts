@@ -429,26 +429,42 @@ async function buyWeapons(ctx: SceneContext): Promise<void> {
   };
 
   for (const [name, basePrice, key] of items) {
+    // 3060 draws the price, and all three refusals end `GOTO 3070` - not 3060 - so the price
+    // and the list behind it are drawn **once** an item. Rolling a fresh `RND` on every
+    // rejected answer, which is what this used to do, would let a silly number be typed until
+    // the price came out low.
+    const price = Math.floor((Math.random() + 0.2) * 4 * basePrice);
+    list({ name, price });
+
     for (;;) {
-      const price = Math.floor((Math.random() + 0.2) * 4 * basePrice);
-      list({ name, price });
+      hires.hcolor(1);
       hires.text('BUY HOW MANY? ', 2, 11);   // 3070's `VTAB 11`
       const qty = await readNumber(ctx, 2, 12);   // 3070's V = 12, H = 2
 
-      // 3070, 3072 and 3090 all print their refusal back on row 11, over the question.
+      // 3070, 3072 and 3090 all blank row 11, print their refusal there, and then blank the
+      // input row underneath - `PRINT "          "` and friends - so the number that was
+      // typed goes away before the question comes back. 3070 and 3072 have no delay loop at
+      // all: what holds the message on screen is `SPEED= 90` and `SPEED= 127` printing it a
+      // character at a time, which the waits here stand in for.
+      const refuse = async (msg: string, clearWidth: number, ms: number, alsoClear11 = false) => {
+        clearLines(hires, 2, 11, 18, 1);
+        hires.hcolor(1);
+        hires.text(msg, 2, 11);
+        await wait(ms);
+        if (alsoClear11) clearLines(hires, 2, 11, 18, 1);
+        clearLines(hires, 2, 12, clearWidth, 1);
+      };
       if (qty < 0 || qty > 255) {
-        hires.text('BUY 255 MAX.  ', 2, 11);
-        await wait(1500);
+        await refuse('BUY 255 MAX.  ', 10, 1500);
         continue;
       }
       if (qty + (state.forces[key] as number) > 255) {
-        hires.text('255 MAX        ', 2, 11);
-        await wait(1500);
+        await refuse('255 MAX ', 7, 1500);
         continue;
       }
       if (qty * price > state.credits) {
-        hires.text('NOT ENOUGH CREDITS', 2, 11);
-        await wait(2000);
+        // 3090 is the one with a `FOR L = 1 TO 2000` of its own, and it clears row 11 after.
+        await refuse('NOT ENOUGH CREDITS', 11, 2000, true);
         continue;
       }
 

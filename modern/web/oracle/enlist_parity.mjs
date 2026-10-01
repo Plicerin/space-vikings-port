@@ -89,6 +89,14 @@ const shots = await page.evaluate(async (g) => {
   await typeIn('100');
   await wait(600);
   out.buyweapons = grab();
+
+  // 3070's own refusal: more than 255 sends it back to 3070, not to 3060, so the price stays.
+  await typeIn('300');
+  await wait(600);
+  out.max255 = grab();
+  await wait(1600);
+  out.reprice = grab();
+
   const s = window.__spaceVikingsState;
   out.after = { credits: Math.floor(s.credits), troops: s.forces.troops };
   return out;
@@ -135,6 +143,21 @@ compare('reask');
 compare('toomany');
 // 3060's price is an RND draw, so its row cannot be reproduced.
 compare('buyweapons', [10]);
+// Row 11 is 3070's message, and it is printed under `SPEED= 90` - a character at a time,
+// with the page standing still between characters, so there is no moment on the machine at
+// which it is reliably whole. What this checks is the rest of that page: in particular row
+// 12, where the refused number is still standing, because 3070 wipes it only after the
+// message has been typed out.
+compare('max255', [10, 11]);
+compare('reprice', [10]);
+
+// The strongest statement about the price does not need the machine's number at all: on the
+// disk the re-asked page is the first page to the pixel, because `GOTO 3070` never reaches
+// 3060 again. If the port re-rolled, these two would differ on row 10.
+const samePrice = shots.reprice.every((v, i) => v === shots.buyweapons[i]);
+console.log('');
+console.log(`  ${samePrice ? 'ok  ' : 'FAIL'}  a refused quantity does not re-roll the price`);
+if (!samePrice) bad++;
 
 console.log('');
 // 2285's `POKE 38389,0` is only observable through what happens next: if the attempt were

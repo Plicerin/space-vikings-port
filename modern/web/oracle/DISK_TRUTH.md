@@ -3847,6 +3847,35 @@ re-asked question, `TOO MANY TROOPS.` and BUY WEAPONS' first page, which only 22
 differing, and the sums come out as the machine's - 10000 credits and 2000 troops in, 9900 and
 19600 out after enlisting a hundred into an army of 19500.
 
+### BUY WEAPONS' three refusals all go back to 3070, not to 3060
+
+```
+3060 NEXT: PRINT "..................": C = INT((RND(1) + .2) * 4 * MU(J1 + 1)):
+     VTAB 10: PRINT A$(J1 + 1);" COST";C
+3070 JJ = J: J = 0: VTAB 11: PRINT "BUY HOW MANY? ": V = 12: H = 2: GOSUB 5000: B = CC:
+     IF B < 0 OR B > 255 THEN VTAB 11: PRINT 17sp: VTAB 11: SPEED= 90:
+     PRINT "BUY 255 MAX.  ": SPEED= 255: PRINT "          ": GOTO 3070
+3072 IF B + PEEK(LO - J1) > 255 THEN ... SPEED= 127: PRINT "255 MAX ": ... GOTO 3070
+3090 IF B * C > CR THEN ... PRINT "NOT ENOUGH CREDITS": FOR L = 1 TO 2000: NEXT:
+     ... GOTO 3070
+```
+
+**The price is rolled once an item.** Every refusal ends `GOTO 3070`, and 3060 - which holds
+the `RND` - is only ever entered from the outer `FOR J1`. The port had the draw inside its
+retry loop, so a silly answer bought a fresh price: type 300 until the fighters come cheap.
+Proved without needing the machine's number at all - on the disk the re-asked page is the
+first page **to the pixel**, 12,131 lit both times.
+
+**Each refusal wipes the number that was typed**, with the `PRINT` of spaces that follows it -
+ten columns for 3070, seven for 3072, eleven for 3090, which also clears its own message row
+because it is the only one with a delay loop. 3070 and 3072 have no delay at all: `SPEED= 90`
+and `SPEED= 127` printing the message a character at a time is the delay.
+
+That last detail is also why the message row cannot be captured: under `SPEED= 90` the page
+stands still between characters, so there is no moment at which it is reliably whole. The row
+is scored out, and what the capture is kept for is the rest of the page - above all the
+refused number still standing on row 12, because it is wiped only after the message.
+
 Two of the captures needed a second attempt, both for reasons worth writing down. 3060 opens
 with the `NEXT` of 3020's own `FOR J = 0 TO 3`, so stopping there catches BUY WEAPONS after a
 single line - the same trap as REPAIR's 2540 and the EX burst's line 30. And 2080 leaves
