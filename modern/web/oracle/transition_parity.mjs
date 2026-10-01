@@ -49,6 +49,10 @@ const shots = await page.evaluate(async (steps) => {
   for (const s of steps) {
     if (s.key !== null) await press(s.key, 800);
     else await new Promise((r) => setTimeout(r, 800));
+    // A scene change now costs the disk load it costs on the machine, and the old screen is
+    // what is on display for all of it - so a settle on "the page stopped changing" would
+    // settle on the previous screen. Give every step the transition time first.
+    await new Promise((r) => setTimeout(r, 1600));
     // Settle on the drawing, not on a timer: a scene that is still painting gives a count that
     // looks like a missing screen. Wait for two equal snapshots in a row, up to four seconds.
     let last = -1;

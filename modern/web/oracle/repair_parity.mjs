@@ -67,12 +67,27 @@ const shots = await page.evaluate(async (slots) => {
     s.credits = credits;
   };
 
+  // A scene change costs a disk load - `sceneManager`'s SCENE_TRANSITION_MS, measured at
+  // 1290 ms - and the **old** screen stays up for all of it, exactly as it does on the
+  // machine. So a wall-clock wait after a keypress is no good here, and neither is "the page
+  // stopped changing": the page it has stopped changing on is the previous one.
+  const arrive = async (want, ms = 12000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if (sceneNow().toLowerCase() === want.toLowerCase()) return true;
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    return false;
+  };
+
   const out = {};
   // --- the poor run: the list, then the refusal ------------------------------------------
   setUp(10000);
-  await press('C', 900);
-  await press('2', 900);
-  await press('6', 450);
+  await press('C', 60); await arrive('com');
+  await press('2', 60); await arrive('groundForces');
+  await press('6', 60); await arrive('shoreLeave');
+  // 2510's list is drawn as the scene opens and stands for 1500 ms.
+  await new Promise((r) => setTimeout(r, 400));
   out.list = grab();
   out.listScene = sceneNow();
   // The list stands for 1500ms, then the bill and the refusal land in the same tick.
@@ -87,10 +102,12 @@ const shots = await page.evaluate(async (slots) => {
   };
 
   // --- the rich run: the bill, held by 2580's prompt ---------------------------------------
-  await new Promise((r) => setTimeout(r, 3000));
+  await arrive('groundForces', 20000);
   setUp(99999999);
-  if (sceneNow() !== 'groundForces') await press('9', 900);
-  await press('6', 2400);
+  await press('6', 60);
+  await arrive('shoreLeave');
+  // past 2510's list and 2545's lamp, onto 2560 and the prompt that holds it
+  await new Promise((r) => setTimeout(r, 2600));
   out.bill = grab();
   out.billScene = sceneNow();
   return out;

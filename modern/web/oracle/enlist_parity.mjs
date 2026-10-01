@@ -41,6 +41,10 @@ const shots = await page.evaluate(async (g) => {
     await new Promise((r) => setTimeout(r, 250));
   };
   const grab = () => Array.from(sv.hires.snapshot().on);
+  const sceneNow = () => {
+    const l = window.__gameLog.getLog();
+    return l.length ? l[l.length - 1].scene : '?';
+  };
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   for (let i = 0; i < 7; i++) await press('N', 700);
@@ -61,10 +65,22 @@ const shots = await page.evaluate(async (g) => {
   };
   setUp();
 
+  // A scene change costs its disk load and leaves the old screen up while it runs, so these
+  // wait on the scene rather than on the clock.
+  const arrive = async (want, ms = 12000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if (sceneNow().toLowerCase() === want.toLowerCase()) return true;
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    return false;
+  };
+
   const out = {};
-  await press('C', 900);
-  await press('2', 900);
-  await press('4', 900);
+  await press('C', 60); await arrive('com');
+  await press('2', 60); await arrive('groundForces');
+  await press('4', 60); await arrive('shoreLeave');
+  await wait(400);
   out.prompt = grab();
 
   // 2280: more than the purse holds.

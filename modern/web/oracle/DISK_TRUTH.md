@@ -3993,6 +3993,59 @@ programs, and START reuses it at boot to decide whether to write the galaxy bloc
 
 ---
 
+## What a scene change costs
+
+Every screen in this game is its own Applesoft program, and moving between them is one program
+printing `^DRUN <name>` and DOS 3.3 going to the disk for the next one. That is the single
+most common thing the game does, and nothing had ever timed it.
+
+`probe_runtime.mjs` times the span the port's scene manager stands in for: from the frame on
+which the line carrying the `^DRUN` is current, to the frame on which the next program is
+loaded and running. Not from the keypress - the flight loop only looks at the keyboard once a
+pass, and that wait is the game's, not the disk's - and not up to anything the new program
+draws. Timed in video frames, because `frames()` is what ticks the drive: 17,030 cycles,
+16.688 ms.
+
+| | |
+| --- | --- |
+| STARSHIP SIMULATOR -> COM | 1051 ms, twice, to the frame |
+| COM -> STARSHIP SIMULATOR | 1802 ms |
+| COM -> GROUND FORCES | 851 ms on one run, 1669 on the next |
+| GROUND FORCES -> COM | 1035 and 1018 ms |
+| COM -> RADAR | 1001 ms |
+| RADAR -> COM | 1151 ms |
+| COM -> END | 1769 and 1752 ms |
+
+**It is not a property of the program being loaded.** The obvious reading of the first few
+numbers is that each file costs what it costs - COM came in at 1051, 1051, 1018 and 1151 - but
+COM to GROUND FORCES went 851 ms on one run and 1669 on the next, and END is 813 bytes and
+costs as much as the simulator's 5,553. What is being paid for is the head: DOS seeks to the
+catalog to find the file and then to wherever the file is, so it depends on what was read
+last. Fourteen samples over two runs: **851 ms to 1802 ms, mean 1290, median 1051**.
+
+So a single figure is the honest summary, and `sceneManager.ts` now waits the measured mean of
+1290 ms before each scene, with the old screen still up - which is what the machine shows,
+since DOS has the drive and nothing has redrawn. It had been 2200 ms, which was nobody's
+measurement, and then nothing at all, which was no better in the other direction.
+
+One caveat worth stating rather than papering over: a few of the port's scenes are not a `RUN`
+on the disk. The ship identification screen is a `BLOAD` inside RADAR, and it pays the same
+here, which overstates it - one shape file is a smaller read than a program.
+
+### And it broke three harnesses, for a reason worth keeping
+
+Putting the load time back turned `repair_parity`, `enlist_parity` and `transition_parity` red,
+and none of it was the game. They waited on the clock after a keypress, or on the page having
+stopped changing - and **a page that has stopped changing is now the screen you were already
+on**, because the old screen stays up for the whole of the load. `transition_parity` settled on
+five identical snapshots of the previous scene and compared that.
+
+All three wait on the scene they are going to now, not on a timer, which is what they should
+have been doing anyway. It is the same shape of mistake as a harness that draws the page it
+then compares: the signal looked like it meant "ready" and meant something else.
+
+---
+
 ---
 
 ## RECALL, all five branches
