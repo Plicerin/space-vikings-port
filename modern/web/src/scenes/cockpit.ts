@@ -343,6 +343,9 @@ const enemy = spawnEnemy(state);
     let next: string | null = null;
     let lastT = performance.now();
     let simulatorAccumulator = 0;
+    /** Whether the main loop has taken a step this browser frame - one pass, one picture. */
+    let ticked = false;
+    let framesDrawn = 0;
     let prevHeading = headingRad;
     let prevPitch = pitchRad;
     let fireCooldown = 0;
@@ -535,6 +538,7 @@ const enemy = spawnEnemy(state);
       // frame: at S=120, Z advances in exact 120-unit chunks.
       simulatorAccumulator += dt;
       const simulatorTicks = Math.floor(simulatorAccumulator / BASIC_SIMULATOR_TICK_SECONDS);
+      ticked = simulatorTicks > 0;
       simulatorAccumulator -= simulatorTicks * BASIC_SIMULATOR_TICK_SECONDS;
       for (let i = 0; i < simulatorTicks; i += 1) {
         const newPos = v3add(v3(state.x, state.y, state.z), v3scale(fwd, state.speed));
@@ -975,7 +979,20 @@ const enemy = spawnEnemy(state);
       checkEnemyDestruction();
       if (runNextScene()) return;
 
-      renderFrame(cam, dt);
+      // One pass of 15-210 draws one picture, and the machine shows it by flipping the page
+      // at 147's `POKE 29461,84 + OO`. Measured, `probe_framerate.mjs`: the page it is
+      // showing changes every 175, 178, 176 frames - **2.94 seconds, a third of a frame a
+      // second**. That is the rate the game was drawn at, and drawing it sixty times a second
+      // is not a better version of it, it is a different one: the ship slides where it should
+      // step, and the starfield swims.
+      //
+      // So a new picture is drawn when the simulator has taken a step, and not otherwise.
+      // The loop still runs every browser frame, because that is what reads the keyboard.
+      // `smoothFlight` in the QOL panel puts the sixty back.
+      if (ticked || framesDrawn === 0 || qolOn('smoothFlight')) {
+        renderFrame(cam, dt);
+        framesDrawn++;
+      }
       raf = requestAnimationFrame(frame);
     }
 

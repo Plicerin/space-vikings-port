@@ -4369,6 +4369,46 @@ it, on a page that is not even about the map.
 
 ---
 
+## The frame rate is already the disk's, and the pass is longer than 2.55 s
+
+Asked to improve the frame rate - not to make it artificially fast, but to make it run as it
+was meant to - and the measurement says there is nothing to improve, plus one thing that is
+genuinely out.
+
+### How often the machine draws
+
+One pass of 15-210 draws one picture and shows it by flipping the page at 147's `POKE
+29461,84 + OO`. `probe_framerate.mjs` watches that register: the page being shown changes every
+**175, 178, 176, 176, 176 frames - 2.94 s, a third of a frame a second**. That is the rate the
+game was drawn at.
+
+The port was already doing this, which was a surprise. Its flight loop runs at the browser's
+sixty frames a second, but `updatePhysics` only moves the ship when the simulator has taken a
+step, so fifty-nine of those sixty frames were redrawing **the same picture**. Measured with a
+full-image hash sampled every 16 ms: four distinct pictures in ten seconds, 0.40 a second, with
+the old behaviour and with the new one alike.
+
+So the redraw is gated on the step now. It is a saving and not a change: the same pictures, in
+the same order, at the same moments, with the other fifty-nine redraws not done. `smoothFlight`
+in the QOL panel puts them back for anyone who wants to see what the port looked like.
+
+### The pass is 2.94 s here, and `BASIC_SIMULATOR_TICK_SECONDS` says 2.55
+
+Timing the page flip and line 140's store of Z **in the same run** gives the same intervals to
+the frame - 175, 178, 176, 176, 176 - which is what the listing says should happen, since a
+pass does both exactly once. So in that state a pass is 2.94 s.
+
+`probe_flightspeed.mjs` measured 2.5 to 2.6 s from the position steps, which is where the
+2.55 came from, and that is not wrong either: **the pass time depends on what is being drawn**.
+`CALL CA` walks a display list, and the list is longer with the enemy ship in it. The two
+measurements are different scenes, not a contradiction.
+
+That leaves the constant at the fast end of its real range. It is the ship's speed in units a
+second - 120 a pass is 47/s at 2.55 and 41/s at 2.94 - so moving it changes how the game plays,
+and it is left where it is until that is a decision rather than a side effect.
+
+---
+
 ---
 
 ## RECALL, all five branches

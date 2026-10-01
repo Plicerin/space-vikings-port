@@ -1,0 +1,1 @@
+{"source":"the flight loop on the machine, timing how often it draws","frameMs":16.6879,"drawAt":[19,82,258,372,435,611,725,788],"flipAt":[{"frame":81,"to":84},{"frame":256,"to":85},{"frame":434,"to":84},{"frame":610,"to":85},{"frame":786,"to":84},{"frame":962,"to":85}],"stepAt":[80,255,433,609,785,961,962],"drawIntervalMs":1833.3,"fps":0.545}

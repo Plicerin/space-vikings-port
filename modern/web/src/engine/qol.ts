@@ -19,7 +19,8 @@ export type QolKey =
   | 'crtBloom'
   | 'crtScanlines'
   | 'fastFire'
-  | 'gamepad';
+  | 'gamepad'
+  | 'smoothFlight';
 
 export interface QolFeature {
   key: QolKey;
@@ -61,6 +62,12 @@ export const QOL_FEATURES: readonly QolFeature[] = [
     label: 'Gamepad',
     group: 'Play',
     note: 'Stick or d-pad to fly, A to fire, B for return, X for weapon, Y for the computer, shoulders for speed. The keyboard still works; the letters and digits are only there.',
+  },
+  {
+    key: 'smoothFlight',
+    label: 'Smooth flight',
+    group: 'Play',
+    note: 'Redraws the view every browser frame. The machine draws it once a pass of its main loop - measured at one new picture every 2.9 seconds, a third of a frame a second - and off is that.',
   },
 ];
 
