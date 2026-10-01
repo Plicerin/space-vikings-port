@@ -4028,9 +4028,21 @@ So a single figure is the honest summary, and `sceneManager.ts` now waits the me
 since DOS has the drive and nothing has redrawn. It had been 2200 ms, which was nobody's
 measurement, and then nothing at all, which was no better in the other direction.
 
-One caveat worth stating rather than papering over: a few of the port's scenes are not a `RUN`
-on the disk. The ship identification screen is a `BLOAD` inside RADAR, and it pays the same
-here, which overstates it - one shape file is a smaller read than a program.
+Every scene the port changes to is a `RUN` on the disk. The ship identification screen stood
+here for a while as a `BLOAD` inside RADAR that was being overcharged - that was a misreading.
+`5005 PRINT "^DRUN SHIP # ";J;" I.D."` runs it, `1070 PRINT "^DRUN RADAR"` comes back, and all
+four `SHIP # n I.D.` files are **Applesoft**, 374 to 1,728 bytes. Timed with the rest:
+
+| | |
+| --- | --- |
+| RADAR -> ship identification | 1,085 ms |
+| ship identification -> RADAR | 1,051 ms |
+
+Both in the middle of the band, so there was nothing to fix.
+
+Twenty-four samples over three runs now give a pooled mean of 1,210 ms against the 1,290 the
+scene manager uses. The constant is left alone: the spread is 851 to 1,802, and re-tuning by
+80 ms inside a range that wide is chasing noise rather than measuring anything.
 
 ### And it broke three harnesses, for a reason worth keeping
 
@@ -6285,6 +6297,13 @@ formulas themselves are no longer taken on a bound.
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
 is what is genuinely not known, roughly in order of how much it matters.
+
+### Both pages that were listed as uncaptured are captured
+
+The galaxy map's `Y` answer is in `probe_mapinfo.mjs` and exact. The ship identification
+screen's load turned out not to be the `BLOAD` it was listed as - it is a `RUN` like every
+other scene change, timed at 1,085 ms out and 1,051 ms back - so there was nothing to capture
+and nothing to fix.
 
 ### Whole parts of the game have never been looked at
 

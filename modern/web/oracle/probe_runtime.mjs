@@ -30,7 +30,8 @@ const signatureOf = (name) => {
   const r = disk.read(f);
   return { name, firstLine: r.data[2] | (r.data[3] << 8), prgEnd: 0x801 + r.len, len: r.len };
 };
-const PROGRAMS = ['STARSHIP SIMULATOR', 'COM', 'GROUND FORCES', 'END', 'RADAR'];
+const PROGRAMS = ['STARSHIP SIMULATOR', 'COM', 'GROUND FORCES', 'END', 'RADAR',
+  'SHIP # 3 I.D.'];
 const SIGS = Object.fromEntries(PROGRAMS.map((n) => [n, signatureOf(n)]));
 
 const a2 = await openOracle();
@@ -102,6 +103,11 @@ runs.push(await timeRun('C', 319, 'COM', 'STARSHIP SIMULATOR -> COM again'));
 runs.push(await timeRun('2', 127, 'GROUND FORCES', 'COM -> GROUND FORCES'));
 runs.push(await timeRun('9', 75, 'COM', 'GROUND FORCES -> COM'));
 runs.push(await timeRun('3', 133, 'RADAR', 'COM -> RADAR'));
+// The ship identification screen is a `RUN` like everything else - `5005 PRINT "^DRUN SHIP #
+// ";J;" I.D."` - and the four `SHIP # n I.D.` files are Applesoft programs, not binary. It
+// had been listed here as a BLOAD inside RADAR, which it is not.
+runs.push(await timeRun('Z', 5005, 'SHIP # 3 I.D.', 'RADAR -> ship identification'));
+runs.push(await timeRun('Z', 1070, 'RADAR', 'ship identification -> RADAR'));
 runs.push(await timeRun('X', 2058, 'COM', 'RADAR -> COM'));
 runs.push(await timeRun('4', 132, 'END', 'COM -> END'));
 

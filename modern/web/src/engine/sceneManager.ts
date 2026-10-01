@@ -33,9 +33,11 @@ import { setScene, log as glog } from './gameLog';
  * The 2200 ms this used to be was nobody's measurement, and removing it altogether was no
  * better in the other direction.
  *
- * One caveat, stated rather than papered over: a few of the port's scenes are not a `RUN` on
- * the disk. The ship identification screen is a `BLOAD` inside RADAR, and it pays the same
- * here, which overstates it - a BLOAD of one shape file is a smaller read than a program.
+ * Every scene the port changes to is a `RUN` on the disk. The ship identification screen was
+ * listed here for a while as a `BLOAD` inside RADAR that was being overcharged; it is not.
+ * `5005 PRINT "^DRUN SHIP # ";J;" I.D."` runs it and `1070 PRINT "^DRUN RADAR"` comes back,
+ * and all four `SHIP # n I.D.` files are Applesoft, not binary. Timed with the rest: 1,085 ms
+ * out and 1,051 ms back, which is the middle of the band.
  */
 export const SCENE_TRANSITION_MS = 1290;
 
