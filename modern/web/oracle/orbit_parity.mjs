@@ -8,32 +8,53 @@ import fs from 'fs';
 
 const PORT_URL = process.env.PORT_URL || 'http://localhost:4545/';
 const golden = JSON.parse(fs.readFileSync('captured/orbit/golden.json', 'utf8'));
-const tableJson = JSON.parse(fs.readFileSync('../public/data/shapes/shape-table.json', 'utf8'));
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(PORT_URL, { waitUntil: 'load' });
-await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikings.drawOrbitScreen), null, { timeout: 30000 })
+await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikingsState), null, { timeout: 30000 })
   .catch(() => { throw new Error('the port did not expose drawOrbitScreen - is the dev server running at ' + PORT_URL + '?'); });
 
-const shot = await page.evaluate(({ tj }) => {
+// This used to compose the page it compared - `drawInstruments` and then `drawOrbitScreen`
+// into a canvas of its own - which is the one thing a parity harness must not do: ORBIT
+// floods rows 0 to 125 and inherits everything below from the flight it interrupted, so a
+// hand-built panel tests the drawing and not the screen. It flies there now, the way 158
+// does: `IF PEEK(38210) = 1 AND Y > 4000 THEN RUN ORBIT`.
+const shot = await page.evaluate(async () => {
   const sv = window.__spaceVikings;
-  const shapes = sv.decodeShapeTableJson(tj);
-  const c = document.createElement('canvas');
-  c.width = 560; c.height = 384;
-  const h = new sv.Hires(c);
-  h.hgr();
-  sv.drawInstruments(h);
-  // No needles. The flight loop double-buffers - STARSHIP SIMULATOR line 180 only records
-  // the positions it must erase `IF OO = 1` - so which hi-res page carries them depends on
-  // the flip phase when ORBIT takes over, and the page this capture caught has neither the
-  // bank needle at x 140 nor the pitch needle at x 136. ORBIT's own line 2 erases only the
-  // speed and energy tracks, so it is not ORBIT that removed them.
-  sv.drawOrbitScreen(h, shapes);
-  return Array.from(h.snapshot().on);
-}, { tj: tableJson });
+  const press = (k) => {
+    const code = /^[0-9]$/.test(k) ? 'Digit' + k : k === ' ' ? 'Space' : 'Key' + k.toUpperCase();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: k, code, bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: k, code, bubbles: true }));
+  };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const scene = () => {
+    const l = window.__gameLog.getLog();
+    return l.length ? l[l.length - 1].scene : '?';
+  };
+  const arrive = async (want, ms = 25000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      if (scene().toLowerCase() === want.toLowerCase()) return true;
+      await sleep(80);
+    }
+    return false;
+  };
+
+  press('N');
+  if (!await arrive('cockpit', 30000)) throw new Error('no cockpit');
+  await sleep(1200);
+  // Into the atmosphere first - 158 only fires with 38210 set - and then climb out of it.
+  const st = window.__spaceVikingsState;
+  st.atmosphere = 1; st.inOrbit = false;
+  await sleep(600);
+  st.y = 4200;
+  if (!await arrive('orbit', 30000)) throw new Error('never reached ORBIT');
+  await sleep(1500);
+  return Array.from(sv.hires.snapshot().on);
+});
 await browser.close();
 for (const e of errors.slice(0, 3)) console.log('page error:', e);
 
@@ -55,9 +76,11 @@ const region = (from, to, label) => {
   console.log(`${label} (rows ${from}-${to}): ${onlyDisk + onlyPort} of ${px} differ  ` +
     `(${(100 * (1 - (onlyDisk + onlyPort) / px)).toFixed(2)}%)   disk ${diskLit} lit, port ${portLit} lit, ` +
     `${onlyDisk} disk only, ${onlyPort} port only`);
+  return onlyDisk + onlyPort;
 };
-region(0, 125, "ORBIT's own area");
-region(126, HGR_H - 1, 'below it');
+const own = region(0, 125, "ORBIT's own area");
+region(126, 183, 'the panel it inherits');
+region(184, 191, "line 155's live readout");
 
 let diff = 0;
 const perRow = new Uint16Array(HGR_H);
@@ -72,3 +95,12 @@ const d = new Uint8Array(diskOn.length);
 for (let k = 0; k < d.length; k++) d[k] = diskOn[k] === portOn[k] ? 0 : 1;
 fs.writeFileSync('captured/orbit/diff.png', toPng(d, { colour: [255, 0, 0] }));
 console.log('wrote captured/orbit/port.png and diff.png');
+console.log('');
+// What ORBIT itself draws has to be exact. Below it, two things are known not to be and are
+// reported rather than required: text row 24 is STARSHIP SIMULATOR line 155's live position,
+// which the two machines never share, and the bank and pitch needles depend on which hi-res
+// page the flight loop had flipped to when 158 fired - the capture this is compared against
+// caught a page with neither.
+console.log(own === 0 ? "orbit parity: ORBIT's own rows 0-125 are exact"
+  : `orbit parity: ${own} pixels differ inside ORBIT's own rows`);
+process.exit(own === 0 && errors.length === 0 ? 0 : 1);

@@ -4081,6 +4081,55 @@ pixels with the scene actually driven.
 
 ---
 
+## A sweep of the harnesses, for two ways of being green and wrong
+
+After `supply_parity` turned out to be painting the page it compared, all forty-three were
+swept for the same thing. Two patterns came out of it, and the second is worse than the first.
+
+### Which harnesses compose the page they compare
+
+Five drive the game: `transition_parity` along its twenty-six step route, and `repair`,
+`enlist`, `supply` and `save`. Ten compare no page at all - `logic`, `damage`, `weapons`,
+`replay`, `rnd`, `rotation`, `sound`, `missile_box`, `project6000`, `clip` - and are sound as
+they stand.
+
+The rest paint, and they divide three ways.
+
+- **Primitives.** `dmg` checks the ten-by-five lamp, `shape` the shape-table decoder, `star`
+  the star projection, `ship` the models, `line6dd5` one 6502 routine's side effects, `frame`
+  a reference render, `map_pick` 3230's hit test. Painting a scratch canvas is the point of
+  these; what they do not answer is whether any scene calls them.
+- **RND-driven, deliberately structural.** `ex`, `ex_burst`, `sx`, `sx_burst`, `hd`. The
+  original differs from itself run to run - `X2 = X1 - (RND(1) * (X1 + X1))` - so these check
+  the background, the extent and the message rather than pixels. Fair, and unavoidable.
+- **"Replays the chain" - the dangerous ones.** `orbit`, `recall`, `collect`, `shoreleave`,
+  `groundforces`, `end`, `shipid`, `com`, `status`, `galaxymap`, `radar` all rebuild the
+  inherited page by hand - panel, lamps, needles, the previous screen's leftovers - and then
+  draw the screen on top. That hand-built page is a **model** of what the game does, and the
+  model is exactly what went wrong in SUPPLY.
+
+Most of that last group is covered anyway, because `transition_parity` drives COM, the
+computer submenu, the directory, the galaxy map, STATUS, SUPPLY, RADAR, the ship id, GROUND
+FORCES, CRYOGENICS and END along a real route. The ones it never reaches are **ORBIT, RECALL
+and COLLECT**, and of those `orbit_parity` now flies there the way 158 does - into the
+atmosphere, then `Y > 4000` - instead of composing. Driven, ORBIT's own rows 0 to 125 are
+exact, 0 of 35,280. What is left below is the live readout row and the bank and pitch needles,
+both of which depend on which hi-res page the flight loop had flipped to, which is what the
+harness's own comment had said all along.
+
+### Seventeen of them could not fail
+
+`collect`, `com`, `dmg`, `end`, `frame`, `ground`, `groundforces`, `hd`, `project6000`,
+`radar`, `ship`, `shipid`, `shoreleave`, `star`, `status`, `supply` and `sx` printed their
+report and exited 0 whatever was in it. Every "43 of 43 passed" in this file counted those as
+passes on the strength of the script not having thrown.
+
+`orbit` and `supply` have verdicts now. The other fifteen still need one, and it is not purely
+mechanical: for the RND-driven ones the criterion is not "zero differ" but the structural
+checks they already print, so each needs its own.
+
+---
+
 ---
 
 ## RECALL, all five branches

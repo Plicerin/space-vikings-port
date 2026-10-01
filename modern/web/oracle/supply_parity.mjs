@@ -72,6 +72,7 @@ const shots = await page.evaluate(async ({ cargo, credits }) => {
 await browser.close();
 for (const e of errors.slice(0, 3)) console.log('page error:', e);
 
+let worst = 0;
 for (const name of ['page1', 'page2']) {
   const diskOn = new Uint8Array(HGR_W * HGR_H);
   for (const [x, y] of golden[name].points) diskOn[y * HGR_W + x] = 1;
@@ -94,6 +95,7 @@ for (const name of ['page1', 'page2']) {
     else if (portOn[k]) { onlyPort++; perRow[(k / HGR_W) | 0]++; }
   }
   const diff = onlyDisk + onlyPort;
+  worst = Math.max(worst, diff);
   console.log(`${name}:`);
   console.log(`  disk ${diskLit} lit, port ${portLit} lit, ${both} in both`);
   console.log(`  ${diff} of ${diskOn.length} differ  (${(100 * (1 - diff / diskOn.length)).toFixed(3)}% agree)`);
@@ -108,3 +110,10 @@ for (const name of ['page1', 'page2']) {
   fs.writeFileSync(`captured/supply/${name}-diff.png`, toPng(d, { colour: [255, 0, 0] }));
 }
 console.log('wrote captured/supply/*-port.png and *-diff.png');
+
+// A harness that only prints is a harness that cannot fail. Both pages are deterministic
+// once the live readout row is out, so both have to be exact.
+console.log('');
+console.log(worst === 0 ? 'supply parity: both pages exact'
+  : `supply parity: ${worst} pixels differ`);
+process.exit(worst === 0 && errors.length === 0 ? 0 : 1);
