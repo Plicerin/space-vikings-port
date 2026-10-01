@@ -356,6 +356,7 @@ async function repairRestock(ctx: SceneContext, scenes: SceneManager): Promise<v
   const angry = () => {
     state.planetSurrendered = false;
     state.planets[state.planetIndex].surrendered = false;
+    state.planets[state.planetIndex].securedByte = 0;
     clearPendingConquestCollection(state, state.planetIndex);
   };
   if (state.credits < totalCost) {

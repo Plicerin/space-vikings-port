@@ -426,6 +426,7 @@ export class GameState {
     baseScale: 1,
     hasBase: false,
     surrendered: false,
+    securedByte: 0,
     looted: false,
   };
 
@@ -438,6 +439,19 @@ export class GameState {
 export interface PlanetState {
   name: string;
   surrendered: boolean;
+  /**
+   * `38219 + P`, the conquered flag, as the **byte** and not as a yes or no.
+   *
+   * It matters because GALAXY MAP 3066 tests it for exactly 1: `IF PEEK(38219 + P) = 1 THEN
+   * HCOLOR= 2`. SOL ships at **100** in PLANET FILE-M - measured, `probe_mappick.mjs` reads
+   * 100 for planet 1 and 0 for the other nineteen - so SOL is drawn in HCOLOR 3 like any
+   * unconquered star and only 3075's box marks it. 1550's `POKE 38219 + PEEK(38209),1` is what
+   * puts a 1 there, and SHORE LEAVE 2610 puts it back to 0.
+   *
+   * Collapsing this to the boolean drew SOL in HCOLOR 2, which lights half the pixels of a
+   * shape: six of its thirteen.
+   */
+  securedByte: number;
   looted: boolean;
   hasBase: boolean;
   groundAssaultFailed: boolean;
@@ -466,6 +480,8 @@ export function makeInitialGalaxy(): PlanetState[] {
     // 38219+P. Only SOL is secured at the start, which is where "Sol is friendly from the
     // start" came from - it is now read rather than assumed.
     surrendered: p.secured,
+    // SOL ships at 100 and everything else at 0; only play writes a 1.
+    securedByte: p.secured ? (i === 0 ? 100 : 1) : 0,
     looted: i === 0, // Sol has no raid loot to collect; no disk source for this one
     hasBase: p.repairBase,                 // 38303+P, COM 1150
     groundAssaultFailed: false,

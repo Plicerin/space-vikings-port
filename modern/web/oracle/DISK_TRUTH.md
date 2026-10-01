@@ -4292,6 +4292,51 @@ server before believing anything measured in it.
 
 ---
 
+## The galaxy map's Y answer, captured - and SOL drawn in the wrong colour
+
+The map's `Y` page was on the open list as plausible but unchecked. `probe_mapinfo.mjs` walks
+it on the machine - the paddle cursor onto Alpha Centauri, the button, then Y - and it turned
+up two things, one of them nothing to do with the page.
+
+### COM does not flood on this route
+
+```
+3260 ... IF AN$ = "Y" THEN POKE 38388,P: POKE 38149,8: PRINT " ": PRINT "^DRUN COM"
+12   GOSUB 15100: IF PEEK(38388) > 0 THEN C = PEEK(38388): GOTO 978
+```
+
+Line 12 jumps to **978**, clean over 910 - which is the line that floods rows 0 to 123 in
+HCOLOR 5 and pokes 973 to 255. So the directory's black-on-orange is not what this page looks
+like: there is no flood, 973 is still the 0 line 8 left, and 980's spaces erase rather than
+paint. White text on black, with the map's own caption band still underneath because nothing
+repainted it - rows 152-191 are 1,552 lit before and after, the same pixels.
+
+The port drew the directory's version on both routes: **28,902 pixels of white that is not
+there**, and `READY` printed over the caption at row 20 instead of 1170's `VTAB 15` at the
+window's left edge. Both fixed; the page is now 0 of 53,760.
+
+### SOL is drawn in HCOLOR 3, not 2
+
+Seven pixels were left over on the *readout* page, in a cross at 115, 75 - which is SOL. Not
+the Y page at all, and not the cursor.
+
+`3066 IF PEEK(38219 + P) = 1 THEN HCOLOR= 2` tests the conquered byte for **exactly 1**, and
+SOL's ships at **100**: measured, `probe_mappick.mjs` reads 100 for planet 1 and 0 for the
+other nineteen. So SOL is drawn in HCOLOR 3 like any unconquered star and only 3075's box marks
+it. The port kept that flag as a boolean and sent a 1, so SOL came out in HCOLOR 2 - which
+lights half a shape's pixels, six of its thirteen.
+
+The byte is carried now, as `securedByte`: 100 for SOL out of PLANET FILE-M, 1 where 1550 pokes
+one, 0 where 2610 takes it back. The port's own comment at 3066 had said all of this; the code
+below it had not.
+
+**`galaxymap_parity` could not have caught it**, and passed throughout. It builds its page from
+the machine's own star table, where SOL's byte is 100 - so the one value the port gets wrong is
+the one value the harness never asks it for. The scene-driven `mapinfo_parity` is what found
+it, on a page that is not even about the map.
+
+---
+
 ---
 
 ## RECALL, all five branches

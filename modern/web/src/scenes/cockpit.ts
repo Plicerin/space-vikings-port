@@ -985,6 +985,8 @@ const enemy = spawnEnemy(state);
   if (state.planetSurrendered && !state.commanderMode) {
     state.planetSurrendered = false;
     state.planets[state.planetIndex].surrendered = false;
+  state.planets[state.planetIndex].securedByte = 0;
+    state.planets[state.planetIndex].securedByte = 0;
     clearPendingConquestCollection(state, state.planetIndex);
     state.planetVitalityLimit = 100;
   }
@@ -1019,6 +1021,8 @@ const enemy = spawnEnemy(state);
   if (state.planetSurrendered && !state.commanderMode) {
     state.planetSurrendered = false;
     state.planets[state.planetIndex].surrendered = false;
+  state.planets[state.planetIndex].securedByte = 0;
+    state.planets[state.planetIndex].securedByte = 0;
     clearPendingConquestCollection(state, state.planetIndex);
     state.planetVitalityLimit = 100;
   }
@@ -1460,6 +1464,7 @@ function applyCockpitDebugOverrides(state: GameState): void {
   state.inOrbit = false;
   state.planetSurrendered = false;
   state.planets[state.planetIndex].surrendered = false;
+  state.planets[state.planetIndex].securedByte = 0;
   state.shipKind = 0;
   state.enemyShips = 0;
   state.speed = Math.max(30, state.speed);

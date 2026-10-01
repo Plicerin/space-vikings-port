@@ -271,9 +271,13 @@ export const comScene = async (ctx: SceneContext, scenes: SceneManager): Promise
   if (state.commanderMapTarget !== null) {
     const target = state.commanderMapTarget;
     state.commanderMapTarget = null;
-    showPlanetData(hires, state.planets[target], PLANET_NAMES[target], target);
-    hires.hcolor(5);
-    hires.text('READY', 10, 20);
+    // Line 12 jumps to 978 without passing through 910, so this page has no flood behind it
+    // and 973 is still 0: white text on whatever the galaxy map left, which is black up here
+    // and its own caption band below row 18. 1170 then puts READY at the window's left edge -
+    // `VTAB 15: PRINT "READY ";` - and not over the caption, which is where the port had it.
+    showPlanetData(hires, state.planets[target], PLANET_NAMES[target], target, false);
+    hires.hcolor(6);
+    hires.text('READY ', 2, 15);
     await input.waitForKey();
     glog('com', 'return to galaxy map');
     return scenes.run('galaxyMap');
@@ -446,19 +450,35 @@ function enterNavComputer(hires: import('../engine/hires').Hires): boolean {
  */
 const INVERSE = { invert: true } as const;
 
+/**
+ * 979 to 1170, the planet's page.
+ *
+ * It is reached two ways and they do not look alike. The directory gets here through 910,
+ * which floods rows 0-123 in HCOLOR 5 and pokes 973 to 255, so everything after it is black
+ * text on orange. The galaxy map's `Y` gets here through **line 12** - `IF PEEK(38388) > 0
+ * THEN C = PEEK(38388): GOTO 978` - which jumps clean over 910, so there is no flood and 973
+ * is still the 0 that line 8 left. White on black, and 980's spaces erase rather than paint.
+ *
+ * Measured, `probe_mapinfo.mjs`: the machine's Y page is black behind the text, and the port
+ * was drawing the directory's orange-and-inverse version on both routes - 28,902 pixels of
+ * white that is not there.
+ */
 function showPlanetData(
   hires: import('../engine/hires').Hires,
   planet: import('../engine/gameState').PlanetState,
   name: string,
   _idx: number,
+  inverse = true,
 ): void {
+  const style = inverse ? INVERSE : undefined;
+  if (!inverse) hires.hcolor(6);
   // 980
-  for (let r = 2; r <= 15; r++) hires.text(' '.repeat(38), 2, r, INVERSE);
+  for (let r = 2; r <= 15; r++) hires.text(' '.repeat(38), 2, r, style);
 
   // 990: `PRINT TAB( 5);S$(C);" STAR SYSTEM"` - TAB is absolute, so column 4.
-  hires.text(`${name} STAR SYSTEM`, 5, 2, INVERSE);
+  hires.text(`${name} STAR SYSTEM`, 5, 2, style);
 
-  const say = (text: string, row: number) => hires.text(text, 2, row, INVERSE);
+  const say = (text: string, row: number) => hires.text(text, 2, row, style);
 
   // 1005: `PEEK(38240 + C)`, the visited flag.
   if (!planet.visited) {

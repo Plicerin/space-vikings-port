@@ -253,6 +253,7 @@ export function markPlanetConquered(state: GameState): void {
   if (!planet) return;
   state.planetSurrendered = true;
   planet.surrendered = true;
+  planet.securedByte = 1;            // 1550's `POKE 38219 + PEEK(38209),1`
   planet.groundAssaultFailed = false;
   state.pendingConquestCollectionPlanet = planet.looted || state.planetIndex === 0
     ? null

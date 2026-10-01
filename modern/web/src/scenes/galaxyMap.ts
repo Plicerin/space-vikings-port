@@ -229,9 +229,10 @@ export function galaxyMapDataFrom(state: import('../engine/gameState').GameState
       x: p.x,
       y: p.y,
       z: p.z,
-      // The port keeps this as a boolean; the disk's byte is not one - SOL's reads 100, and
-      // line 3066 only colours a star when it is exactly 1.
-      secured: p.surrendered ? 1 : 0,
+      // 3066 tests the byte for exactly 1, and SOL's is 100 - so SOL draws in HCOLOR 3 like
+      // any other star and only 3075's box marks it. Sending a 1 here drew it in HCOLOR 2,
+      // which lights six of the shape's thirteen pixels.
+      secured: p.securedByte,
     })),
     here: state.planetIndex + 1,
   };
