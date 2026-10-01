@@ -111,14 +111,31 @@ export class GameState {
   /** Number of missiles remaining. PEEK(38187)=$954B. Decremented by 2
    * per missile salvo (STARSHIP_SIM:1090). Initial 0 until restocked. */
   missilesRemaining = 60;
-  /** Laser tone / type byte LT = $9557 (38167). Cycled by fire flow. */
-  laserType = 0;
+  /**
+   * `LT`, 38167, which STARSHIP SIMULATOR line 2 names and 205, 317, 318 and 321 set to 2, 4,
+   * 3 and 1 for W, A, B and S. **It ships at 3**, in the master and in a running game both,
+   * and this was 0. Nothing in the port reads it yet, but it is one of SHIP'S DATA's 54 bytes
+   * and the disk's value is 3.
+   *
+   * STATUS 1386 also reads it, as the high byte of something else entirely:
+   * `IF (PEEK(38167) * 256) + PEEK(38159) = 0 THEN "THE TROOPS ARE ALL DEAD!"`. The port does
+   * not compute that message this way - it has a troop count of its own - which is just as
+   * well, because 3 * 256 + 20 is 788 and the troops start at 2000.
+   */
+  laserType = 3;
   /** Planet surrendered flag — PEEK(38208)=$9550. 1 = planet has
    * surrendered; suppresses further combat at this planet. */
   planetSurrendered = false;
-  /** Planet vitality — PEEK(38160)=$94F8. Damaged by player attacks;
+  /**
+   * 38160, `VP`. **A new game starts at 1, not 0** - it is 1 in SHIP'S DATA-M and 1 in a
+   * freshly booted game both (`probe_shipdata.mjs`), and this was 0. GROUND FORCES 510 reads
+   * it as `VP = PEEK(38160)`, STARSHIP SIMULATOR 1535 accumulates into it, and H/D 93 puts it
+   * back to 0 on arrival at a tech-2 planet, so the opening value is the one the first assault
+   * works from.
+   *
+   * Planet vitality — PEEK(38160)=$94F8. Damaged by player attacks;
    * when >= planetVitalityLimit ($38150=$94EE), planet surrenders. */
-  planetVitality = 0;
+  planetVitality = 1;
   /** Planet vitality limit — PEEK(38150)=$94EE. Live captures show this is
    * an explicit encounter-state value and should not be recomputed from tech
    * in scene logic. Planet surrenders when planetVitality >= this value. */
@@ -147,9 +164,19 @@ export class GameState {
   /** Laser system operational — PEEK(38186)=$952A. 0 = inoperable.
    * Checked before laser fire (STARSHIP_SIM:1502). */
   laserOperational = true;
-  /** Missile mode flag — PEEK(38202)=$955A. 1 = missile, 0 = laser.
+  /**
+   * 38202. **A new game has 1**, measured in a running machine, and this was `false` while
+   * `weaponMode` right below it said `'missile'` - the two disagreed from the first frame.
+   *
+   * It matters on the disk in two places: STARSHIP SIMULATOR 1501 is
+   * `IF PEEK(38202) = 1 THEN 1000`, which is what sends the fire button to the missile
+   * routine, and GALAXY MAP 5030/5040 draw the MISSILE and LASER lamps from it. The port
+   * fires from `weaponMode` and lights the lamps from it too, so nothing was visibly wrong -
+   * but this is one of the 54 bytes a save carries, and it was carrying the wrong one.
+   *
+   * Missile mode flag — PEEK(38202)=$955A. 1 = missile, 0 = laser.
    * When 1, fire button (line 185→1500→1501) redirects to missile (1000). */
-  missileMode = false;
+  missileMode = true;
   /** 38165 is the ship's condition, not a turret: STATUS 1290-1294 prints it as GREEN, BLUE
    * or RED for 1, 2 and 3, and GALAXY MAP 5060-5070 colours the readout from the same byte.
    * STARSHIP SIMULATOR 5200 returns unless it is 3, so the guns answer ground fire only at

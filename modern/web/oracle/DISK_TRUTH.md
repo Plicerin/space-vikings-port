@@ -6557,6 +6557,62 @@ halves of the loop: the climb to Y > 4000 that line 158 wants, and the fall back
 
 ---
 
+## Which probes nothing reads, and what that found
+
+The controls were wrong for one mechanical reason: `probe_controls.mjs` measured all of it and
+no harness consumed the measurement. That is a property you can check for rather than notice,
+so it was checked for - every `probe_*.mjs`, what it writes under `captured/`, and whether any
+harness reads that directory.
+
+Most of the orphans are investigation tools - disassembly, opcode tables, traces, font and
+colour spelunking - which measure the machine rather than the game and have nothing to compare
+against. One was not.
+
+### SHIP'S DATA, 38150-38203
+
+`probe_shipdata.mjs` dumps all 54 bytes twice: the `-M` master as stored on the diskette, and
+the same range read out of a freshly booted game one pass into flight. Nothing had ever put
+either beside the port. These are the numbers every other screen is built from, and a wrong one
+is invisible to the pixel harnesses, because those compare a disk screen against a port screen
+**driven from the same wrong value**.
+
+`shipdata_parity.mjs` starts a new game, plays it to the cockpit, reads the port's own state
+and compares. Three were wrong:
+
+| cell | what it is | disk | port had |
+| --- | --- | --- | --- |
+| 38160 | `VP`, the assault progress | 1 | 0 |
+| 38167 | `LT`, the laser type | 3 | 0 |
+| 38202 | missile mode | 1 | 0 |
+
+**38202 is the interesting one.** `GameState` had `missileMode = false` with
+`weaponMode: 'missile'` on the next line, so the two disagreed from the first frame. On the
+disk that byte is what sends the fire button to the missile routine - STARSHIP SIMULATOR 1501
+is `IF PEEK(38202) = 1 THEN 1000` - and what draws GALAXY MAP 5030/5040's MISSILE and LASER
+lamps. The port fires from `weaponMode` and lights the lamps from it too, so nothing was
+visibly wrong; but 38202 is one of the 54 bytes `SHIP'S DATA` saves, and the save was carrying
+the wrong one. A bug with no symptom until you reload.
+
+**38167** is `LT`, which line 2 names and 205, 317, 318 and 321 set to 2, 4, 3 and 1 for W, A,
+B and S. It ships at 3. Nothing in the port reads it yet. STATUS 1386 reads it as the high byte
+of something else - `IF (PEEK(38167) * 256) + PEEK(38159) = 0 THEN "THE TROOPS ARE ALL DEAD!"` -
+and 3 * 256 + 20 is 788 while the troops start at 2000, so whatever that pair is, it is not the
+troop count. The port computes that message from its own count and is right to.
+
+The harness also reports, without failing, **13 cells the port carries no field for**, five of
+them non-zero in a fresh game: 38158 (1), 38159 (20), 38184 (100, nav. comp.), 38188 (100) and
+38192 (62). Those are open.
+
+### Two of the three "failures" were the harness
+
+Worth recording because it is the ordinary case. The first run reported fourteen, and eleven
+were the harness's own field map guessing `s.loot.artWorks` and `s.damage.navPct`. The port
+calls that loot field `artUnits`, and it has no nav. comp. field at all because STATUS 5120
+prints the figure as a constant 100 and never reads 38184. A parity harness has to know both
+sides, and getting the port's side wrong looks exactly like a finding until you check.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
