@@ -4239,6 +4239,26 @@ addition, and an addition that is always on is indistinguishable from a bug. So 
 switches, in `engine/qol.ts`, and **every one of them defaults to off**: a fresh browser plays
 the game the machine played.
 
+So far there are five, in two groups. **Picture**: smoothing, bloom and scanlines, below.
+**Play**: `fastFire`, which puts the old 0.45 s trigger back in place of the machine's measured
+6.69, and `gamepad`.
+
+The gamepad is the clean case of what an addition should be. There is no pad on the disk, so
+there is nothing to be faithful to and nothing to get wrong - every control it offers is one
+the keyboard already has, pushed through the same `Input`, so the game cannot tell the
+difference and neither can a harness. The stick and d-pad become the arrow keys the flight loop
+polls with `isDown`; the face buttons become fire, Return, the weapon toggle and the computer;
+the shoulders become 1, 2, 3 and 4. The letters and the digits the menus want are not mapped,
+because a pad has no room for them and the keyboard has not gone anywhere.
+
+The one thing it has to get right is the **latch**. `Input` models $C000 - one key, held until
+the program reads it - and a pad polled sixty times a second would overwrite that latch sixty
+times a second, turning one press into a stream. Buttons fire on the rising edge only. Checked
+with a stubbed `navigator.getGamepads`, `gamepad_check.mjs`: with the switch off a held fire
+button spends nothing and the stick does not steer; with it on, holding fire for two and a half
+seconds spends exactly two missiles - one shot, which is what 1090 takes - and the stick turns
+the ship.
+
 The first three are the picture, and they were found by being asked why the text looked fuzzy.
 The blit to the canvas had three softenings hard-coded into it, none of which any Apple II
 ever did:

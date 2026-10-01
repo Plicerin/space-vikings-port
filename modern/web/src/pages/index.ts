@@ -55,6 +55,7 @@ import { shipDebugScene } from '../scenes/shipDebug';
 import { shipVectorDebugScene } from '../scenes/shipVectorDebug';
 import { mountQolPanel } from '../engine/qolPanel';
 import { qolOn, setQol, QOL_FEATURES } from '../engine/qol';
+import { GamepadInput } from '../engine/gamepad';
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 function boot(): void {
@@ -79,6 +80,8 @@ function boot(): void {
     ro.observe(viewportEl);
   }
   const input = new Input();
+  // An addition, so it starts off and watches its own switch; see `engine/gamepad.ts`.
+  new GamepadInput(input);
   const audio = new Audio();
   const loader = new Loader();
   const state = new GameState();

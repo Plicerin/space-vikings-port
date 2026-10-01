@@ -18,7 +18,8 @@ export type QolKey =
   | 'crtSmoothing'
   | 'crtBloom'
   | 'crtScanlines'
-  | 'fastFire';
+  | 'fastFire'
+  | 'gamepad';
 
 export interface QolFeature {
   key: QolKey;
@@ -54,6 +55,12 @@ export const QOL_FEATURES: readonly QolFeature[] = [
     label: 'Fast fire',
     group: 'Play',
     note: 'Lets you fire about every half-second. The machine takes a whole pass of its main loop to fire, measured at 6.7 seconds for a missile and 6.0 for the laser.',
+  },
+  {
+    key: 'gamepad',
+    label: 'Gamepad',
+    group: 'Play',
+    note: 'Stick or d-pad to fly, A to fire, B for return, X for weapon, Y for the computer, shoulders for speed. The keyboard still works; the letters and digits are only there.',
   },
 ];
 
