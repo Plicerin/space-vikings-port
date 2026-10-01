@@ -4403,9 +4403,32 @@ pass does both exactly once. So in that state a pass is 2.94 s.
 `CALL CA` walks a display list, and the list is longer with the enemy ship in it. The two
 measurements are different scenes, not a contradiction.
 
-That leaves the constant at the fast end of its real range. It is the ship's speed in units a
-second - 120 a pass is 47/s at 2.55 and 41/s at 2.94 - so moving it changes how the game plays,
-and it is left where it is until that is a decision rather than a side effect.
+### And 2.55 is the median of the real distribution
+
+`probe_passtime.mjs` times the page flip in four states of flight, in one run, with `frames()`
+as the only clock:
+
+| state | a pass |
+| --- | --- |
+| the opening, enemy ahead | 2.94 s |
+| far out, nothing else in view | 2.46 s |
+| in the atmosphere, ground below | 2.54 s |
+| in the box, taking return fire | 2.4 to 9.0 s |
+
+Twenty passes: 2.42 s to 9.03 s, **median 2.55**. Which is the constant, exactly - so
+`BASIC_SIMULATOR_TICK_SECONDS` is not at the fast end of anything. The 2.94 was the opening,
+the most expensive ordinary case, with the enemy's model in the display list `CALL CA` walks;
+the quiet cases are 2.46 and 2.54; and the one that lurches is a planet shooting back, where
+192's `GOSUB 3000` and `GOSUB 5000` push a pass as far as nine seconds.
+
+Nothing to change, then. It is worth having the distribution written down rather than a single
+number, because the next person to measure one state will find it disagrees with the constant
+and think, as I did, that something is wrong.
+
+One method note, learned the hard way: the clock has to be `frames()`. A first version lined
+the machine up with raw `cpu.stepCycles`, which skips the IO and MMU ticks `frames()` makes,
+and it read the opening at 52 frames a pass against the 176 that is really there - and left the
+variable table unreadable into the bargain.
 
 ---
 
