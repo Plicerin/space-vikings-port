@@ -4,295 +4,626 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Space Vikings</title>
+    <meta name="description" content="G.M. Robbins's 1982 Apple II space-combat game, rebuilt in the browser and checked against the original floppy by an oracle of 51 parity suites." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
     <style>
       :root {
         color-scheme: dark;
-        --bg: #000000;
-        --bg-deep: #000000;
-        --panel: #000000;
-        --panel-strong: #000000;
-        --line: #000000;
-        --line-strong: #000000;
-        --text: #ffffff;
-        --text-dim: #aaaaaa;
-        --glow: none;
+        /* The Apple II hi-res palette, which is the whole colour vocabulary this game had. */
+        --a2-green: #14f53c;
+        --a2-orange: #ff6a3c;
+        --a2-violet: #ff44fd;
+        --a2-blue: #14cffd;
+        --a2-white: #ffffff;
+
+        --bg: #05070a;
+        --bg-2: #0a0e14;
+        --panel: #0e131a;
+        --line: #1d2630;
+        --line-2: #2b3744;
+        --ink: #dfe6ef;
+        --ink-2: #98a6b6;
+        --ink-3: #65717f;
+        --maxw: 1060px;
+        --radius: 14px;
+
+        /* names the game shell below still uses */
+        --text: var(--ink);
+        --text-dim: var(--ink-2);
+        --line-strong: var(--a2-blue);
       }
-      html, body {
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
         margin: 0;
-        padding: 0;
         background:
-          radial-gradient(circle at top, rgba(18, 58, 120, 0.24), transparent 35%),
-          radial-gradient(circle at bottom, rgba(0, 177, 198, 0.14), transparent 28%),
-          linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
-        color: var(--text);
-        height: 100%;
-        font-family: "Consolas", "Cascadia Mono", "SFMono-Regular", ui-monospace, monospace;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
+          radial-gradient(900px 520px at 50% -8%, rgba(20, 207, 253, 0.10), transparent 70%),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+        background-attachment: fixed;
+        color: var(--ink);
+        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
       }
-      body::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        pointer-events: none;
-        background:
-          linear-gradient(rgba(0, 0, 0, 0) 23px, rgba(32, 146, 225, 0.08) 24px),
-          linear-gradient(90deg, rgba(0, 0, 0, 0) 23px, rgba(32, 146, 225, 0.05) 24px);
-        background-size: 24px 24px;
-        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent 92%);
+      a { color: var(--a2-blue); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      code, kbd, .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+      code {
+        background: #0c1118; border: 1px solid var(--line);
+        border-radius: 5px; padding: 1px 6px; font-size: 0.88em; color: var(--a2-green);
       }
-      #container {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        height: 100%;
+      kbd {
+        display: inline-block; min-width: 1.7em; padding: 1px 7px; text-align: center;
+        border: 1px solid var(--line-2); border-bottom-width: 3px; border-radius: 6px;
+        background: #151c25; color: var(--ink); font-size: 0.82em; line-height: 1.5;
+        font-family: 'IBM Plex Mono', monospace;
+      }
+      h2 {
+        font-size: clamp(1.4rem, 3.4vw, 2rem); line-height: 1.2; margin: 0 0 6px;
+        letter-spacing: -0.01em;
+      }
+      h3 { font-size: 1.02rem; margin: 0 0 8px; letter-spacing: 0.01em; }
+      p { margin: 0 0 14px; }
+      .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 18px; }
+      .lead { color: var(--ink-2); }
+      .lead b, .lead strong { color: var(--ink); font-weight: 600; }
+
+      /* ---------- top bar ---------- */
+      .top {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 14px; padding: 16px 0; font-size: 13px;
+      }
+      .brand {
+        display: flex; align-items: center; gap: 10px;
+        font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+        letter-spacing: 0.1em; color: var(--ink);
+      }
+      .brand .pip {
+        width: 10px; height: 10px; border-radius: 2px; background: var(--a2-green);
+        box-shadow: 0 0 10px rgba(20, 245, 60, 0.8);
+      }
+      .top nav { display: flex; gap: 18px; flex-wrap: wrap; }
+      .top nav a { color: var(--ink-2); }
+      .top nav a:hover { color: var(--ink); text-decoration: none; }
+
+      /* ---------- hero ---------- */
+      .hero { padding: 30px 0 24px; text-align: center; }
+      .stripes {
+        display: grid; grid-auto-flow: column; gap: 5px;
+        margin: 0 auto 22px; max-width: 420px;
+      }
+      .stripes span { height: 6px; border-radius: 3px; }
+      .hero h1 {
+        margin: 0 0 14px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-weight: 700;
+        font-size: clamp(2rem, 7.5vw, 3.6rem);
+        letter-spacing: 0.1em;
+        line-height: 1.05;
+        color: var(--a2-white);
+        text-shadow: 0 0 26px rgba(20, 207, 253, 0.35);
+      }
+      .hero .sub {
+        max-width: 660px; margin: 0 auto 10px; color: var(--ink-2);
+        font-size: clamp(1rem, 2.3vw, 1.12rem);
+      }
+      .hero .sub b { color: var(--ink); font-weight: 600; }
+      .byline {
+        font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+        letter-spacing: 0.14em; color: var(--ink-3); margin-bottom: 20px;
+      }
+      .cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 10px 18px; border-radius: 10px;
+        border: 1px solid var(--line-2); background: var(--panel);
+        color: var(--ink); font-weight: 600; font-size: 0.94rem;
+      }
+      .btn:hover { border-color: var(--a2-blue); text-decoration: none; }
+      .btn.primary {
+        background: linear-gradient(180deg, #16405a, #0d2838);
+        border-color: #2f7fa8; color: #eaf8ff;
+      }
+
+      /* ---------- the game ---------- */
+      #container { padding: 6px 0 4px; }
+      .bezel {
+        position: relative;
+        border: 1px solid var(--line-2);
+        border-radius: 18px;
+        padding: 14px;
+        background: linear-gradient(180deg, #11161d, #080b0f);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
       }
       #viewport {
         position: relative;
-        flex: 1;
-        min-height: 0;
         width: 100%;
-        line-height: 0;
+        aspect-ratio: 35 / 24;     /* 280 x 192, the hi-res screen */
+        border-radius: 10px;
         overflow: hidden;
         background: #000;
         isolation: isolate;
+        line-height: 0;
       }
       #viewport::after {
         content: '';
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
+        position: absolute; inset: 0; pointer-events: none; z-index: 3;
         background-image: repeating-linear-gradient(
-          to bottom,
-          transparent 0 1px,
-          rgba(0, 0, 0, 0.06) 1px,
-          rgba(0, 0, 0, 0.06) 2px
-        );
+          to bottom, transparent 0 1px, rgba(0, 0, 0, 0.055) 1px, rgba(0, 0, 0, 0.055) 2px);
         mix-blend-mode: multiply;
-        z-index: 3;
       }
       #stage {
-        display: block;
-        background: #000;
-        width: 100%;
-        height: 100%;
-        image-rendering: auto;
-        touch-action: none;
+        display: block; width: 100%; height: 100%;
+        background: #000; image-rendering: auto; touch-action: none;
       }
-      #cpu-panel { display: none; }
-      .panel-header {
-        font-weight: bold;
-        font-size: 0.72rem;
-        letter-spacing: 0.18em;
-        white-space: nowrap;
-        opacity: 0.78;
+      .tray {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; flex-wrap: wrap; margin-top: 12px;
+        font-size: 13px; color: var(--ink-2);
       }
-      #cpu-status {
-        flex: 1;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: 0.98rem;
-        font-weight: bold;
+      .tray .hint { font-family: 'IBM Plex Mono', monospace; }
+      .tray button {
+        background: var(--panel); color: var(--ink);
+        border: 1px solid var(--line-2); border-radius: 8px;
+        padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer;
       }
-      #copy-log-btn {
-        background: var(--line-strong);
-        color: #000;
-        border: none;
-        padding: 12px 18px;
-        font-size: 0.88rem;
-        font-family: inherit;
-        font-weight: bold;
-        cursor: pointer;
-        border-radius: 8px;
-        transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
-        box-shadow: 0 0 22px rgba(24, 227, 240, 0.18);
+      .tray button:hover { border-color: var(--a2-blue); }
+
+      /* ---------- sections ---------- */
+      section { padding: 44px 0 6px; }
+      .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+      .card {
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: var(--radius); padding: 18px;
       }
-      #copy-log-btn:hover {
-        background: #ffffff;
+      .card p:last-child { margin-bottom: 0; }
+      .card .tag {
+        font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+        letter-spacing: 0.16em; color: var(--a2-green); margin-bottom: 8px;
       }
-      #copy-log-btn:focus-visible {
-        outline: 2px solid #fff;
-        outline-offset: 2px;
+      ul.keys { list-style: none; margin: 0; padding: 0; font-size: 0.92rem; }
+      ul.keys li {
+        display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+        padding: 7px 0; border-bottom: 1px dashed var(--line);
       }
-      #copy-log-btn:active {
-        transform: translateY(1px);
+      ul.keys li:last-child { border-bottom: 0; }
+      ul.keys span:first-child { color: var(--ink-2); }
+      .stat { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+      .stat:last-child { border-bottom: 0; }
+      .stat .n {
+        font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+        font-size: 1.5rem; color: var(--a2-green); min-width: 3.6em;
       }
+      .stat .t { color: var(--ink-2); font-size: 0.9rem; }
+      .pull {
+        border-left: 3px solid var(--a2-orange);
+        padding: 2px 0 2px 16px; margin: 18px 0;
+        color: var(--ink); font-size: 1.02rem;
+      }
+      figure.listing {
+        margin: 16px 0; background: #070b10; border: 1px solid var(--line);
+        border-radius: 10px; overflow: hidden;
+      }
+      figure.listing pre {
+        margin: 0; padding: 14px 16px; overflow-x: auto;
+        font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;
+        line-height: 1.65; color: var(--a2-green);
+      }
+      figure.listing figcaption {
+        padding: 8px 16px; border-top: 1px solid var(--line);
+        font-size: 12px; color: var(--ink-3);
+      }
+
+      /* ---------- game shell bits the app drives ---------- */
       #touch-controls {
-        width: min(100%, 1100px);
-        display: none;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 12px;
+        display: none; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;
       }
       .touch-cluster {
-        background:
-          linear-gradient(180deg, rgba(7, 22, 44, 0.88), rgba(2, 12, 28, 0.96));
-        border: 1px solid rgba(80, 180, 255, 0.48);
-        border-radius: 18px;
-        padding: 14px;
-        display: grid;
-        gap: 10px;
-        box-shadow: inset 0 0 0 1px rgba(104, 214, 255, 0.08);
+        background: linear-gradient(180deg, rgba(10, 24, 40, 0.9), rgba(5, 12, 22, 0.95));
+        border: 1px solid rgba(20, 207, 253, 0.34);
+        border-radius: 14px; padding: 12px; display: grid; gap: 9px;
       }
+      .touch-cluster:last-child { grid-column: 1 / -1; }
       .touch-cluster .label {
-        color: var(--text-dim);
-        font-size: 0.82rem;
-        letter-spacing: 0.08em;
-        margin-bottom: 2px;
-        text-align: center;
-        opacity: 0.95;
+        color: var(--ink-2); font-size: 0.76rem; letter-spacing: 0.12em;
+        text-align: center; font-family: 'IBM Plex Mono', monospace;
       }
-      .touch-row {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px;
-      }
+      .touch-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
       .touch-control {
-        border: 1px solid #4db6ff;
-        border-radius: 14px;
+        border: 1px solid #2d7fa6; border-radius: 12px;
         background: linear-gradient(180deg, rgba(9, 43, 72, 0.92), rgba(7, 33, 55, 0.96));
-        color: #00faff;
-        min-height: 72px;
-        padding: 10px 8px;
-        font-size: 1rem;
-        font-weight: 700;
-        line-height: 1.05;
-        text-align: center;
-        user-select: none;
-        cursor: pointer;
-        touch-action: none;
-        overflow-wrap: anywhere;
-        box-shadow: inset 0 0 0 1px rgba(126, 216, 255, 0.08);
+        color: var(--a2-blue); min-height: 62px; padding: 8px 6px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: clamp(0.72rem, 3.4vw, 0.9rem); font-weight: 700;
+        text-align: center; user-select: none; cursor: pointer; touch-action: none;
       }
-      .touch-control:active {
-        background: rgba(0, 90, 140, 0.9);
+      .touch-control:active { background: rgba(0, 90, 140, 0.9); }
+      #cpu-panel { display: none; }
+      .panel-header { font-weight: 700; font-size: 0.68rem; letter-spacing: 0.16em; opacity: 0.8; }
+      #cpu-status { flex: 1; min-width: 0; font-size: 0.9rem; font-weight: 700; }
+      #copy-log-btn {
+        background: var(--line-strong); color: #00141c; border: none;
+        padding: 10px 16px; font: inherit; font-size: 0.82rem; font-weight: 700;
+        cursor: pointer; border-radius: 8px;
       }
-      @media (max-width: 840px), (hover: none) and (pointer: coarse) {
-        body {
-          overflow: auto;
-        }
-        #container {
-          justify-content: flex-start;
-          padding: 18px 16px 22px;
-          gap: 18px;
-        }
-        #viewport {
-          width: min(100%, 560px);
-          border-radius: 20px;
-          flex: none;
-        }
-        #stage {
-          width: 100%;
-          height: auto;
-          aspect-ratio: 35 / 24;
-          max-height: 100%;
-        }
-        #cpu-panel {
-          width: 100%;
-          padding: 12px 14px;
-          gap: 10px;
-          align-items: stretch;
-          flex-wrap: wrap;
-        }
-        #touch-controls {
-          display: grid;
-          width: 100%;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
-        }
-        .touch-cluster:last-child {
-          grid-column: 1 / -1;
-        }
-        .touch-cluster {
-          padding: 12px;
-        }
-        .touch-cluster .label {
-          font-size: 0.8rem;
-        }
-        .touch-control {
-          min-height: 66px;
-          font-size: clamp(0.76rem, 3.8vw, 0.95rem);
-          padding: 8px 6px;
-        }
-        .panel-header {
-          font-size: 0.65rem;
-          letter-spacing: 0.14em;
-        }
-        #cpu-status {
-          min-width: 0;
-          font-size: 0.88rem;
-        }
-        #copy-log-btn {
-          width: 100%;
-          font-size: 0.82rem;
-          padding: 11px 14px;
-        }
+
+      /* ---------- footer ---------- */
+      footer { margin-top: 54px; border-top: 1px solid var(--line); padding: 22px 0 46px; }
+      footer .row {
+        display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+        font-size: 12.5px; color: var(--ink-3);
+      }
+      details.dev { margin-top: 16px; font-size: 12.5px; color: var(--ink-3); }
+      details.dev summary { cursor: pointer; color: var(--ink-2); }
+
+      @media (hover: none) and (pointer: coarse) {
+        #touch-controls { display: grid; }
+        #cpu-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+      }
+      @media (max-width: 720px) {
+        /* The nav crowds the brand long before it wraps nicely, so stack it. */
+        .top { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 0 10px; }
+        .top nav { gap: 14px 18px; }
+      }
+      @media (max-width: 560px) {
+        .bezel { padding: 9px; border-radius: 14px; }
+        section { padding: 34px 0 4px; }
+        .hero { padding: 18px 0 20px; }
+        ul.keys li { flex-wrap: wrap; gap: 4px 12px; }
       }
     </style>
   </head>
   <body>
-    <div id="container">
-      <div id="viewport">
-        <canvas id="stage"></canvas>
+    <div class="wrap">
+      <div class="top">
+        <div class="brand"><span class="pip"></span> SPACE VIKINGS</div>
+        <nav>
+          <a href="#play">Play</a>
+          <a href="#controls">Controls</a>
+          <a href="#history">1982</a>
+          <a href="#oracle">How it was ported</a>
+          <a href="#findings">What the disk said</a>
+          <a href="https://github.com/Plicerin/space-vikings-port" target="_blank" rel="noopener">GitHub</a>
+        </nav>
       </div>
-      <div id="touch-controls" aria-label="Touch game controls">
-        <div class="touch-cluster">
-          <div class="label">MOVE</div>
-          <div class="touch-row">
-            <span></span>
-            <button class="touch-control" data-code="ArrowUp" data-hold="1">▲</button>
-            <span></span>
+
+      <header class="hero">
+        <div class="stripes" aria-hidden="true">
+          <span style="background: var(--a2-green)"></span>
+          <span style="background: var(--a2-violet)"></span>
+          <span style="background: var(--a2-blue)"></span>
+          <span style="background: var(--a2-orange)"></span>
+          <span style="background: var(--a2-white)"></span>
+        </div>
+        <h1>SPACE VIKINGS</h1>
+        <p class="sub">
+          A 1982 Apple&nbsp;II space-combat game, rebuilt in the browser and
+          <b>checked against the original floppy, byte by byte</b>. Twenty planets to take,
+          one ship, and a crew whose morale you can ruin.
+        </p>
+        <p class="byline">COPYRIGHT 1982 &nbsp;BY: &nbsp;G.M. ROBBINS</p>
+        <div class="cta">
+          <a class="btn primary" href="#play">Play it</a>
+          <a class="btn" href="#oracle">How it was ported</a>
+        </div>
+      </header>
+
+      <main>
+        <!-- The game. Every id below is one the app drives; the shell moved, not the wiring. -->
+        <div id="container">
+          <div id="play" class="bezel">
+            <div id="viewport">
+              <canvas id="stage"></canvas>
+            </div>
+            <div class="tray">
+              <div class="hint">Press <kbd>N</kbd> for a new game &middot; <kbd>O</kbd> to load one</div>
+              <div>
+                <button id="fullscreen" type="button">Fullscreen</button>
+              </div>
+            </div>
           </div>
-          <div class="touch-row">
-            <button class="touch-control" data-code="ArrowLeft" data-hold="1">◀</button>
-            <span></span>
-            <button class="touch-control" data-code="ArrowRight" data-hold="1">▶</button>
+
+          <div id="touch-controls" aria-label="Touch game controls">
+            <div class="touch-cluster">
+              <div class="label">BANK / PITCH</div>
+              <div class="touch-row">
+                <span></span>
+                <button class="touch-control" data-code="ArrowUp" data-hold="1">▲</button>
+                <span></span>
+              </div>
+              <div class="touch-row">
+                <button class="touch-control" data-code="ArrowLeft" data-hold="1">◀</button>
+                <span></span>
+                <button class="touch-control" data-code="ArrowRight" data-hold="1">▶</button>
+              </div>
+              <div class="touch-row">
+                <span></span>
+                <button class="touch-control" data-code="ArrowDown" data-hold="1">▼</button>
+                <span></span>
+              </div>
+            </div>
+            <div class="touch-cluster">
+              <div class="label">FIRE / POWER</div>
+              <div class="touch-row">
+                <button class="touch-control" data-code="1">SPD-</button>
+                <button class="touch-control" data-code="3">SPD--</button>
+                <button class="touch-control" data-code=" ">FIRE</button>
+              </div>
+              <div class="touch-row">
+                <button class="touch-control" data-code="2">SPD+</button>
+                <button class="touch-control" data-code="4">SPD++</button>
+                <button class="touch-control" data-code="W">WEAPON</button>
+              </div>
+            </div>
+            <div class="touch-cluster">
+              <div class="label">SYSTEMS</div>
+              <div class="touch-row">
+                <button class="touch-control" data-code="A">AUTO</button>
+                <button class="touch-control" data-code="B">COND</button>
+                <button class="touch-control" data-code="S">SHLD</button>
+              </div>
+              <div class="touch-row">
+                <button class="touch-control" data-code="R">RADAR</button>
+                <button class="touch-control" data-code="H">HYPER</button>
+                <button class="touch-control" data-code="C">COM</button>
+              </div>
+            </div>
           </div>
-          <div class="touch-row">
-            <span></span>
-            <button class="touch-control" data-code="ArrowDown" data-hold="1">▼</button>
-            <span></span>
+
+          <div id="cpu-panel">
+            <div class="panel-header">CPU PILOT STATUS</div>
+            <div id="cpu-status">WAITING...</div>
+            <button id="copy-log-btn">COPY GAME LOG</button>
           </div>
         </div>
-        <div class="touch-cluster">
-          <div class="label">FIRE / POWER</div>
-          <div class="touch-row">
-            <button class="touch-control" data-code="1">SPD-</button>
-            <button class="touch-control" data-code="3">SPD--</button>
-            <button class="touch-control" data-code=" ">FIRE</button>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="controls">
+          <h2>You do not steer. You bank.</h2>
+          <p class="lead">
+            The Apple&nbsp;II shipped this game with paddles, and the paddles do not point the
+            ship &mdash; they set a <b>rate</b>. Each pass of the main loop adds a step to your
+            pitch and your bank, and it is the <b>bank</b> that brings the nose round. Let go and
+            the bank stays where it got to, so the ship keeps turning until you bank back the
+            other way. It is a roll, not a yaw, and it is the whole feel of the game.
+          </p>
+          <div class="grid">
+            <div class="card">
+              <div class="tag">FLYING</div>
+              <ul class="keys">
+                <li><span>Bank left / right</span><span><kbd>←</kbd> <kbd>→</kbd></span></li>
+                <li><span>Nose up / down</span><span><kbd>↑</kbd> <kbd>↓</kbd></span></li>
+                <li><span>Speed, small steps</span><span><kbd>1</kbd> <kbd>2</kbd></span></li>
+                <li><span>Speed, large steps</span><span><kbd>3</kbd> <kbd>4</kbd></span></li>
+                <li><span>Fire</span><span><kbd>Space</kbd></span></li>
+                <li><span>Missile / laser</span><span><kbd>W</kbd></span></li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="tag">SHIP</div>
+              <ul class="keys">
+                <li><span>Autopilot</span><span><kbd>A</kbd></span></li>
+                <li><span>Battle condition</span><span><kbd>B</kbd></span></li>
+                <li><span>Shields</span><span><kbd>S</kbd></span></li>
+                <li><span>Radar</span><span><kbd>R</kbd></span></li>
+                <li><span>Hyperdrive</span><span><kbd>H</kbd></span></li>
+                <li><span>Computer / orders</span><span><kbd>C</kbd></span></li>
+              </ul>
+              <p class="lead" style="margin: 12px 0 0; font-size: 0.86rem">
+                That is every key the flight loop answers &mdash; the original's table is
+                exactly this long, and the port's matches it.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">A WARNING ABOUT PACE</div>
+              <p class="lead">
+                This game is <b>slow</b>, and deliberately so. One pass of the main loop takes
+                about <b>2.5 seconds</b> on real hardware, and that is one step of movement and
+                one new picture. A missile leaves the rack every <b>6.69&nbsp;s</b>.
+              </p>
+              <p class="lead" style="margin-bottom: 0">
+                All of that is measured, not guessed. If you would rather not play at 1982
+                speed, the <b>QOL</b> button in the corner has switches for a faster trigger,
+                smoother flight, a gamepad and save slots &mdash; every one of them off by
+                default, because off is the disk.
+              </p>
+            </div>
           </div>
-          <div class="touch-row">
-            <button class="touch-control" data-code="2">SPD+</button>
-            <button class="touch-control" data-code="4">SPD++</button>
-            <button class="touch-control" data-code="W">LASER</button>
+        </section>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="history">
+          <h2>Where it came from</h2>
+          <p class="lead">
+            <b>Space Vikings</b> is a space-combat and conquest game for the Apple&nbsp;II,
+            published in 1982 and credited on its own title screen to <b>G.M. Robbins</b>. You
+            command one ship in a galaxy of twenty planets: fly, fight whatever is defending the
+            place, bombard it, land troops, take the surrender, and move on. There is an economy
+            underneath &mdash; loot to sell, repairs to pay for, troops to enlist, bases to
+            build &mdash; and a crew whose morale you can wreck by working them without leave.
+          </p>
+          <p class="lead">
+            Technically it is a 140&nbsp;KB DOS&nbsp;3.3 floppy holding <b>23 chained Applesoft
+            BASIC programs</b>, each of which <code>RUN</code>s the next, plus machine-language
+            modules for the things BASIC was far too slow for: the 3D projection, the shape
+            drawing, and the flight controls. Changing screen means loading a program off the
+            disk, which is why moving between the cockpit and the computer costs a visible
+            second and a quarter.
+          </p>
+          <p class="pull">
+            A single pass of the flight loop &mdash; read the paddles, move the ship, draw the
+            starfield, flip the page &mdash; takes two and a half seconds. That is not emulation
+            overhead. That is how fast the game ran in 1982.
+          </p>
+        </section>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="oracle">
+          <h2>How it was ported</h2>
+          <p class="lead">
+            Not by reading the BASIC and reimplementing it. The listings tell you what the
+            author wrote; they do not tell you what the machine <i>does</i> &mdash; and on this
+            project the difference turned out to matter again and again.
+          </p>
+          <p class="lead">
+            So the port is built against an <b>oracle</b>: the real game, running on an
+            Apple&nbsp;II emulator inside a headless browser, driven by a script that can press
+            keys, read memory and screenshot the hi-res page. Everything goes through two
+            stages.
+          </p>
+          <div class="grid">
+            <div class="card">
+              <div class="tag">STAGE ONE &mdash; CAPTURE</div>
+              <h3>A probe asks the machine</h3>
+              <p class="lead" style="margin-bottom: 0">
+                Boot the disk, play to the thing in question, and record what happened &mdash;
+                the bytes, the screen, the timing. The answer is written to a
+                <b>golden</b> file. There are <b>112</b> of these.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">STAGE TWO &mdash; COMPARE</div>
+              <h3>A harness checks the port</h3>
+              <p class="lead" style="margin-bottom: 0">
+                Drive the port the same way, through its own screens, and compare against the
+                golden &mdash; pixel for pixel where it is a picture, value for value where it
+                is a number. There are <b>51</b> of these, and they all have to pass.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">THE RULE</div>
+              <h3>The disk wins</h3>
+              <p class="lead" style="margin-bottom: 0">
+                Where the port and the floppy disagree, the floppy is right &mdash; including
+                when it is obviously a bug, and including when the manual says otherwise. The
+                findings are written up as they are measured, in a document that is now about
+                6,700 lines long.
+              </p>
+            </div>
           </div>
+          <p class="pull">
+            The hardest lesson was not about the Apple&nbsp;II. It was that a test which cannot
+            fail is worse than no test, because it is counted.
+          </p>
+          <p class="lead">
+            Several harnesses were, at one point, quietly meaningless: some built the screen
+            they were about to compare against, and some printed a report and exited zero
+            whatever it said. The flight controls were wrong for most of the project's life
+            while forty-eight suites passed &mdash; the measurement existed, sat in a file, and
+            nothing read it. Every harness now has to be shown failing before it is believed.
+          </p>
+        </section>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="findings">
+          <h2>What the disk actually said</h2>
+          <p class="lead">
+            A sample of things that are true of the original, that nobody would have guessed,
+            and that the port now does too.
+          </p>
+          <div class="grid">
+            <div class="card">
+              <div class="tag">SAVING</div>
+              <h3>Your position is not saved</h3>
+              <p class="lead" style="margin-bottom: 0">
+                The save writes three blocks to disk, and the sixteen bytes holding the ship's
+                position and attitude sit in the gap <i>between</i> two of them. Save and
+                continue in the same session and the ship is where you left it; switch the
+                machine off first and it starts over, at the wrong planet.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">TURNING</div>
+              <h3>The hardest turn is unreachable</h3>
+              <p class="lead" style="margin-bottom: 0">
+                The table that turns bank into heading has a strongest row, at a bank of 48. The
+                clamp that stops you banking too far stops at <b>47</b>. One short, so that row
+                can never fire in play.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">PITCHING OVER</div>
+              <h3>A half turn that is not half</h3>
+              <p class="lead" style="margin-bottom: 0">
+                Point the nose far enough back and the heading flips. The flip adds 126 and
+                wraps at <b>253</b> &mdash; while every other angle on the ship wraps at 256. So
+                it is not quite a half turn, and flipping twice leaves you one off where you
+                started.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">THE CREW</div>
+              <h3>Shore leave, or else</h3>
+              <p class="lead" style="margin-bottom: 0">
+                Put your troops on the ground, then jump to another system without stopping for
+                shore leave, and morale drops a point. Taking the leave is what clears it
+                &mdash; and the flag is set <i>before</i> the game asks whether you will pay
+                them. They got their leave either way. They just did not get paid.
+              </p>
+            </div>
+          </div>
+          <figure class="listing">
+<pre>  15 FOR OO = 0 TO 1: IF PEEK(38164) = 1 THEN 20
+  19 J = PDL(1):K = PDL(0): POKE 38397,J: POKE 38398,K
+  20 P = PEEK(P1):B = PEEK(B1):H = PEEK(H1)
+ 129 ... X = X + X1:Z = Z + Z1:Y = Y + Y1 ...
+ 150 CALL CA</pre>
+            <figcaption>
+              STARSHIP SIMULATOR, the flight loop. Line 19 reads the paddles, 129 moves the
+              ship, and <b>150</b> is where the controls are finally applied &mdash; after the
+              move, from paddles read before it. Getting that order wrong changes how the ship
+              handles.
+            </figcaption>
+          </figure>
+          <div class="grid" style="margin-top: 16px">
+            <div class="card">
+              <div class="stat"><span class="n">51</span><span class="t">parity suites, all green</span></div>
+              <div class="stat"><span class="n">112</span><span class="t">probes that ask the real machine</span></div>
+              <div class="stat"><span class="n">23</span><span class="t">Applesoft programs on the floppy</span></div>
+              <div class="stat"><span class="n">20</span><span class="t">planets in the galaxy</span></div>
+            </div>
+            <div class="card">
+              <div class="stat"><span class="n">2.55s</span><span class="t">one pass of the flight loop</span></div>
+              <div class="stat"><span class="n">6.69s</span><span class="t">between missiles, measured</span></div>
+              <div class="stat"><span class="n">1.29s</span><span class="t">to load the next screen off disk</span></div>
+              <div class="stat"><span class="n">0</span><span class="t">findings taken from the old analysis without re&#8209;checking</span></div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <div class="row">
+          <div>
+            Space Vikings is &copy; 1982 G.M. Robbins. This is an unofficial preservation
+            project, not affiliated with the author or any publisher.
+          </div>
+          <div><a href="https://github.com/Plicerin/space-vikings-port" target="_blank" rel="noopener">Source on GitHub</a></div>
         </div>
-        <div class="touch-cluster">
-          <div class="label">SYSTEMS</div>
-          <div class="touch-row">
-            <button class="touch-control" data-code="A">AUTO</button>
-            <button class="touch-control" data-code="B">COND</button>
-            <button class="touch-control" data-code="S">SHLD</button>
-          </div>
-          <div class="touch-row">
-            <button class="touch-control" data-code="R">RADAR</button>
-            <button class="touch-control" data-code="H">HYPER</button>
-            <button class="touch-control" data-code="O">ORBIT</button>
-          </div>
-          <div class="touch-row">
-            <button class="touch-control" data-code="C">COM</button>
-            <span></span>
-            <button class="touch-control" data-code="Escape">MENU</button>
-          </div>
-        </div>
-      </div>
-      <div id="cpu-panel">
-        <div class="panel-header">CPU PILOT STATUS</div>
-        <div id="cpu-status">WAITING...</div>
-        <button id="copy-log-btn">COPY GAME LOG</button>
-      </div>
+        <details class="dev">
+          <summary>Notes for the curious</summary>
+          <p style="margin-top: 10px">
+            The findings document lives at <code>modern/web/oracle/DISK_TRUTH.md</code> in the
+            repository and is the only trusted account of what the disk does; the oracle itself
+            is <code>modern/web/oracle/</code>, and <code>node run_all.mjs</code> runs every
+            suite against a local dev server. The repository's older analysis predates all of
+            this and was not trusted &mdash; where it and a measurement disagreed, the
+            measurement replaced it.
+          </p>
+        </details>
+      </footer>
     </div>
+
+    <script>
+      document.getElementById('fullscreen').addEventListener('click', () => {
+        const v = document.getElementById('viewport');
+        if (document.fullscreenElement) document.exitFullscreen();
+        else v.requestFullscreen?.();
+      });
+    </script>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>
