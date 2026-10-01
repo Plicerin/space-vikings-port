@@ -172,16 +172,3 @@ export function clampPitch175(pitch: number): number {
   return pitch;
 }
 
-/**
- * Keys to a paddle byte.
- *
- * A paddle is absolute and a key is not, so a held key is full deflection and nothing held is
- * centre - the strongest step the hardware offers, and the dead zone otherwise. There is no
- * disk behaviour to copy here: the original shipped with paddles and the port has a keyboard.
- * A gamepad stick arrives through the same keys, so it gets the same thing; feeding its axis
- * in as a real 0..255 deflection is the obvious next use for this.
- */
-export function paddleFromKeys(negative: boolean, positive: boolean): number {
-  if (negative === positive) return PADDLE_CENTRE;
-  return negative ? 0 : 255;
-}

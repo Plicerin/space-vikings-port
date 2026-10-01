@@ -93,6 +93,22 @@ async function run(gamepadOn) {
     const bankHeld = s.bank;
     pad.axes[0] = 0;
     await sleep(300);
+
+    // And the reason a stick is not just four arrow keys: it is a paddle, and the control
+    // table has four step sizes. Half deflection has to land on a smaller one than hard over.
+    // Measured from the same place both times so the comparison is only about the stick.
+    const bankOver = async (axis, ms) => {
+      s.bank = 0;
+      await sleep(100);
+      pad.axes[0] = axis;
+      await sleep(ms);
+      pad.axes[0] = 0;
+      const b = s.bank;
+      await sleep(200);
+      return b > 127 ? b - 256 : b;
+    };
+    const full = await bankOver(-1, 6000);
+    const half = await bankOver(-0.6, 6000);
     // The cockpit keeps heading to itself and writes it back on the way out, so ask for COM.
     key('C');
     for (let i = 0; i < 160 && scene() !== 'com'; i++) await sleep(150);
@@ -103,6 +119,7 @@ async function run(gamepadOn) {
       firedWhileHeld: before - whileHeld,
       heading: s.heading,
       bank: ((bankHeld - bank0) > 127 ? bankHeld - bank0 - 256 : bankHeld - bank0),
+      full, half,
       scene: scene(),
     };
   });
@@ -132,6 +149,11 @@ check('a held fire button is one shot, not a stream', on.firedWhileHeld === 2,
 // only once the bank is out of the 0-4 dead band.
 check('the stick banks the ship', on.bank !== 0, `bank 0 to ${on.bank}`);
 check('and the bank turns the nose', on.heading !== 0, `heading ${on.heading}`);
+// A key is on or off and a paddle is not. Half over has to bank less than hard over, in the
+// same time - which is only true because the stick hands PDL(0) a real 0..255 now.
+check('half a stick is a smaller step than all of it',
+  on.half !== 0 && Math.abs(on.half) < Math.abs(on.full),
+  `${on.full} hard over, ${on.half} at 0.6`);
 
 fs.mkdirSync('captured/gamepad', { recursive: true });
 fs.writeFileSync('captured/gamepad/result.json', JSON.stringify({

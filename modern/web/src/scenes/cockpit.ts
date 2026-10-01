@@ -1,7 +1,6 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { fireLaser1500, fireMissile1000, missileHit1000 } from '../engine/diskWeapons';
-import { applyControls, paddleFromKeys, clampPitch175, PADDLE_CENTRE }
-  from '../engine/diskControls';
+import { applyControls, clampPitch175, PADDLE_CENTRE } from '../engine/diskControls';
 import { damageTick3000, spawnGroundBolt5000, stepGroundBolt5095, groundBoltSpent5095,
   groundBoltStep5090, damageTickRuns190 } from '../engine/diskDamage';
 import { GameState } from '../engine/gameState';
@@ -428,8 +427,8 @@ const enemy = spawnEnemy(state);
         // Line 19: `J = PDL(1):K = PDL(0)`. Reading the paddles is all that happens here -
         // the ship is not moved by it. `$9023` turns these into a step once a pass, from
         // `updatePhysics`, which is where line 150 calls it.
-        pdl1 = paddleFromKeys(input.isDown('ArrowUp'), input.isDown('ArrowDown'));
-        pdl0 = paddleFromKeys(input.isDown('ArrowLeft'), input.isDown('ArrowRight'));
+        pdl1 = input.paddle(1);
+        pdl0 = input.paddle(0);
       }
     }
 
@@ -513,20 +512,21 @@ const enemy = spawnEnemy(state);
           : state.condition === 'blue' ? 'red' : 'green';
         state.antiFighterTurrets = state.condition === 'red' ? 3 : 0;
       } else if (ch === 'C') {
+        // 203: `ON K - 16 GOTO 317,318,319`, and 319 is `PRINT "RUNCOM"`.
+        //
+        // The whole table, which is short and which this follows: 201 takes 1-4 to
+        // `GOSUB 311,312,313,314` - speed -3, +3, -15, +15 - 203 takes A, B and C to 317-319,
+        // 205 takes W, 206 takes R and S, and 209 takes H. There is no `O`. The port had one
+        // that set the orbit flag and teleported Y to 3000 or 4500, which skipped the climb
+        // to Y > 4000 that line 158 asks for and the fall back into the box at 156 - the loop
+        // the game is made of. It is gone.
         next = 'com';
       } else if (ch === 'R') {
+        // 206: `ON K - 33 GOTO 320,321`, and 320 is `PRINT "RUNRADAR"`.
         next = 'radar';
       } else if (ch === 'H') {
         if (state.navDestination !== null && !state.atmosphere) {
           next = 'hyperdrive';
-        }
-      } else if (ch === 'O') {
-        if (state.inOrbit) {
-          state.inOrbit = false;
-          state.atmosphere = true;
-          state.y = 3000;
-        } else if (state.atmosphere) {
-          state.y = 4500;
         }
       } else if (ch === 'V') {
         vectorMode = !vectorMode;
@@ -604,7 +604,12 @@ const enemy = spawnEnemy(state);
         glog('transition', `commander siege reentry pos=(${state.x},${state.y},${state.z})`);
         next = 'reentry';
       } else if (Math.abs(state.x) < 900 && Math.abs(state.y) < 900
-        && Math.abs(state.z) < 900 && !state.atmosphere && !state.inOrbit) {
+        && Math.abs(state.z) < 900 && !state.atmosphere) {
+        // 156: `IF ABS(X) < 900 AND ABS(Y) < 900 AND ABS(Z) < 900 AND PEEK(38210) = 0 THEN
+        // "RUNRE"`. The box and the atmosphere flag, and nothing else. This also tested
+        // `!state.inOrbit`, which the disk has no byte for and which could strand a ship:
+        // ORBIT leaves you at (700, 200, 2000) in vacuum, and flying Z down into the box is
+        // how you get back - the gate stopped exactly that. REENTRY clears the lamp itself.
         glog('transition', `reentry pos=(${state.x},${state.y},${state.z})`);
         next = 'reentry';
       }

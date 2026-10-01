@@ -168,7 +168,19 @@ export class GameState {
    * Reentry triggered when |X|,|Y|,|Z| < 900 in space (STARSHIP_SIM:156).
    * Orbit insertion when Y > 4000 in atmosphere (STARSHIP_SIM:158). */
   atmosphere = false;
-  /** Currently in orbit ($953F or similar — TODO confirm). */
+  /**
+   * The ORBIT lamp on the panel.
+   *
+   * This used to say `$953F or similar - TODO confirm`, and $953F is 38207, which is the
+   * ground batteries. There is no in-orbit byte on the disk at all. ORBIT.bas line 22 plots
+   * the lamp itself - `FOR J = 153 TO 157: HPLOT 200,J TO 209,J` in HCOLOR 1 - and nothing
+   * ever reads it back. Being in orbit is not a state the game stores; ORBIT.bas clears the
+   * atmosphere flag at line 25 and drops the ship at a fixed place, and that is all of it.
+   * END 190's `IF PEEK(38210) = 1 THEN "YOU MUST BE IN ORBIT TO SAVE GAME"` is the proof:
+   * the message says orbit and the test is only that we are out of the atmosphere.
+   *
+   * So this is the port's own, kept because the lamp is real and something has to light it.
+   */
   inOrbit = false;
   /** Force redraw next frame ($9505 set to 7 in STARSHIP_SIM:9). */
   forceRedraw = false;

@@ -31,6 +31,18 @@ const AXES: { code: string; axis: number; sign: 1 | -1; button: number }[] = [
 ];
 
 /**
+ * Which stick axis is which paddle.
+ *
+ * `PDL(0)` is bank, which is the turn, and `PDL(1)` is pitch - line 19 reads them in that
+ * order into 38397 and 38398. The signs match the arrow keys above: left is paddle 0 low,
+ * nose-up is paddle 1 low.
+ */
+const PADDLES: { paddle: number; axis: number; sign: 1 | -1 }[] = [
+  { paddle: 0, axis: 0, sign: 1 },
+  { paddle: 1, axis: 1, sign: 1 },
+];
+
+/**
  * The buttons, in the standard mapping Chrome reports.
  *
  * Face buttons first, then the shoulders for speed - 1 and 2 are STARSHIP SIMULATOR's three
@@ -74,6 +86,7 @@ export class GamepadInput {
   }
 
   private releaseAll(): void {
+    for (const p of PADDLES) this.input.setPaddle(p.paddle, null);
     for (const code of this.held) this.input.releaseHold(code);
     this.held.clear();
     this.wasDown.clear();
@@ -96,6 +109,16 @@ export class GamepadInput {
         if (down && !this.held.has(a.code)) { this.input.pressHold(a.code); this.held.add(a.code); }
         else if (!down && this.held.has(a.code)) { this.input.releaseHold(a.code); this.held.delete(a.code); }
       }
+      // The stick is the thing the Apple II actually had: a paddle. As well as standing in
+      // for a held arrow - which the menus and everything outside flight still want - its
+      // deflection is handed over as a real 0..255, so the smaller steps in the control
+      // table become reachable. Inside the dead zone it hands over nothing and the keys
+      // answer, which is what keeps the keyboard working with a pad plugged in.
+      for (const p of PADDLES) {
+        const v = pad.axes[p.axis] ?? 0;
+        this.input.setPaddle(p.paddle, Math.abs(v) > DEADZONE ? 128 + v * p.sign * 127 : null);
+      }
+
       for (const b of BUTTONS) {
         const down = pad.buttons[b.index]?.pressed === true;
         // The rising edge only: the latch holds one key, and a held button is not a repeat.

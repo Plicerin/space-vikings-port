@@ -2,8 +2,16 @@
 // Apple II semantics: PEEK(-16384) returns the last key with high bit set
 // until POKE -16368, 0 clears the strobe. Paddles return 0..255.
 
+/** A key is on or off, so holding one is as far as the paddle goes. */
+function paddleFromHeld(negative: boolean, positive: boolean): number {
+  if (negative === positive) return 128;
+  return negative ? 0 : 255;
+}
+
 export class Input {
   private pendingKey: number | null = null;
+  /** `PDL(0)` and `PDL(1)` when a stick is pushed; null means read the keys. */
+  private paddleAxis: (number | null)[] = [null, null];
   private down = new Set<string>();
   private readonly touchCodeMap: Record<string, number> = {
     ArrowLeft: 0x88,
@@ -82,9 +90,30 @@ export class Input {
     this.pendingKey = null;
   }
 
-  // PDL(0..3) — paddles return 0..255. Stub: center.
-  paddle(_n: number): number {
+  /**
+   * `PDL(n)`: 0..255, 128 at centre.
+   *
+   * STARSHIP SIMULATOR line 19 reads paddles 0 and 1 every pass and the control module turns
+   * them into a step whose size is how far off centre they are. This returned a constant 128
+   * and nothing called it, because the port steered with the arrow keys instead.
+   *
+   * It is real now, and it has two sources. A key is not a paddle - it is on or off - so a
+   * held arrow is full deflection, which is the strongest step the table offers. A stick is a
+   * paddle, so when one is pushed its own deflection is passed through and the smaller steps
+   * in the table become reachable. `setPaddle` is how the pad hands them over; nothing else
+   * writes them, and with no pad they stay null and the keys answer.
+   */
+  paddle(n: number): number {
+    const axis = this.paddleAxis[n];
+    if (axis !== null && axis !== undefined) return axis;
+    if (n === 0) return paddleFromHeld(this.isDown('ArrowLeft'), this.isDown('ArrowRight'));
+    if (n === 1) return paddleFromHeld(this.isDown('ArrowUp'), this.isDown('ArrowDown'));
     return 128;
+  }
+
+  /** A real deflection from a stick, or null to let the keys answer again. */
+  setPaddle(n: number, value: number | null): void {
+    this.paddleAxis[n] = value === null ? null : Math.max(0, Math.min(255, Math.round(value)));
   }
 
   isDown(code: string): boolean {

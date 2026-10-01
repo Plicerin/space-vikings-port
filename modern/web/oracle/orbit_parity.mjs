@@ -101,6 +101,55 @@ console.log('');
 // which the two machines never share, and the bank and pitch needles depend on which hi-res
 // page the flight loop had flipped to when 158 fired - the capture this is compared against
 // caught a page with neither.
+// ---------------------------------------------------------------------------------------
+// And what you can do once you are there, which the pixels say nothing about.
+//
+// ORBIT line 35 leaves the ship at (700, 200, 2000) with the atmosphere flag cleared, so it
+// is in vacuum and outside the box. Line 156 brings it back - `IF ABS(X) < 900 AND ABS(Y) <
+// 900 AND ABS(Z) < 900 AND PEEK(38210) = 0 THEN "RUNRE"` - and the way back is to fly Z down
+// until it is inside. The port used to test `!state.inOrbit` as well, which has no byte
+// behind it on the disk and stopped that from ever happening.
+const reentered = await (async () => {
+  const b2 = await chromium.launch({ headless: true });
+  const pg = await b2.newPage();
+  await pg.goto(PORT_URL, { waitUntil: 'load' });
+  await pg.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikingsState),
+    null, { timeout: 30000 });
+  const out = await pg.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const scene = () => {
+      const l = window.__gameLog.getLog();
+      return l.length ? l[l.length - 1].scene : '?';
+    };
+    const init = { key: 'N', code: 'KeyN', bubbles: true };
+    window.dispatchEvent(new KeyboardEvent('keydown', init));
+    window.dispatchEvent(new KeyboardEvent('keyup', init));
+    for (let i = 0; i < 500 && scene() !== 'cockpit'; i++) await sleep(70);
+    await sleep(1500);
+
+    // Where ORBIT leaves you, lamp and all.
+    const s = window.__spaceVikingsState;
+    Object.assign(s, { x: 700, y: 200, z: 2000, atmosphere: 0, inOrbit: true, speed: 0 });
+    await sleep(400);
+    const before = scene();
+
+    // Fly in. Z inside 900 is the only thing missing.
+    s.z = 400;
+    for (let i = 0; i < 300 && scene() === 'cockpit'; i++) await sleep(100);
+    return { before, after: scene(), inOrbit: s.inOrbit };
+  });
+  await b2.close();
+  return out;
+})();
+
+const reentryOk = reentered.after === 'reentry' || reentered.after === 'cockpit'
+  ? reentered.after === 'reentry' : false;
+console.log('');
+console.log(reentryOk
+  ? `  ok    from orbit, flying into the 900 box re-enters   ${reentered.before} -> ${reentered.after}`
+  : `  FAIL  from orbit, flying into the 900 box re-enters   ${reentered.before} -> ${reentered.after}`);
+
+console.log('');
 console.log(own === 0 ? "orbit parity: ORBIT's own rows 0-125 are exact"
   : `orbit parity: ${own} pixels differ inside ORBIT's own rows`);
-process.exit(own === 0 && errors.length === 0 ? 0 : 1);
+process.exit(own === 0 && reentryOk && errors.length === 0 ? 0 : 1);

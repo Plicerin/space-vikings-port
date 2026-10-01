@@ -6494,6 +6494,69 @@ drawing it again. Shots of both are in `captured/saveslots/`.
 
 ---
 
+## The paddle was a stub, and the orbit flag did not exist
+
+Two loose ends left by the control work, both of the same kind: something in the port that
+claimed to be the disk and was not.
+
+### `PDL(n)` is real now, and a stick is a paddle
+
+`Input.paddle()` returned a constant 128 and nothing called it. That was honest while the port
+steered with arrow keys, and wrong as soon as line 19 became the thing the cockpit does - so it
+answers properly now, and the cockpit asks it rather than asking the keys.
+
+It has two sources, and the distinction is the whole point. **A key is on or off**, so a held
+arrow is full deflection - the strongest of the four steps, and the only one a keyboard can
+reach. **A stick is a paddle**, which is what the machine actually had, so with the `gamepad`
+switch on its deflection is passed through as a real 0..255 and the smaller steps become
+reachable. Inside the dead zone it hands over nothing and the keys answer, which is what keeps
+the keyboard working with a pad plugged in.
+
+`gamepad_check.mjs` holds this: six seconds hard over banks 8, six seconds at 0.6 banks 4,
+because 0.6 puts `PDL(0)` at 52 and 50-69 is the +2 row. Eight checks.
+
+### There is no in-orbit byte
+
+`gameState.ts` carried `/** Currently in orbit ($953F or similar - TODO confirm). */`. $953F is
+38207, which is the ground batteries. The guess was wrong, and so was the premise: **the disk
+has no in-orbit flag at all.**
+
+ORBIT.bas line 22 draws the lamp itself - `FOR J = 153 TO 157: HPLOT 200,J TO 209,J` in HCOLOR
+1, the box next to INSTRUMENTS line 180's `ORBIT` label - and nothing ever reads it back. Being
+in orbit is not a state the game stores. Line 25 clears the atmosphere flag, line 35 drops the
+ship at a fixed place, and that is all of it. END 190 settles it: `IF PEEK(38210) = 1 THEN
+"YOU MUST BE IN ORBIT TO SAVE GAME"` - the message says orbit and the test is only that we are
+out of the atmosphere.
+
+So `inOrbit` is the port's own, and it is kept, because the lamp is real and something has to
+light it. The comment says that now instead of naming a byte that holds something else.
+
+### Two divergences this turned up, both now gone
+
+Both were in how the port *used* `inOrbit`, and between them they had replaced the loop the
+game is made of with a key.
+
+**The reentry test had a gate the disk does not.** Line 156 is `IF ABS(X) < 900 AND ABS(Y) <
+900 AND ABS(Z) < 900 AND PEEK(38210) = 0 THEN "RUNRE"` - the box and the atmosphere flag, and
+nothing else. The port also tested `!state.inOrbit`, which has no byte behind it, and that one
+is not cosmetic: ORBIT line 35 leaves the ship at (700, 200, 2000) with the atmosphere flag
+cleared, which is in vacuum and outside the box on Z alone. Flying Z down into the box is how
+you get back. The gate stopped exactly that, so a ship that reached orbit could not come home
+by flying.
+
+`orbit_parity.mjs` holds it now: put the ship where ORBIT leaves it with the lamp lit, bring Z
+inside 900, and the next scene has to be REENTRY. Checked by putting the gate back, which
+gives `cockpit -> cockpit`.
+
+**There was no `O` key.** The simulator's key table is complete and short - line 201 takes 1-4
+to `GOSUB 311,312,313,314` (speed -3, +3, -15, +15), 203 takes A, B and C to 317-319, 205 takes
+W, 206 takes R and S, and 209 takes H - and that is every key the flight loop answers. The port
+had an `O` branch that set the orbit flag and teleported Y to 3000 or 4500, which skipped both
+halves of the loop: the climb to Y > 4000 that line 158 wants, and the fall back into the box at
+156. It is gone, and with the gate gone too, flying is the way again.
+
+---
+
 ## Open questions
 
 Answered ones have been removed from this list rather than left to accumulate. What follows
