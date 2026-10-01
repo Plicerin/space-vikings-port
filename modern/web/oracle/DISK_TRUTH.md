@@ -4219,6 +4219,39 @@ recorded here as plausible rather than checked.
 
 ---
 
+## Where additions live: the QOL switchboard
+
+The port's job is to be the disk. Anything that makes the game *nicer* than the machine was -
+a smoother picture, a faster frame, a gamepad, a save slot the original never had - is an
+addition, and an addition that is always on is indistinguishable from a bug. So they go behind
+switches, in `engine/qol.ts`, and **every one of them defaults to off**: a fresh browser plays
+the game the machine played.
+
+The first three are the picture, and they were found by being asked why the text looked fuzzy.
+The blit to the canvas had three softenings hard-coded into it, none of which any Apple II
+ever did:
+
+- **Smoothing** - `imageSmoothingEnabled = true`, so the 280x192 buffer was bilinearly
+  interpolated up to the window. A hi-res pixel is hard-edged; off is nearest-neighbour.
+- **Bloom** - the frame drawn a second time with `globalCompositeOperation = 'screen'`, which
+  bleeds bright pixels into their neighbours. Text is the brightest thing on these screens, so
+  text bloomed most, which is what the fuzz mostly was.
+- **Scanlines** - a dark line every other row of the display.
+
+None of this touches the 280x192 buffer the parity harnesses read - they compare that, not the
+canvas - so the suite was blind to it either way, which is exactly why it sat there unexamined.
+
+The panel builds itself from `QOL_FEATURES`, so a new switch needs one entry and one `qolOn()`
+at the point it applies. The settings persist per browser, and the footer names what is on so
+a screenshot of a problem says which additions were running.
+
+One thing the panel has to get right: the game reads keys straight off `window`, and a focused
+checkbox answers Space and Return itself. Every control blurs as soon as it is used and key
+events inside the panel are stopped before they reach the game - checked by pressing C with the
+panel open and arriving in COM.
+
+---
+
 ---
 
 ## RECALL, all five branches

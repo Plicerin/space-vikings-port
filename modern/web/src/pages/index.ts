@@ -53,6 +53,7 @@ import { shipIdScene, drawShipId } from '../scenes/shipId';
 import { shapeDemoScene } from '../scenes/shapeDemo';
 import { shipDebugScene } from '../scenes/shipDebug';
 import { shipVectorDebugScene } from '../scenes/shipVectorDebug';
+import { mountQolPanel } from '../engine/qolPanel';
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 function boot(): void {
@@ -62,6 +63,10 @@ function boot(): void {
   const hires = new Hires(stage);
 
   const viewportEl = document.getElementById('viewport');
+  // The QOL switchboard, in the corner of the viewport. Everything it offers is an addition
+  // to what the machine did and everything starts off, so a fresh browser plays the disk's
+  // game; see `engine/qol.ts`.
+  if (viewportEl) mountQolPanel(viewportEl);
   const logSize = () => {
     if (!viewportEl || !stage) return;
     console.log(`viewport=${viewportEl.clientWidth}x${viewportEl.clientHeight} stage=${stage.clientWidth}x${stage.clientHeight}`);

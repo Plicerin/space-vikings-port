@@ -1,4 +1,5 @@
 import { glyphFor } from './diskFont';
+import { qolOn } from './qol';
 const W = 560;
 const H = 384;
 
@@ -856,21 +857,29 @@ export class Hires {
       gy = Math.round((ch - gh) / 2);
     }
 
-    // Smooth bilinear upscale — turns blocky pixels into a soft retro look
-    this.displayCtx.imageSmoothingEnabled = true;
+    // Three softenings, all of them additions to what the machine put on a screen, and all of
+    // them behind their own switch in the QOL panel. Off - the default - is nearest-neighbour
+    // with nothing on top, which is what an Apple II hi-res pixel looks like: hard-edged.
+    //
+    // None of this touches the 280x192 buffer the parity harnesses read, only the blit to the
+    // canvas, so the suite is blind to it either way.
+    this.displayCtx.imageSmoothingEnabled = qolOn('crtSmoothing');
 
     this.displayCtx.drawImage(this.offscreen, 0, 0, GW, GH, gx, gy, gw, gh);
 
-    // CRT bloom wash — soft glow over bright areas
-    this.displayCtx.globalCompositeOperation = 'screen';
-    this.displayCtx.drawImage(this.offscreen, 0, 0, GW, GH, gx, gy, gw, gh);
-    this.displayCtx.globalCompositeOperation = 'source-over';
+    if (qolOn('crtBloom')) {
+      // The frame again in screen mode, so bright pixels bleed into their neighbours.
+      this.displayCtx.globalCompositeOperation = 'screen';
+      this.displayCtx.drawImage(this.offscreen, 0, 0, GW, GH, gx, gy, gw, gh);
+      this.displayCtx.globalCompositeOperation = 'source-over';
+    }
 
-    // Display-resolution scanlines — always 1px every other row at the
-    // output pixel grid, so they stay crisp at any scale.
-    for (let sy = gy; sy < gy + gh; sy += 2) {
-      this.displayCtx.fillStyle = 'rgba(0,0,0,0.15)';
-      this.displayCtx.fillRect(gx, sy, gw, 1);
+    if (qolOn('crtScanlines')) {
+      // One pixel every other row of the **display**, so they stay crisp at any scale.
+      for (let sy = gy; sy < gy + gh; sy += 2) {
+        this.displayCtx.fillStyle = 'rgba(0,0,0,0.15)';
+        this.displayCtx.fillRect(gx, sy, gw, 1);
+      }
     }
   }
 }
