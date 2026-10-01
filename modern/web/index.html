@@ -283,6 +283,7 @@
         <nav>
           <a href="#play">Play</a>
           <a href="#controls">Controls</a>
+          <a href="#qol">Switches</a>
           <a href="#history">1982</a>
           <a href="#oracle">How it was ported</a>
           <a href="#findings">What the disk said</a>
@@ -425,10 +426,79 @@
                 one new picture. A missile leaves the rack every <b>6.69&nbsp;s</b>.
               </p>
               <p class="lead" style="margin-bottom: 0">
-                All of that is measured, not guessed. If you would rather not play at 1982
-                speed, the <b>QOL</b> button in the corner has switches for a faster trigger,
-                smoother flight, a gamepad and save slots &mdash; every one of them off by
-                default, because off is the disk.
+                All of that is measured, not guessed &mdash; and if you would rather not play
+                at 1982 speed, <a href="#qol">the switches below</a> will speed it up.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="qol">
+          <h2>Seven switches, all off</h2>
+          <p class="lead">
+            Anything that makes this nicer than the machine was is an <b>addition</b>, and an
+            addition that is always on is indistinguishable from a bug &mdash; you can no longer
+            tell what the game did. So every one lives behind a switch in the <b>QOL</b> panel,
+            in the top right corner of the game screen, and <b>every one starts off</b>. A browser that has never
+            seen this page plays the game the Apple&nbsp;II played.
+          </p>
+          <div class="grid">
+            <div class="card">
+              <div class="tag">PICTURE</div>
+              <h3>The filters come off</h3>
+              <p class="lead">
+                These three are the odd ones out: they were <i>already on</i>, hard-coded into
+                the blit, until someone asked why the text looked fuzzy. A bilinear upscale, a
+                second pass in screen blending so bright pixels bleed, and a dark line every
+                other row.
+              </p>
+              <p class="lead" style="margin-bottom: 0">
+                None of it was measured and none of it is what you are meant to be looking at
+                &mdash; an Apple&nbsp;II pixel is a hard-edged pixel. Off is nearest-neighbour
+                and nothing else. Turn them back on if you miss the glass.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">PLAY</div>
+              <h3>Gamepad</h3>
+              <p class="lead">
+                Stick or d-pad to fly, <b>A</b> to fire, <b>B</b> for return, <b>X</b> for the
+                weapon toggle, <b>Y</b> for the computer, shoulders for speed. The keyboard
+                keeps working alongside it.
+              </p>
+              <p class="lead" style="margin-bottom: 0">
+                The stick is the interesting part. This game was built for <b>paddles</b>, and a
+                paddle is analogue &mdash; so a stick hands the flight model a real deflection
+                and the gentler turns become available. A key can only ever be full tilt.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">PLAY</div>
+              <h3>Fast fire &amp; smooth flight</h3>
+              <p class="lead">
+                <b>Fast fire</b> puts the trigger at about half a second. The machine tests the
+                button once per pass of its main loop, which measured at 6.7&nbsp;s for a
+                missile and 6.0&nbsp;s for the laser.
+              </p>
+              <p class="lead" style="margin-bottom: 0">
+                <b>Smooth flight</b> redraws every browser frame. The machine draws one new
+                picture per pass &mdash; about one every 2.9&nbsp;seconds &mdash; and off is
+                exactly that, which is why the stars move the way they do.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">SAVING</div>
+              <h3>Save slots</h3>
+              <p class="lead">
+                Four saved games instead of one, and a saved game that comes back
+                <i>where it was</i>.
+              </p>
+              <p class="lead" style="margin-bottom: 0">
+                Off is the disk, and the disk is unkind here: it keeps one save, a new game
+                destroys it, and the ship's position is in none of the three blocks it writes
+                &mdash; so switching the machine off loses where you were and which planet you
+                were at. That is faithfully reproduced, and this is the way out of it.
               </p>
             </div>
           </div>
