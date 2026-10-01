@@ -2,7 +2,9 @@ import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
 import { OPENING_NEW_GAME_STATE } from '../engine/extractedOriginalData';
 import { GameState } from '../engine/gameState';
-import { applySave, readSave, clearSave, clearGap } from '../engine/diskSave';
+import { applySave, readSave, clearSave, clearGap, listSlots, SLOT_COUNT }
+  from '../engine/diskSave';
+import { qolOn } from '../engine/qol';
 
 export async function startScene(
   ctx: SceneContext,
@@ -60,7 +62,16 @@ export async function startScene(
       // the surrender and atmosphere flags and the planet we are at all come back as a fresh
       // machine has them. 190 and 195 set the position, and 225 copies the gap over it if
       // this run of the page still holds it.
-      const saved = readSave();
+      // One save on the disk, so `O` just loads it. With `saveSlots` on there are four and
+      // this asks which; an answer that is not a slot goes back to the title rather than
+      // guessing at one.
+      let slot = 1;
+      if (qolOn('saveSlots')) {
+        const picked = await askLoadSlot(ctx);
+        if (picked === null) continue;
+        slot = picked;
+      }
+      const saved = readSave(slot);
       if (!saved) {
         hires.hcolor(5);
         hires.text('THERE IS NO GAME SAVED', 8, 22);
@@ -73,7 +84,7 @@ export async function startScene(
       const restored = new GameState();
       applySave(restored, saved);
       Object.assign(state, restored);
-      glog('start', `loaded saved game, planet ${saved.savedPlanet}`);
+      glog('start', `loaded saved game from slot ${slot}, planet ${saved.savedPlanet}`);
       return scenes.run('instruments');
     }
   }
@@ -81,4 +92,34 @@ export async function startScene(
 
 function wait(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));
+}
+
+/**
+ * The slot list on the title screen, with what is in each. `saveSlots` only.
+ *
+ * It starts at row 19 and takes the five rows to 23, which is as low as the screen goes - 24
+ * rows of text in 192 lines, and the fourth slot ran off the bottom when this started at 21.
+ * That puts slot 1 over the `(N)EW GAME OR (O)LD GAME?` prompt, so the prompt is drawn again
+ * on the way out.
+ */
+const LOAD_LIST_TOP = 19;
+
+async function askLoadSlot(ctx: SceneContext): Promise<number | null> {
+  const { hires, input } = ctx;
+  hires.hcolor(5);
+  hires.text('WHICH SAVED GAME?', 8, LOAD_LIST_TOP);
+  for (const s of listSlots()) {
+    const what = s.stardate === null
+      ? 'EMPTY'
+      : `SD ${s.stardate.toFixed(1)}  ${s.credits} CR  ${s.conquered} TAKEN`;
+    hires.text(`${s.slot}) ${what}`.padEnd(32), 8, LOAD_LIST_TOP + s.slot);
+  }
+  const k = await input.waitForKey();
+  const n = parseInt(String.fromCharCode(k & 0x7f), 10);
+  for (let r = LOAD_LIST_TOP; r <= LOAD_LIST_TOP + SLOT_COUNT; r++) {
+    hires.text(' '.repeat(32), 8, r);
+  }
+  hires.hcolor(1);
+  hires.text('(N)EW GAME OR (O)LD GAME?', 8, 20);
+  return Number.isInteger(n) && n >= 1 && n <= SLOT_COUNT ? n : null;
 }

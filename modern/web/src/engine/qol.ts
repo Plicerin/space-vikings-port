@@ -20,7 +20,8 @@ export type QolKey =
   | 'crtScanlines'
   | 'fastFire'
   | 'gamepad'
-  | 'smoothFlight';
+  | 'smoothFlight'
+  | 'saveSlots';
 
 export interface QolFeature {
   key: QolKey;
@@ -68,6 +69,12 @@ export const QOL_FEATURES: readonly QolFeature[] = [
     label: 'Smooth flight',
     group: 'Play',
     note: 'Redraws the view every browser frame. The machine draws it once a pass of its main loop - measured at one new picture every 2.9 seconds, a third of a frame a second - and off is that.',
+  },
+  {
+    key: 'saveSlots',
+    label: 'Save slots',
+    group: 'Saving',
+    note: 'Four saves instead of one, and a saved game comes back where it was. The disk has one save and loses the ship\'s position to a power cycle, which is what off does.',
   },
 ];
 

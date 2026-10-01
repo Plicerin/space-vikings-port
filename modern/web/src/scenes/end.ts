@@ -1,6 +1,7 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { setScene, log as glog } from '../engine/gameLog';
-import { buildSave, writeSave, stashGap } from '../engine/diskSave';
+import { buildSave, writeSave, stashGap, listSlots, SLOT_COUNT } from '../engine/diskSave';
+import { qolOn } from '../engine/qol';
 
 /**
  * END, the save/quit menu - END.bas.
@@ -86,28 +87,38 @@ export async function endScene(ctx: SceneContext, scenes: SceneManager): Promise
     if (c === '1') {
       // 190: `IF PEEK(38210) = 1 THEN "YOU MUST BE IN ORBIT TO SAVE GAME" ... RETURN`. The
       // message says orbit; the test is only that we are out of the atmosphere.
-      drawEndSaveResult(hires, state.atmosphere);
-      if (!state.atmosphere) {
-        // 200 and 202 copy the nine position and attitude cells out of 29467-29475 into
-        // 38211-38219, which is the sixteen-byte gap between SHIP'S DATA and PLANET FILE -
-        // so they are kept for as long as the page is open and never written to storage,
-        // exactly as they are never written to disk.
-        stashGap({
-          x: state.x, y: state.y, z: state.z,
-          heading: state.heading, pitch: state.pitch,
-          planetIndex: state.planetIndex,
-        });
-        // 202 lands on 38219, and `38219 + P` is the conquered flag GALAXY MAP 3066 reads -
-        // but the disk numbers its planets 1 to 20, so 38219 is slot 0 and nothing ever reads
-        // it. The port's `planets[i]` is the disk's planet `i + 1`, which puts `planets[0]` at
-        // 38220, so this write has no planet behind it on either side. It is left out rather
-        // than aimed at `planets[0]`, which would be the disk's planet 1 - Sol.
-        // 204
-        state.savedGameSentinel = 77;
-        // 210's three BSAVEs.
-        writeSave(buildSave(state));
+      if (state.atmosphere) {
+        drawEndSaveResult(hires, true);
+        glog('end', 'cannot save in atmosphere');
+        await new Promise((r) => setTimeout(r, 2000));
+        continue;
       }
-      glog('end', state.atmosphere ? 'cannot save in atmosphere' : 'game saved');
+      // 200 and 202 copy the nine position and attitude cells out of 29467-29475 into
+      // 38211-38219, which is the sixteen-byte gap between SHIP'S DATA and PLANET FILE -
+      // so they are kept for as long as the page is open and never written to storage,
+      // exactly as they are never written to disk.
+      stashGap({
+        x: state.x, y: state.y, z: state.z,
+        heading: state.heading, pitch: state.pitch,
+        planetIndex: state.planetIndex,
+      });
+      // 202 lands on 38219, and `38219 + P` is the conquered flag GALAXY MAP 3066 reads -
+      // but the disk numbers its planets 1 to 20, so 38219 is slot 0 and nothing ever reads
+      // it. The port's `planets[i]` is the disk's planet `i + 1`, which puts `planets[0]` at
+      // 38220, so this write has no planet behind it on either side. It is left out rather
+      // than aimed at `planets[0]`, which would be the disk's planet 1 - Sol.
+      // 204
+      state.savedGameSentinel = 77;
+      // 210's three BSAVEs. One save on the disk; four when `saveSlots` is on, and then it
+      // asks which - there is no line of BASIC behind this prompt, so it only appears with
+      // the switch.
+      // The chooser goes before 210's `PRINT "GAME SAVED."`, not after it - a screen that
+      // says the game is saved and then asks where to put it has the order backwards.
+      const slot = qolOn('saveSlots') ? await askSlot(ctx, 'SAVE TO WHICH?') : 1;
+      if (slot === null) { glog('end', 'save cancelled'); continue; }
+      writeSave(buildSave(state), slot);
+      drawEndSaveResult(hires, false);
+      glog('end', 'game saved');
       await new Promise((r) => setTimeout(r, 2000));
       continue;
     }
@@ -124,4 +135,32 @@ export async function endScene(ctx: SceneContext, scenes: SceneManager): Promise
     glog('end', 'game ended');
     return scenes.run('start');
   }
+}
+
+/**
+ * Which slot, drawn in the game's own text because the game is a canvas.
+ *
+ * Only reachable with `saveSlots` on. Returns null if the answer is not a slot, which leaves
+ * END's menu where it was rather than guessing. `hcolor` is left where it was found; every
+ * caller of this sets its own before printing, and `drawEndSaveResult` is the next one.
+ */
+async function askSlot(
+  ctx: SceneContext,
+  title: string,
+): Promise<number | null> {
+  const { hires, input } = ctx;
+  hires.hcolor(5);
+  hires.text(title, 2, 14);
+  const slots = listSlots();
+  for (const s of slots) {
+    const what = s.stardate === null
+      ? 'EMPTY'
+      : `SD ${s.stardate.toFixed(1)}  ${s.credits} CR  ${s.conquered} TAKEN`;
+    hires.text(`${s.slot}) ${what}`.padEnd(34), 2, 15 + s.slot);
+  }
+  const k = await input.waitForKey();
+  const n = parseInt(String.fromCharCode(k & 0x7f), 10);
+  // Wipe the chooser off again whatever the answer was.
+  for (let r = 14; r <= 15 + SLOT_COUNT; r++) hires.text(' '.repeat(34), 2, r);
+  return Number.isInteger(n) && n >= 1 && n <= SLOT_COUNT ? n : null;
 }

@@ -4239,9 +4239,10 @@ addition, and an addition that is always on is indistinguishable from a bug. So 
 switches, in `engine/qol.ts`, and **every one of them defaults to off**: a fresh browser plays
 the game the machine played.
 
-So far there are five, in two groups. **Picture**: smoothing, bloom and scanlines, below.
+So far there are seven, in three groups. **Picture**: smoothing, bloom and scanlines, below.
 **Play**: `fastFire`, which puts the old 0.45 s trigger back in place of the machine's measured
-6.69, and `gamepad`.
+6.69; `gamepad`; and `smoothFlight`, which puts the fifty-nine redundant redraws a pass back.
+**Saving**: `saveSlots`, four games instead of one.
 
 The gamepad is the clean case of what an addition should be. There is no pad on the disk, so
 there is nothing to be faithful to and nothing to get wrong - every control it offers is one
@@ -6373,6 +6374,56 @@ and what is left between them is that the two ships are not in the same place.
 `damage_parity.mjs` and `logic_parity.mjs` still run - they cover far more ticks and rounds than
 a recording can, and they check the gates and the rates over tens of thousands of draws. But the
 formulas themselves are no longer taken on a bound.
+
+---
+
+## Four saves, and a save that comes back where it was
+
+The disk keeps one game. END 210 `BSAVE`s over `P/F`, `PLANET FILE` and `SHIP'S DATA` by name,
+there is one of each on the diskette, and START 2000-2050 masters back over all three for a new
+game. So saving twice loses the first game and starting a new one loses both. That is modelled
+and it is what `saveSlots` **off** does.
+
+On, there are four, and slot 1 is the plain `spaceVikingsSave` key - so the save that already
+exists is slot 1, and turning the switch on or off loses nothing either way. END and START ask
+which slot in the game's own text, listing what is in each: `SD 122.2  22222 CR  3 TAKEN`, or
+`EMPTY`. An answer that is not a slot leaves the menu where it was rather than guessing.
+
+Two things in it are not just four copies of the same thing.
+
+**A new game no longer clears them.** Off, it still does, because 2000-2050 genuinely destroys
+the one save. On, `clearSave` keeps its hands off: four slots a new game emptied would not be
+four slots, and nothing on the disk argues for it - there was never more than one place to put
+a game, which is the whole reason the question never came up. A slot is overwritten when a game
+is saved into it and not before.
+
+**The save carries the gap.** This is the real difference. 38204-38219 is in none of the three
+blocks (see above), so on the disk the nine cells 200 and 202 fill - the ship's position and
+attitude, copied out of 29467-29475 - have nowhere to go. START 225 copies them straight back
+and the mechanism is complete **within one run of the machine**; across a power cycle it
+restores whatever RAM happens to hold, and the ship starts where 190 and 195 put it. With slots
+on those nine cells travel in the payload instead, and a saved game resumes where it was.
+
+The planet comes with them, and that is worth spelling out because the disk half-saves it. 204
+does `POKE 38392,PEEK(38209)`, and 38392 **is** inside `PLANET FILE`, so the planet you saved at
+is written to the diskette and START 220 reads it back to pick the right `P/F` record. But
+nothing ever writes it back to 38209. The disk therefore loads the correct planet's data and
+then tells you you are somewhere else. `applySave` restores `planetIndex` only when the gap
+arrived in the payload - that is, only with the switch on - so off reproduces the quirk exactly.
+
+`saveslots_check.mjs` drives it, nine checks: two saves into two slots, a reload between them
+so nothing is coming out of the session's own memory, then both loaded back and checked for the
+right game *and* the right position; an answer that is not a slot, which must write nothing and
+leave both menus where they were; and with the switch off, that option 1 asks nothing and writes
+the one plain key. `save_parity.mjs` holds the other end - still sixteen checks, still including
+"the ship starts where START 190 and 195 put it" and "38209 is not restored", which is what
+fidelity looks like here.
+
+Two of the four defects this turned up came from the harness and two from **looking at the
+screens**, which nothing had done - they are new screens, and the parity suite only knows how to
+compare against the disk, which has nothing here to compare to. The chooser printed slot 4 on row
+25 of a 24-row screen, and it covered the title's `(N)EW GAME OR (O)LD GAME?` prompt without
+drawing it again. Shots of both are in `captured/saveslots/`.
 
 ---
 

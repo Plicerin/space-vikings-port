@@ -13,7 +13,7 @@ import fs from 'fs';
 
 const filter = process.argv[2] || '';
 const files = fs.readdirSync('.')
-  .filter((f) => f.endsWith('_parity.mjs') || f === 'playthrough.mjs' || f === 'gamepad_check.mjs')
+  .filter((f) => f.endsWith('_parity.mjs') || f.endsWith('_check.mjs') || f === 'playthrough.mjs')
   .filter((f) => !filter || f.includes(filter))
   .sort();
 

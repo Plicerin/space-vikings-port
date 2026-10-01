@@ -53,8 +53,51 @@
  * 204's two markers.
  */
 import type { GameState } from './gameState';
+import { qolOn } from './qol';
 
 export const SAVE_KEY = 'spaceVikingsSave';
+
+/**
+ * Slots, which the disk does not have.
+ *
+ * END 210 writes over the same three files every time, so the machine keeps exactly one game -
+ * and loses the ship's position with it, because 38211-38219 is in none of those files. Both
+ * of those are modelled, and both are what you get with `saveSlots` off.
+ *
+ * On, there are four, and a save carries the gap as well so a game comes back where it was.
+ * Slot 1 is the plain key, so a save made before the switch existed is slot 1 and nothing is
+ * lost by turning it on or off again.
+ */
+export const SLOT_COUNT = 4;
+
+export function slotKey(slot: number): string {
+  return slot <= 1 ? SAVE_KEY : `${SAVE_KEY}:${slot}`;
+}
+
+export interface SlotSummary {
+  slot: number;
+  /** null when the slot is empty. */
+  stardate: number | null;
+  credits: number | null;
+  planet: number | null;
+  conquered: number | null;
+}
+
+/** What is in each slot, for the chooser to print. */
+export function listSlots(): SlotSummary[] {
+  const out: SlotSummary[] = [];
+  for (let slot = 1; slot <= SLOT_COUNT; slot++) {
+    const saved = readSave(slot);
+    out.push(saved ? {
+      slot,
+      stardate: saved.misc.stardate,
+      credits: saved.misc.credits,
+      planet: saved.savedPlanet,
+      conquered: saved.planets.filter((p) => p && p.surrendered).length,
+    } : { slot, stardate: null, credits: null, planet: null, conquered: null });
+  }
+  return out;
+}
 
 /** 204: `POKE 38391,77`. 77 is `M`. */
 export const SAVED_MARKER = 77;
@@ -110,6 +153,12 @@ export interface SavedGame {
     navDestination: number | null;
   };
   /**
+   * 38211-38219, the nine cells 200 and 202 copy - present only with `saveSlots` on. The disk
+   * has nowhere to put these, so without the switch they are absent and a loaded game starts
+   * where START 190 and 195 put it.
+   */
+  gap?: GapCells | null;
+  /**
    * `PLANET FILE`, 38220-38394, and `P/F`, 38881-39200. Both are per-planet, so they are kept
    * together here: the first holds the conquered flag, the tech, the base and the star's
    * coordinates, the second the working record MEM TRANSFER A swaps in and out.
@@ -123,7 +172,11 @@ export interface SavedGame {
 
 /** END 210, once 190 has let it through. */
 export function buildSave(state: GameState): SavedGame {
+  // With slots on, the gap goes into the payload - which is the whole difference between a
+  // save that comes back where it was and the disk's, which does not.
+  const gapCells = qolOn('saveSlots') ? peekGap() : null;
   return {
+    gap: gapCells,
     savedGameSentinel: SAVED_MARKER,
     savedPlanet: state.planetIndex,
     misc: {
@@ -188,20 +241,28 @@ export function applySave(state: GameState, saved: SavedGame): void {
   state.heading = START_POSITION.heading;
   state.pitch = START_POSITION.pitch;
 
-  // 225, which reads the gap - present only if the page has not been reloaded since the save.
-  const cells = peekGap();
+  // 225, which reads the gap. In the payload when `saveSlots` wrote it, otherwise only in the
+  // session holder - which is empty if the page has been reloaded, exactly as the machine's
+  // RAM is empty after a power cycle.
+  const cells = saved.gap ?? peekGap();
   if (cells) {
     state.x = cells.x;
     state.y = cells.y;
     state.z = cells.z;
     state.heading = cells.heading;
     state.pitch = cells.pitch;
+    // The planet only when the gap travelled in the payload, which is `saveSlots` and nothing
+    // else. 225 does not restore it: 38209 is in no block, and the planet 204 did save - into
+    // 38392, which START 220 reads to pick the P/F record - is only ever used to choose the
+    // record, never written back to 38209. So the disk loads the right planet's data and then
+    // says you are somewhere else. A slot that carries the gap carries the planet with it.
+    if (saved.gap) state.planetIndex = cells.planetIndex;
   }
 }
 
-export function readSave(): SavedGame | null {
+export function readSave(slot = 1): SavedGame | null {
   let raw: string | null = null;
-  try { raw = localStorage.getItem(SAVE_KEY); } catch { return null; }
+  try { raw = localStorage.getItem(slotKey(slot)); } catch { return null; }
   if (!raw) return null;
   try {
     const data = JSON.parse(raw) as SavedGame;
@@ -214,10 +275,19 @@ export function readSave(): SavedGame | null {
   }
 }
 
-export function writeSave(saved: SavedGame): void {
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(saved)); } catch { /* storage refused */ }
+export function writeSave(saved: SavedGame, slot = 1): void {
+  try { localStorage.setItem(slotKey(slot), JSON.stringify(saved)); } catch { /* storage refused */ }
 }
 
+/**
+ * A new game throws the saved game away: 2000-2050 masters back over the three live files, and
+ * there is one set of them, so on the disk the previous game is simply gone.
+ *
+ * With `saveSlots` on it keeps its hands off. Four slots whose contents a new game destroyed
+ * would not be four slots, and nothing on the disk says otherwise - there was never more than
+ * one place to put a game. A slot is overwritten when a game is saved into it and not before.
+ */
 export function clearSave(): void {
-  try { localStorage.removeItem(SAVE_KEY); } catch { /* storage refused */ }
+  if (qolOn('saveSlots')) return;
+  try { localStorage.removeItem(slotKey(1)); } catch { /* storage refused */ }
 }
