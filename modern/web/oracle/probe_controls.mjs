@@ -1,4 +1,8 @@
-// The flight controls at $9023, measured rather than read.
+// The flight controls at $9023, measured rather than read, and written out as a golden.
+//
+// Everything below is swept across all 256 input values rather than sampled, because the
+// sampled version of this got a boundary wrong: it read bank -5 as +1 heading when the
+// machine gives 0.
 //
 // Disassembly says the routine turns the two paddle bytes into pitch and bank changes
 // through a stepped response with a dead zone, and lets bank drive heading. This checks
@@ -14,6 +18,7 @@
 //   its drawing is not part of the question.
 import { openOracle } from './a2.mjs';
 import { openDisk, DISK } from './dsk.mjs';
+import fs from 'fs';
 
 const SIM = 0x9023;
 const PITCH = 0x7321, BANK = 0x7322, HEADING = 0x7323;
@@ -50,6 +55,8 @@ await type(`30 POKE ${FLAG},0: GOTO 10`);
 await type('RUN');
 await a2.frames(60);
 
+const s8 = (v) => (v > 127 ? v - 256 : v);
+
 /** Set the inputs, run one CALL, read the outputs back. */
 async function once({ pdl1 = 128, pdl0 = 128, pitch = 0, bank = 0, heading = 0, latch = 0 }) {
   await a2.ev(`(() => {
@@ -69,7 +76,100 @@ async function once({ pdl1 = 128, pdl0 = 128, pitch = 0, bank = 0, heading = 0, 
   })`));
 }
 
-const s8 = (v) => (v > 127 ? v - 256 : v);
+// ---------------------------------------------------------------------------------------
+// The sweeps. These are the golden; the printed tables below are for reading.
+// ---------------------------------------------------------------------------------------
+
+/** pitch step for every paddle 1 value, from pitch 0. */
+const pitchStep = [];
+for (let p = 0; p < 256; p++) pitchStep.push(s8((await once({ pdl1: p })).pitch));
+
+/** bank step for every paddle 0 value, from bank 0. */
+const bankStep = [];
+for (let p = 0; p < 256; p++) bankStep.push(s8((await once({ pdl0: p })).bank));
+
+/** heading change for every bank value, paddles centred so only $912E acts. */
+const headingStep = [];
+for (let b = 0; b < 256; b++) {
+  const r = await once({ bank: b, heading: 100 });
+  headingStep.push(s8((r.heading - 100) & 0xff));
+}
+
+/**
+ * The steep-pitch flip at $90F2: which pitch values trigger it, and what it does to a
+ * heading. Swept over pitch at one heading, then over heading at one steep pitch.
+ */
+const flipPitch = [];
+for (let pitch = 0; pitch < 256; pitch++) {
+  const r = await once({ pitch, heading: 100, latch: 0 });
+  flipPitch.push({ pitch, heading: r.heading, latch: r.latch });
+}
+const flipHeading = [];
+for (let h = 0; h < 256; h++) {
+  const r = await once({ pitch: 0x80, heading: h, latch: 0 });
+  flipHeading.push({ from: h, to: r.heading });
+}
+
+/**
+ * The arithmetic itself. `flipHeading` says heading is modulo 253, not 256, so the stepping
+ * is swept over every starting value to find where each of the three wraps.
+ */
+const wrap = { headingDown: [], headingUp: [], pitchDown: [], pitchUp: [], bankFrom: [] };
+for (let h = 0; h < 256; h++) {
+  wrap.headingDown.push((await once({ bank: 16, heading: h })).heading);   // bank +16 steps -1
+  wrap.headingUp.push((await once({ bank: 240, heading: h })).heading);    // bank -16 steps +1
+}
+for (let v = 0; v < 256; v++) {
+  wrap.pitchDown.push((await once({ pdl1: 255, pitch: v })).pitch);        // -4
+  wrap.pitchUp.push((await once({ pdl1: 0, pitch: v })).pitch);            // +4
+  wrap.bankFrom.push((await once({ pdl0: 0, bank: v })).bank);             // +4, to find the clamp
+}
+
+/** Where repeated full deflection stops, both ways, for bank and for pitch. */
+async function pile(key, out, value, steps = 24) {
+  let v = 0;
+  const seen = [];
+  for (let i = 0; i < steps; i++) {
+    const r = await once({ [key]: value, [out]: v });
+    v = r[out];
+    seen.push(s8(v));
+  }
+  return seen;
+}
+const clamp = {
+  bankDown: await pile('pdl0', 'bank', 255),
+  bankUp: await pile('pdl0', 'bank', 0),
+  pitchDown: await pile('pdl1', 'pitch', 255),
+  pitchUp: await pile('pdl1', 'pitch', 0),
+};
+
+fs.mkdirSync('captured/controls', { recursive: true });
+fs.writeFileSync('captured/controls/golden.json', JSON.stringify({
+  source: 'SPACE SIMULATOR ASSEMBLY at $9023 on the 6502, $921E patched to RTS',
+  addresses: { pitch: PITCH, bank: BANK, heading: HEADING, pdl1: PDL1, pdl0: PDL0, latch: LATCH },
+  pitchStep, bankStep, headingStep, flipPitch, flipHeading, clamp, wrap,
+}, null, 1) + String.fromCharCode(10));
+
+/** Collapse a 256-entry sweep into its runs, which is how the tables read. */
+function runs(arr) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) {
+    if (out.length && out[out.length - 1].value === arr[i]) out[out.length - 1].to = i;
+    else out.push({ from: i, to: i, value: arr[i] });
+  }
+  return out;
+}
+const show = (name, arr) => {
+  console.log(name);
+  for (const r of runs(arr)) {
+    const range = r.from === r.to ? String(r.from) : `${r.from}-${r.to}`;
+    console.log(`  ${range.padStart(7)}   ${r.value >= 0 ? '+' : ''}${r.value}`);
+  }
+  console.log('');
+};
+show('pitch step, by paddle 1 (all 256):', pitchStep);
+show('bank step, by paddle 0 (all 256):', bankStep);
+show('heading change, by bank (all 256, signed):', headingStep);
 
 console.log('Paddle 1 ($95FD) against pitch, starting from pitch 0, bank 0:\n');
 console.log(' paddle   pitch after   step');

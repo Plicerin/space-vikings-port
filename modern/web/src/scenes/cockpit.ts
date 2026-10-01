@@ -1,5 +1,7 @@
 import type { SceneContext, SceneManager } from '../engine/sceneManager';
 import { fireLaser1500, fireMissile1000, missileHit1000 } from '../engine/diskWeapons';
+import { applyControls, paddleFromKeys, clampPitch175, PADDLE_CENTRE }
+  from '../engine/diskControls';
 import { damageTick3000, spawnGroundBolt5000, stepGroundBolt5095, groundBoltSpent5095,
   groundBoltStep5090, damageTickRuns190 } from '../engine/diskDamage';
 import { GameState } from '../engine/gameState';
@@ -84,7 +86,7 @@ const FRAME_DT_SCALE = 0.72;
  * one screen they do not compare.
  */
 const BASIC_SIMULATOR_TICK_SECONDS = 2.55;
-const TURN_RATE = 0.9;
+
 /**
  * How often you can fire, which on the disk is not a cooldown at all.
  *
@@ -345,6 +347,9 @@ const enemy = spawnEnemy(state);
     let simulatorAccumulator = 0;
     /** Whether the main loop has taken a step this browser frame - one pass, one picture. */
     let ticked = false;
+    /** 38397 and 38398, what line 19 last read out of the paddles. */
+    let pdl1 = PADDLE_CENTRE;
+    let pdl0 = PADDLE_CENTRE;
     let framesDrawn = 0;
     let prevHeading = headingRad;
     let prevPitch = pitchRad;
@@ -420,10 +425,11 @@ const enemy = spawnEnemy(state);
       } else if (state.autopilot) {
         applyAutoPilot(dt);
       } else {
-        if (input.isDown('ArrowLeft')) headingRad -= TURN_RATE * dt;
-        if (input.isDown('ArrowRight')) headingRad += TURN_RATE * dt;
-        if (input.isDown('ArrowUp')) pitchRad += TURN_RATE * dt;
-        if (input.isDown('ArrowDown')) pitchRad -= TURN_RATE * dt;
+        // Line 19: `J = PDL(1):K = PDL(0)`. Reading the paddles is all that happens here -
+        // the ship is not moved by it. `$9023` turns these into a step once a pass, from
+        // `updatePhysics`, which is where line 150 calls it.
+        pdl1 = paddleFromKeys(input.isDown('ArrowUp'), input.isDown('ArrowDown'));
+        pdl0 = paddleFromKeys(input.isDown('ArrowLeft'), input.isDown('ArrowRight'));
       }
     }
 
@@ -440,9 +446,17 @@ const enemy = spawnEnemy(state);
     }
 
     function clampOrientation() {
-      const pmax = (Math.PI / 180) * 60;
-      if (pitchRad > pmax) pitchRad = pmax;
-      if (pitchRad < -pmax) pitchRad = -pmax;
+      // Pitch is clamped by lines 175 and 177, in bytes, to 0-59 and 195-255 - which is +59
+      // to -61, asymmetric by two. It used to be clamped here to +-60 degrees, which is a
+      // tighter limit than the disk's +-83 and was nobody's measurement. Manual flight is
+      // clamped in `applyControls`' own units; this covers the autopilot, which works in
+      // radians.
+      if (state.autopilot) {
+        const pmax = (59 / 256) * 2 * Math.PI;
+        const pmin = -(61 / 256) * 2 * Math.PI;
+        if (pitchRad > pmax) pitchRad = pmax;
+        if (pitchRad < pmin) pitchRad = pmin;
+      }
       if (headingRad > 2 * Math.PI) headingRad -= 2 * Math.PI;
       if (headingRad < 0) headingRad += 2 * Math.PI;
     }
@@ -541,10 +555,21 @@ const enemy = spawnEnemy(state);
       ticked = simulatorTicks > 0;
       simulatorAccumulator -= simulatorTicks * BASIC_SIMULATOR_TICK_SECONDS;
       for (let i = 0; i < simulatorTicks; i += 1) {
+        // 129, with the orientation the pass started with.
         const newPos = v3add(v3(state.x, state.y, state.z), v3scale(fwd, state.speed));
         state.x = wrap(newPos.x);
         state.y = wrap(newPos.y);
         state.z = wrap(newPos.z);
+
+        // 150: `CALL CA`, CA = 36899 = $9023. The controls are applied *after* the move, from
+        // paddles read before it - so a pass flies on the attitude it had and lands on a new
+        // one. Then 175 and 177 clamp the pitch.
+        if (!state.autopilot) {
+          applyControls(state, pdl1, pdl0);
+          state.pitch = clampPitch175(state.pitch);
+          pitchRad = (state.pitch / 256) * 2 * Math.PI;
+          headingRad = (state.heading / 256) * 2 * Math.PI;
+        }
       }
 
       if (simulatorTicks > 0 && state.atmosphere && state.speed > 0) {

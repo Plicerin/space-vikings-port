@@ -81,8 +81,16 @@ async function run(gamepadOn) {
     await sleep(300);
 
     // --- the stick, which is a key held down -------------------------------------------
+    //
+    // This held the stick for 1800 ms and watched the heading, which worked while the port
+    // steered by adding to a heading every browser frame. It does not any more: the controls
+    // are the disk's, so a held stick banks one step a pass and the *bank* turns the nose -
+    // and the first step, bank 4, is inside the heading dead band. Three passes at 2.55 s
+    // each, and the thing to watch first is the bank.
+    const bank0 = s.bank;
     pad.axes[0] = -1;                  // hard left
-    await sleep(1800);
+    await sleep(9000);
+    const bankHeld = s.bank;
     pad.axes[0] = 0;
     await sleep(300);
     // The cockpit keeps heading to itself and writes it back on the way out, so ask for COM.
@@ -94,6 +102,7 @@ async function run(gamepadOn) {
       gamepadOn: sv.qolOn('gamepad'),
       firedWhileHeld: before - whileHeld,
       heading: s.heading,
+      bank: ((bankHeld - bank0) > 127 ? bankHeld - bank0 - 256 : bankHeld - bank0),
       scene: scene(),
     };
   });
@@ -108,7 +117,8 @@ const off = await run(false);
 check('the switch reads off', off.gamepadOn === false);
 check('a held fire button does nothing', off.firedWhileHeld === 0,
   `${off.firedWhileHeld} missiles spent`);
-check('the stick does not steer', off.heading === 0, `heading ${off.heading}`);
+check('the stick does not steer', off.heading === 0 && off.bank === 0,
+  `heading ${off.heading}, bank ${off.bank}`);
 
 console.log('');
 console.log('with the switch on:');
@@ -118,7 +128,10 @@ check('the switch reads on', on.gamepadOn === true);
 // for two and a half seconds must not give more than that - the interval is 6.69 s.
 check('a held fire button is one shot, not a stream', on.firedWhileHeld === 2,
   `${on.firedWhileHeld} missiles spent`);
-check('the stick steers', on.heading !== 0, `heading ${on.heading}`);
+// Bank first, because that is what the stick actually moves; heading follows from it, and
+// only once the bank is out of the 0-4 dead band.
+check('the stick banks the ship', on.bank !== 0, `bank 0 to ${on.bank}`);
+check('and the bank turns the nose', on.heading !== 0, `heading ${on.heading}`);
 
 fs.mkdirSync('captured/gamepad', { recursive: true });
 fs.writeFileSync('captured/gamepad/result.json', JSON.stringify({

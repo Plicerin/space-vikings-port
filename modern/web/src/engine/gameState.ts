@@ -73,6 +73,11 @@ export class GameState {
   bank: PaddleByte = 0;
   /** Heading byte ($7323). Set to 0 by START.bas:195 on new game. */
   heading: PaddleByte = 0;
+  /**
+   * `$952F`, the latch the control module keeps so the steep-pitch heading flip fires on the
+   * change rather than every pass. See `diskControls.ts`.
+   */
+  steepLatch = 0;
 
   // ---------------------------------------------------------------------
   // Drive / power

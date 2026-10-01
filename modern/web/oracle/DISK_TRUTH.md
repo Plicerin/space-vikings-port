@@ -790,23 +790,90 @@ both.
 
 | bank | heading change |
 | --- | --- |
-| -4..+4 | 0 |
+| -5..+4 | 0 |
 | 5-16 | -1 |
 | 17-32 | -2 |
 | 33-47 | -3 |
 | 48 | -4 |
-| -16..-5 | +1 |
+| -16..-6 | +1 |
 | -32..-17 | +2 |
 | -48..-33 | +3 |
 
-**Bank is clamped to +/-48.** `$91FE` and `$920E` undo an increment that would carry bank
-into `$30..$CF`. Measured by holding full deflection: bank steps -4, -8 ... -48 and then
-stays at -48 however long you hold it.
+> **Corrected.** Two rows here were wrong, and sampling is why. The first version of
+> `probe_controls.mjs` tried a handful of bank values and read -5 as +1; sweeping all 256 says
+> -5 gives 0, so the dead band is -5 to +4 and the +1 row starts at -6. The suite now holds all
+> three tables against the machine value by value rather than at the boundaries I happened to
+> pick, which is the only reason this surfaced.
+
+**Bank is clamped, and by one more going down than up.** `$91FE` and `$920E` undo an increment
+that would carry bank out of range, and the limits are **+47 and -48** - a signed compare
+against 48. Holding full deflection steps -4, -8 ... -48 and stays; the other way it steps
+4, 8 ... 44 and then **47**, not 48.
+
+That one has a consequence. The table above gives +-4 of heading only at bank 48 and beyond,
+and the clamp stops at 47, so **the strongest turn in the table is unreachable in play**: the
+most a player can hold is +-3. Pitch, by contrast, is not clamped by this module at all - it
+runs on past +-96 and wraps - because lines 175 and 177 of the BASIC clamp it instead, every
+pass, to 0-59 and 195-255.
 
 **Pitching past vertical reverses heading** (`$90F2`). While pitch is in `$40..$BF` the ship
 is inverted, and crossing into or out of that band flips the heading once - `$952F` latches
 which side you are on so it happens on the transition, not every pass. Measured from
 heading 100: entering the band gives 226, leaving it gives 226 again from 100.
+
+The flip itself is **`(heading + 126) mod 253`**, checked against all 256 headings, and that
+253 is not a typo for 256. Everything else in the module - pitch, bank, heading - steps modulo
+256. So the flip is not quite half a turn, and flipping twice does not put you back: it leaves
+the heading one off. Whether the author meant a half turn and the table behind it has 253
+entries, or 253 is the bug it looks like, the disk cannot say; the port does what the machine
+does.
+
+Where the flip can fire is decided by lines 175 and 177, which clamp pitch to 0-59 and 195-255
+on the pass straight after the controls run. Nose-up, the most a pass can present is 63, one
+short of the band. Nose-down it is **191**, which is inside it by exactly one. So the flip is
+reachable with the nose fully down and unreachable with it fully up, and the latch then holds
+it there until the pitch comes off the stop.
+
+### The port was not using any of it
+
+All of the above was measured and written down here, and then nothing consumed it. The port
+steered like this:
+
+```ts
+if (input.isDown('ArrowLeft')) headingRad -= TURN_RATE * dt;
+```
+
+`TURN_RATE` was 0.9 radians a second and came from nowhere - it is in no listing and appears
+nowhere in this document, the same shape of invention as the 0.45 s fire cooldown that turned
+out to be 6.69. `state.bank` was written in exactly one place in the whole codebase,
+`hyperdrive.ts` setting it to 0. There was no bank, so there was no roll: the port yawed.
+
+And nothing could have caught it. `probe_controls.mjs` wrote no golden and no harness read it;
+no harness pressed an arrow key at all. Forty-eight suites passed while the thing a player does
+every single pass was both wrong and untested. This is the same lesson as the eleven harnesses
+that composed the page they compared - a measurement nothing consumes is a note, not a test.
+
+`engine/diskControls.ts` is the model now, as run lengths so the ranges can be read, and
+`controls_parity.mjs` expands them to 256 entries each and compares against the golden value by
+value. Four more checks play the game: hold a key, and the ship banks, the bank turns the nose,
+letting go **leaves the bank where it was**, and the ship keeps turning. That last one is the
+whole difference between a roll and a yaw, and it is why the original feels the way it does -
+you do not steer the ship, you set a bank and it comes round until you take the bank off.
+
+Three things about wiring it in that the listing settles and guesswork would not:
+
+- **It runs after the move.** `CA` is 36899, which is `$9023`, and line 150 calls it - after
+  129 has already stepped the position, using paddles line 19 read before that. A pass flies on
+  the attitude it started with and lands on a new one.
+- **It runs once a pass**, not once a frame. The paddles are read into two bytes as keys are
+  held; the step is taken when the simulator ticks.
+- **The old pitch clamp was wrong.** The port clamped to +-60 degrees. The disk clamps in bytes
+  at 175 and 177, to +59 and -61 - +-83 degrees, asymmetric by two. The autopilot still works in
+  radians and is clamped there to the same limits.
+
+Captures of a turn are in `captured/controls/`: level, thirteen seconds of held left (bank 20,
+heading 251), thirteen more with the key released (bank still 20, heading 241 - still coming
+round), and the nose down.
 
 The flip is not symmetric: it is `ADC #$7E` (+126) when heading is below `$7F` and
 `SBC #$7F` (-127) otherwise. That band matches STARSHIP SIMULATOR line 129's
