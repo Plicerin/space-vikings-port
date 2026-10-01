@@ -5836,17 +5836,17 @@ is what is genuinely not known, roughly in order of how much it matters.
 
 ### Whole parts of the game have never been looked at
 
-- **SHORE LEAVE is done.** SELL LOOT and ESTABLISH BASE came out of `probe_economy.mjs`,
-  REPAIR/RESTOCK out of `probe_repair.mjs`, which lands the ship at Y 20 to get past 2505,
-  and ENLIST TROOPS - with BUY WEAPONS behind it - out of `probe_enlist.mjs`. What is left
-  unreached anywhere in the game is COLLECT's tech-1 path.
+- **Every screen has been reached.** SHORE LEAVE was the last holdout: SELL LOOT and
+  ESTABLISH BASE came out of `probe_economy.mjs`, REPAIR/RESTOCK out of `probe_repair.mjs`,
+  which lands the ship at Y 20 to get past 2505, and ENLIST TROOPS - with BUY WEAPONS behind
+  it - out of `probe_enlist.mjs`. COLLECT's tech-1 path was reached earlier by forcing the
+  planet's tech byte. Nothing in the BASIC is now unrun for want of a reachable state.
 - **Replaying is done.** The damage tick, the combat, COLLECT's thirteen loot draws, line
   5000's ground fire and all four of SHORE LEAVE's price screens are replayed and exact.
   Nothing RND-driven is still checked by range alone.
 - **The game logic is done.** The economy, GROUND FORCES' combat, the damage model, the
-  weapons and all five of RECALL's branches have been run against the disk, and there is no
-  enemy AI to do. What is left of the BASIC is COLLECT's tech-1 path and two of SHORE LEAVE's
-  sub-screens, both listed above as reachable-state gaps rather than unread code.
+  weapons - missile flight and all - and all five of RECALL's branches have been run against
+  the disk, and there is no enemy AI to do.
 - **What feeds the ENV. CONTROL readout, if anything.** 38194 is MEM TRANSFER A's loop counter
   and COM shows it as a system percentage. Whether the game was ever meant to have an env.
   control system, or the address was simply reused, is not knowable from the disk.
