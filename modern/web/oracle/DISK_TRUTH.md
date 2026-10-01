@@ -6599,9 +6599,43 @@ of something else - `IF (PEEK(38167) * 256) + PEEK(38159) = 0 THEN "THE TROOPS A
 and 3 * 256 + 20 is 788 while the troops start at 2000, so whatever that pair is, it is not the
 troop count. The port computes that message from its own count and is right to.
 
-The harness also reports, without failing, **13 cells the port carries no field for**, five of
-them non-zero in a fresh game: 38158 (1), 38159 (20), 38184 (100, nav. comp.), 38188 (100) and
-38192 (62). Those are open.
+### The thirteen cells with no field, traced
+
+The harness first reported thirteen, five of them non-zero. Two of those five were the map's
+fault again, and the other three are cells nothing can change.
+
+**38158 is the planet the troops are on, and the port has had it all along** as
+`forces.troopPlanetIndex`. It is a real flag with four readers: GROUND FORCES 66 and 67 refuse
+to enlist or attack with `YOU LEFT YOUR TROOPS ON ANOTHER PLANET!`, 150 sets it to the planet
+you landed on, RECALL 2000 refuses with `TROOPS ARE NOT ON THIS PLANET, SIR!`, and H/D 11
+carries it along on a jump when the troops are aboard. The offset is the usual one: START 2030's
+`POKE 38158,1` is the disk's planet 1, which is the port's index 0, and both mean Sol.
+
+**38151 is the chain flag** and is also modelled, as `runGroundForcesOnReturn`. COM 98 and 115
+read it; GROUND FORCES 310, 670 and 1130 and COLLECT 17 set it to 7.
+
+The other three cannot move, and that was established by tracing all 23 programs - direct
+references, the computed addresses (`38219 + P` and its friends, which all land outside this
+block), and the four variable aliases that name an address in range: `LT = 38167`, `LO = 38156`,
+`C = 38171`, and `LOC = 38198`, which com.bas assigns at line 40 and **never reads**.
+
+| cell | value | what can change it |
+| --- | --- | --- |
+| 38159 | 20 | nothing. Read only by STATUS 1386, as the low byte of a 16-bit value with 38167 |
+| 38184 | 100 | nothing. Named only in SHORE LEAVE 2500's repair DATA, as J = 12 |
+| 38188 | 100 | nothing. Referenced nowhere in any of the 23 programs |
+| 38192 | 62 | nothing. Referenced nowhere in any of the 23 programs |
+
+38184 is the one that could have been a bug and is not. It is in the repair list, so a damaged
+nav. comp. would be repaired and charged for - but nothing damages it. The damage routine at
+3230-3350 does not touch it, and neither does anything else, so `IF D < 100` at 2520 always
+skips it. The port passes a literal 100 and says why.
+
+These four are not given fields, because a field that cannot change is worse than a note. What
+they get instead is a check: the harness holds each value against the golden, so if a
+re-capture ever disagrees, one of these readings was wrong and the suite says so rather than
+staying quiet. The remaining seven are zero in a new game on both sides, which is the one thing
+a new-game comparison cannot see past.
 
 ### Two of the three "failures" were the harness
 
