@@ -263,15 +263,10 @@ check('X from a radar opened in flight returns to flight', await until('cockpit'
   await press('5');
   check('back into flight, lined up on the enemy', await until('cockpit', 20000),
     `scene ${await scene()}`);
-  // `setScene('cockpit')` is logged before the scene awaits its assets, so arriving is not the
-  // same as being ready for a keypress - and with a scene change now costing its disk load,
-  // the first shot was landing in that gap and being dropped. Wait for the ship model, which
-  // is the last thing that load does.
-  for (let i = 0; i < 100; i++) {
-    if (await page.evaluate(() => window.__spaceVikingsState.enemyShapeLoaded)) break;
-    await new Promise((r) => setTimeout(r, 150));
-  }
-  await new Promise((r) => setTimeout(r, 500));
+  // Nothing is waited for here on purpose. `setScene('cockpit')` is logged before the scene
+  // awaits its assets, so this shot is fired into the gap - and the point is that it still
+  // lands, because the key sits in the latch at $C000 until the cockpit reads it, the way it
+  // does on the machine.
 
   const vit = () => page.evaluate(() => window.__spaceVikingsState.shipVitality);
   const missiles = () => page.evaluate(() => window.__spaceVikingsState.missilesRemaining);

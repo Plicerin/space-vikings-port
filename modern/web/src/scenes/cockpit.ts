@@ -421,6 +421,17 @@ const enemy = spawnEnemy(state);
       const k = input.peekKey();
       if (k <= 0) return;
       const ch = String.fromCharCode(k & 0x7f).toUpperCase();
+      // $C000 holds one key until the program reads it, and reading it is what clears the
+      // strobe - so a key pressed while DOS is loading the next program is still there when
+      // that program starts, and gets acted on. The port lost one here: the key was cleared
+      // before the branches ran, so a shot that arrived while `fireCooldown` was still going
+      // was eaten rather than held. Measured with a scene change costing its disk load: the
+      // latch carried the space for the whole 1,290 ms, the cockpit's first frame read it
+      // with 17 ms of cooldown left, and nothing happened.
+      //
+      // Firing is the only thing here that can be refused for a reason that will pass, so it
+      // is the only one that leaves the key where it was.
+      if (ch === ' ' && fireCooldown > 0) return;
       input.clearKey();
       if (k === 0x9b) {
         showControls = !showControls;

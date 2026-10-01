@@ -4148,16 +4148,26 @@ was actually testing:
 Checked by breaking one on purpose: `end_parity` with its criterion inverted exits 1.
 
 Giving them teeth turned `playthrough` red straight away, and on a real difference rather than
-a harness one: its first missile was being fired into the gap between a scene being logged and
-that scene having loaded its assets, and the keypress was **dropped**. On the machine it would
-not be. DOS has the drive during a `RUN`, and a key pressed while it loads sits in the keyboard
-latch at $C000 until the new program reads it - the Apple loses a keystroke only when a second
-one arrives before the first is read. The port drops anything pressed before the scene is
-listening.
+a harness one: its first missile, fired into the gap between a scene being logged and that
+scene having loaded its assets, did nothing.
 
-The harness now waits for the ship model before it fires, which is the last thing that load
-does. The difference itself is still there and is worth closing: a single pending key held
-across a scene change would do it, which is what the hardware does.
+The first guess was that the key had been dropped, and that was wrong - `Input` already models
+$C000 properly, and the latch carried the space for the whole 1,290 ms of the load. What ate it
+was the **read**. `handleDiscreteInput` cleared the key before running its branches, so a key
+the branches then declined to act on was gone. The cockpit's first frame read the space with 17
+milliseconds of `fireCooldown` left - measured, with a diagnostic in that branch - and threw it
+away.
+
+On the machine a key waits in the latch until the program reads it, and the program reads it
+when it is ready to act. So firing, which is the only thing here that can be refused for a
+reason that will pass, now leaves the key where it was. `playthrough` fires into the gap with
+nothing waited for and the shot lands.
+
+One thing beside it is worth stating as unverified rather than fixed: `FIRE_COOLDOWN_SECONDS`
+is 0.45, and it is nobody's measurement. The disk has no cooldown at all - line 185 tests the
+paddle button once a pass, and a pass is 2.55 seconds, so the main loop *is* the rate limit.
+The port's frame loop runs sixty times a second and needs something in its place, but 0.45 is
+a guess, and the thing it stands in for is already a measured constant.
 
 ---
 
