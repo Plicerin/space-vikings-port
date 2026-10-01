@@ -68,7 +68,7 @@ export const QOL_FEATURES: readonly QolFeature[] = [
     key: 'smoothFlight',
     label: 'Smooth flight',
     group: 'Play',
-    note: 'Redraws the view every browser frame. The machine draws it once a pass of its main loop - measured at one new picture every 2.9 seconds, a third of a frame a second - and off is that.',
+    note: 'Carries the view forward between steps so flight is continuous. The machine moves the ship once a pass of its main loop - measured at one step every 2.9 seconds - and off is that: one jump, then stillness. The ship\'s own position stays stepped either way.',
   },
   {
     key: 'saveSlots',

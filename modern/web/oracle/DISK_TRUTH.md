@@ -4457,8 +4457,38 @@ full-image hash sampled every 16 ms: four distinct pictures in ten seconds, 0.40
 the old behaviour and with the new one alike.
 
 So the redraw is gated on the step now. It is a saving and not a change: the same pictures, in
-the same order, at the same moments, with the other fifty-nine redraws not done. `smoothFlight`
-in the QOL panel puts them back for anyone who wants to see what the port looked like.
+the same order, at the same moments, with the other fifty-nine redraws not done.
+
+### `smoothFlight` was a switch that did nothing
+
+The sentence that used to end this section said `smoothFlight` "puts them back", and that is
+exactly what it did, and it was useless. The ship only moves inside the step, so the other
+fifty-nine frames all drew **the same camera from the same place**. Measured with the switch on:
+765 browser frames and **one** distinct picture in six seconds. It redrew as hard as it could
+and the image never changed. Found by someone turning it on and asking why the game was still
+running at one frame a second.
+
+Fixing it took two goes, and the second is the interesting one. Carrying the camera forward
+between steps changed nothing, because `renderStarfield(_cam: Camera)` **ignores its camera
+argument** and reads `state.x/y/z` directly - the underscore was the tell. Two renderers did
+this, the starfield and the enemy ship.
+
+What it does now: motion inside a pass is linear, since the speed is fixed and the orientation
+does not change until 150 runs at the end, so the view is carried along the current heading by
+however far into the pass we are. At the end of a pass that lands exactly on the value the step
+writes, so it is continuous and there is no lag - it predicts the pass in progress rather than
+replaying the last one. **18 distinct pictures a second against 0.63 with the switch off.**
+
+`state` is untouched either way, which is the half that matters: `state.z` still steps 120, 120,
+120 with the switch on, so the damage tick, the transitions, the weapons and every parity
+harness still read the disk's stepped position. Only the drawing uses the carried one.
+
+`smoothflight_check.mjs` holds all of it - the rate both ways, that the difference is a real
+multiple and not noise, and that the position steps by exactly 120 in both. Checked failing by
+disabling the carry, which collapses the switched-on rate back to 0.63 and reds two of the five.
+
+The general lesson, since this is the third time this session: **a QOL switch needs a check like
+anything else.** It had none, so nothing noticed that it had never worked.
 
 ### The pass is 2.94 s here, and `BASIC_SIMULATOR_TICK_SECONDS` says 2.55
 

@@ -1,0 +1,51 @@
+{
+ "off": {
+  "seconds": 8,
+  "browserFrames": 481,
+  "pictures": 4,
+  "perSecond": 0.5,
+  "zSteps": [
+   120,
+   120,
+   120
+  ]
+ },
+ "on": {
+  "seconds": 8,
+  "browserFrames": 481,
+  "pictures": 143,
+  "perSecond": 17.88,
+  "zSteps": [
+   120,
+   120,
+   120
+  ]
+ },
+ "results": [
+  {
+   "what": "off, the picture changes about once a pass",
+   "ok": true,
+   "detail": "0.5 a second"
+  },
+  {
+   "what": "on, the view actually moves between steps",
+   "ok": true,
+   "detail": "17.88 a second, against 0.5 off"
+  },
+  {
+   "what": "and that is a real difference, not noise",
+   "ok": true,
+   "detail": "36x"
+  },
+  {
+   "what": "off, the ship's own position still steps 120 at a time",
+   "ok": true,
+   "detail": "120, 120, 120"
+  },
+  {
+   "what": "on, the ship's own position still steps 120 at a time",
+   "ok": true,
+   "detail": "120, 120, 120"
+  }
+ ]
+}

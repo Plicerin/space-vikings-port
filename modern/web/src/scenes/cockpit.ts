@@ -349,6 +349,15 @@ const enemy = spawnEnemy(state);
     /** 38397 and 38398, what line 19 last read out of the paddles. */
     let pdl1 = PADDLE_CENTRE;
     let pdl0 = PADDLE_CENTRE;
+    /**
+     * Where the view is drawn from.
+     *
+     * The same as the ship's own position, which is stepped once a pass - except with
+     * `smoothFlight` on, where it runs ahead along the current heading so the picture moves
+     * between steps. Only the drawing reads this. The damage tick, the transitions and the
+     * weapons all use `state`, because those are the disk's and have to stay stepped.
+     */
+    let eye = { x: state.x, y: state.y, z: state.z };
     let framesDrawn = 0;
     let prevHeading = headingRad;
     let prevPitch = pitchRad;
@@ -582,8 +591,33 @@ const enemy = spawnEnemy(state);
         }
       }
 
+      // `smoothFlight`, and this is the part that makes it mean anything.
+      //
+      // Gating the redraw on the step was right, but offering the other fifty-nine frames back
+      // as a switch was not: the ship only moves inside the loop above, so those frames all
+      // draw the same camera from the same place. Measured with the switch on: 765 browser
+      // frames, **one** distinct picture in six seconds. It redrew as hard as it could and
+      // nothing moved.
+      //
+      // So the switch now moves the *camera*, not the redraw count. Motion inside a pass is
+      // linear - the speed is fixed and the orientation does not change until 150 runs at the
+      // end - so the position can be carried forward along the current heading by however far
+      // into the pass we are. At the end of a pass that lands exactly on the value the step
+      // writes, so it is continuous, and there is no lag: this predicts the pass in progress
+      // rather than replaying the last one.
+      //
+      // `state` is not touched. The game's own position stays the disk's, stepped, which is
+      // what every transition test and every parity harness reads.
+      let camPos = v3(state.x, state.y, state.z);
+      if (qolOn('smoothFlight') && state.speed > 0) {
+        const into = simulatorAccumulator / BASIC_SIMULATOR_TICK_SECONDS;   // 0..1
+        const ahead = v3scale(forwardVector(pitchRad, headingRad), state.speed * into);
+        camPos = v3(wrap(camPos.x + ahead.x), wrap(camPos.y + ahead.y), wrap(camPos.z + ahead.z));
+      }
+      eye = { x: camPos.x, y: camPos.y, z: camPos.z };
+
       return {
-        pos: v3(state.x, state.y, state.z),
+        pos: camPos,
         pitch: pitchRad,
         heading: headingRad,
       };
@@ -832,7 +866,7 @@ const enemy = spawnEnemy(state);
       // Same projection and clipping as everything else, and the disk plots each star two
       // pixels wide - measured, see oracle/DISK_TRUTH.md.
       drawShipWorld(hires, projectShipWorld(
-        ops, { x: state.x, y: state.y, z: state.z }, state.heading, state.pitch, null,
+        ops, eye, state.heading, state.pitch, null,
       ));
     }
 
@@ -880,7 +914,7 @@ const enemy = spawnEnemy(state);
         // 396, nothing differing.
         const projection = projectShipWorld(
           enemyBytecodeOps,
-          { x: state.x, y: state.y, z: state.z },
+          eye,
           state.heading,
           state.pitch,
           null,
