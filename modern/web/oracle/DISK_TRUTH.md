@@ -3885,6 +3885,63 @@ been. Both stops now wait for the page to stop changing.
 
 ---
 
+## Saving a game: three blocks, three numbers, and a gap between them
+
+What the disk keeps across a power cycle is smaller and stranger than it looks.
+
+**MISC FILE** is a text file of three numbers - `SD`, `TR`, `CR`: the stardate, the troops and
+the credits. It is read by SHORE LEAVE 11, GROUND FORCES 11, SUPPLY 5000, STATUS 5000, RECALL
+11 and H/D 6, and written at eight points during play (SHORE LEAVE 2096, 2160, 2290, 2460 and
+2620; GROUND FORCES 670, 800 and 1120; H/D 6). It needs no save command - those three numbers
+are always current on the disk. `START 2050` resets them to `100.3`, `2000`, `10000` for a new
+game.
+
+**Everything else** waits for END's option 1:
+
+```
+190 IF PEEK(38210) = 1 THEN "YOU MUST BE IN ORBIT TO SAVE GAME" ... RETURN
+200 POKE 38211,PEEK(29467) ... POKE 38218,PEEK(29474)
+202 POKE 38219,PEEK(29475)
+204 POKE 38391,77: POKE 38392,PEEK(38209)
+210 POKE 38823,PEEK(38209): POKE 38824,1: CALL 38825:
+    BSAVE P/F,A$97E1,L$140: BSAVE PLANET FILE,A$954C,L$AF:
+    BSAVE SHIP'S DATA ,A38150,L54: PRINT "GAME SAVED."
+```
+
+Three blocks, and no more: **38150-38203** (the ship - its systems, its loot, its forces, its
+missiles), **38220-38394** (the galaxy - star coordinates, tech levels, conquered flags, bases)
+and **38881-39200** (P/F). `START 210`'s `O` branch BLOADs the same three back.
+
+### The gap, and the nine cells that fall into it
+
+38204 to 38219 is covered by **neither** of the first two blocks. That is where the enemy ship
+lives (38204, 38205), the ground batteries (38207), the surrender flag (38208), the atmosphere
+flag (38210) - and where 200 and 202 put the ship's position and attitude, copied cell by cell
+out of `29467-29475`. None of it is written to disk. A loaded game has no memory of where the
+ship was, which planet it was at (38209 is in the gap too), or what it was fighting.
+
+Measured on the machine, `probe_save.mjs`: in the atmosphere 190 refuses and 38391 stays 0; out
+of it, 200 and 202 copy all nine cells exactly - `188,2,200,0,151,229,0,0,0` into 38211-38219 -
+and 204 sets 38391 to 77 and 38392 to the planet. (The three BSAVEs do not complete under the
+oracle, so the block boundaries are read from the BSAVE arguments and the files' own lengths on
+the image rather than from a write.)
+
+202 also has a second effect that lasts the rest of the session: `38219 + PEEK(38209)` is the
+conquered flag GALAXY MAP 3066 reads and SHORE LEAVE 1550 sets, so saving writes the heading
+byte over planet 0's.
+
+### `SHIP'S DATA` is not on the disk at all
+
+Only `SHIP'S DATA-M` is - 54 bytes, which is exactly `L54` - so this image has never been saved
+to, and `START 3020`'s `BLOAD SHIP'S DATA` would fail on it. `PLANET FILE` and `P/F` are both
+present, and `P/F-M` is 336 bytes where `P/F` is 320, which is what `L$140` writes.
+
+`START 26` is a second, smaller mechanism: `OG = PEEK(38391): POKE 38391,0: IF OG = 77 THEN
+BSAVE PLANET FILE`. 38391 is the marker END, GALAXY MAP and INSTRUMENTS use to route between
+programs, and START reuses it at boot to decide whether to write the galaxy block back.
+
+---
+
 ---
 
 ## RECALL, all five branches
