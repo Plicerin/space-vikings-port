@@ -175,6 +175,8 @@
       /* ---------- sections ---------- */
       section { padding: 44px 0 6px; }
       .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+      /* A paragraph straight after a row of cards needs room; the pull quote used to give it. */
+      .grid + p { margin-top: 22px; }
       .card {
         background: var(--panel); border: 1px solid var(--line);
         border-radius: var(--radius); padding: 18px;
