@@ -13,8 +13,8 @@
  "on": {
   "seconds": 8,
   "browserFrames": 481,
-  "pictures": 143,
-  "perSecond": 17.88,
+  "pictures": 139,
+  "perSecond": 17.38,
   "zSteps": [
    120,
    120,
@@ -30,12 +30,12 @@
   {
    "what": "on, the view actually moves between steps",
    "ok": true,
-   "detail": "17.88 a second, against 0.5 off"
+   "detail": "17.38 a second, against 0.5 off"
   },
   {
    "what": "and that is a real difference, not noise",
    "ok": true,
-   "detail": "36x"
+   "detail": "35x"
   },
   {
    "what": "off, the ship's own position still steps 120 at a time",
