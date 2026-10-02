@@ -264,9 +264,41 @@
       details.dev { margin-top: 16px; font-size: 12.5px; color: var(--ink-3); }
       details.dev summary { cursor: pointer; color: var(--ink-2); }
 
+      /* ---------- compact play mode ----------
+         Only where a touch pad is actually shown. Measured before this existed: the game and
+         its controls did not fit one screen - an iPhone 13 needed 724px of a 664px viewport,
+         and an iPhone SE 896 of 568, the pad alone being taller than the screen. So you played
+         by scrolling between watching the game and reaching the buttons.
+
+         Everything below is inside this query, so the desktop presentation is untouched. */
       @media (hover: none) and (pointer: coarse) {
-        #touch-controls { display: grid; }
-        #cpu-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+        #touch-controls {
+          display: grid;
+          /* Sit under the canvas rather than a screen away from it. */
+          margin-top: 8px;
+          gap: 8px;
+        }
+        #cpu-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+
+        /* The tray cost 108-129px between the canvas and the pad, and its hint tells a phone
+           to press a key it does not have. The fullscreen button earns its place and stays. */
+        .tray { margin-top: 8px; gap: 8px; }
+        .tray .hint { display: none; }
+        .tray button { padding: 6px 12px; font-size: 12px; }
+
+        .bezel { padding: 8px; border-radius: 14px; }
+
+        /* A row of 44px buttons is Apple's minimum target and half the height of what was
+           here; three clusters of them is what brings the pad inside a phone screen. */
+        .touch-cluster { padding: 8px; gap: 6px; border-radius: 12px; }
+        .touch-cluster .label { font-size: 0.66rem; letter-spacing: 0.1em; }
+        .touch-row { gap: 5px; }
+        .touch-control {
+          min-height: 44px;
+          padding: 6px 4px;
+          font-size: clamp(0.68rem, 3.2vw, 0.84rem);
+          border-radius: 10px;
+        }
       }
       @media (max-width: 720px) {
         /* The nav crowds the brand long before it wraps nicely, so stack it. */
