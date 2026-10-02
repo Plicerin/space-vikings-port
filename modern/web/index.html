@@ -245,7 +245,14 @@
         font-size: clamp(0.72rem, 3.4vw, 0.9rem); font-weight: 700;
         text-align: center; user-select: none; cursor: pointer; touch-action: none;
       }
-      .touch-control:active { background: rgba(0, 90, 140, 0.9); }
+      .touch-control:active,
+      /* Still down as far as the game is concerned: a tap is held for one pass of the main
+         loop, because that is how long it takes the simulator to look. Without this the
+         button springs back while the key is still pressed, which reads as nothing happening. */
+      .touch-control.latched {
+        background: rgba(0, 90, 140, 0.9);
+        border-color: #7fe3ff;
+      }
       #cpu-panel { display: none; }
       .panel-header { font-weight: 700; font-size: 0.68rem; letter-spacing: 0.16em; opacity: 0.8; }
       #cpu-status { flex: 1; min-width: 0; font-size: 0.9rem; font-weight: 700; }
@@ -363,7 +370,8 @@
           padding: 4px 3px;
           font-size: clamp(0.6rem, 2.2vw, 0.74rem);
         }
-        .touch-control:active { background: rgba(0, 120, 180, 0.85); }
+        .touch-control:active,
+        .touch-control.latched { background: rgba(0, 120, 180, 0.85); border-color: #7fe3ff; }
         #cpu-panel { display: none; }
       }
 

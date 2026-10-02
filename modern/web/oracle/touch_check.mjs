@@ -75,14 +75,24 @@ const flightPad = await pad();
 check('the cockpit gets the flight pad', flightPad.includes('FIRE') && flightPad.includes('COM'),
   `${flightPad.length} buttons`);
 
+// A *tap* on an arrow, which is the thing a phone player will actually do.
+//
+// The flight loop asks `isDown` once a pass, and a pass is 2.55 s, so a tap used to be over
+// long before anything looked and the arrows did nothing unless you knew to hold them. A short
+// press is latched for one pass now, which is the single step a player holding the paddle
+// across one pass would have got.
+const s8 = (v) => (v > 127 ? v - 256 : v);
 const bankBefore = await page.evaluate(() => window.__spaceVikingsState.bank);
 {
   const btn = page.locator('.touch-control', { hasText: '◀' }).first();
   const box = await btn.boundingBox();
   await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
 }
-await page.waitForTimeout(500);
-const s8 = (v) => (v > 127 ? v - 256 : v);
+await page.waitForTimeout(4200);              // one pass, plus the latch's margin
+const bankAfterTap = await page.evaluate(() => window.__spaceVikingsState.bank);
+check('a tap on an arrow banks the ship, not just a hold',
+  s8(bankAfterTap) !== s8(bankBefore),
+  `bank ${s8(bankBefore)} -> ${s8(bankAfterTap)}`);
 
 // --- the screens that were unreachable ------------------------------------------------------
 await tap('COM');

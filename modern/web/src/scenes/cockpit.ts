@@ -84,7 +84,7 @@ const FRAME_DT_SCALE = 0.72;
  * Nothing in the pixel harnesses could catch this. The flight view moves every frame and is the
  * one screen they do not compare.
  */
-const BASIC_SIMULATOR_TICK_SECONDS = 2.55;
+export const BASIC_SIMULATOR_TICK_SECONDS = 2.55;
 
 /**
  * How often you can fire, which on the disk is not a cooldown at all.

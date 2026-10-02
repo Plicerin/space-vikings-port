@@ -33,7 +33,7 @@ import { initCopyButton } from '../engine/gameLog';
 
 // ── Scene imports ──────────────────────────────────────────────────────────
 import { startScene } from '../scenes/start';
-import { cockpitScene } from '../scenes/cockpit';
+import { cockpitScene, BASIC_SIMULATOR_TICK_SECONDS } from '../scenes/cockpit';
 import { instrumentsScene, drawInstruments, drawPanelNeedles, drawPanelLamps } from '../scenes/instruments';
 import { galaxyMapScene, drawGalaxyMap, drawGalaxyCursor, eraseGalaxyCursor3210, drawStarPick, drawStarPickMiss, galaxyMapDataFrom, starUnderCursor } from '../scenes/galaxyMap';
 import { comScene, drawComMainScreen, eraseComNeedleTracks } from '../scenes/com';
@@ -206,27 +206,58 @@ function wireTouchControls(input: Input): void {
 
   /** Anything still held when the screen changes, so a key cannot stick down across scenes. */
   const held = new Set<string>();
+  /** Latches still running, by key - see `MIN_HOLD_MS`. */
+  const latches = new Map<string, number>();
   const releaseAll = () => {
+    for (const t of latches.values()) clearTimeout(t);
+    latches.clear();
     for (const code of held) input.releaseHold(code);
     held.clear();
   };
 
+  /**
+   * How long a held key stays down at minimum, which is one pass of the main loop.
+   *
+   * The flight loop asks `isDown` once a pass and a pass is 2.55 s, so a tap - pointerdown and
+   * pointerup in the same millisecond - was over long before anything looked, and the arrows
+   * did nothing at all unless you knew to hold them. On a keyboard that is the disk's own
+   * behaviour and fine; on a phone it reads as a broken button.
+   *
+   * So a short press is held on until a pass has gone by, which gives it exactly the one step
+   * a player who held the paddle for one pass would have got. Holding longer still works the
+   * way it did - this only puts a floor under it.
+   */
+  const MIN_HOLD_MS = BASIC_SIMULATOR_TICK_SECONDS * 1000 + 120;
+
   function bindButton(btn: HTMLButtonElement, key: TouchKey): void {
+    let pressedAt = 0;
+
+    const letGo = () => {
+      input.releaseHold(key.code);
+      held.delete(key.code);
+      latches.delete(key.code);
+      btn.classList.remove('latched');
+    };
+
     const onStart = (e: Event) => {
       e.preventDefault();
-      if (key.hold) {
-        input.pressHold(key.code);
-        held.add(key.code);
-      } else {
-        input.press(key.code);
-      }
+      if (!key.hold) { input.press(key.code); return; }
+      const running = latches.get(key.code);
+      if (running !== undefined) { clearTimeout(running); latches.delete(key.code); }
+      pressedAt = performance.now();
+      input.pressHold(key.code);
+      held.add(key.code);
+      btn.classList.add('latched');
     };
+
     const onEnd = (e: Event) => {
       e.preventDefault();
-      if (key.hold) {
-        input.releaseHold(key.code);
-        held.delete(key.code);
-      }
+      if (!key.hold) return;
+      const heldFor = performance.now() - pressedAt;
+      if (heldFor >= MIN_HOLD_MS) { letGo(); return; }
+      // Too short for the simulator to have seen it: keep it down until it has.
+      if (latches.has(key.code)) return;
+      latches.set(key.code, window.setTimeout(letGo, MIN_HOLD_MS - heldFor));
     };
     btn.addEventListener('pointerdown', onStart);
     btn.addEventListener('pointerup', onEnd);
