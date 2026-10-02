@@ -300,6 +300,73 @@
           border-radius: 10px;
         }
       }
+      /* ---------- landscape: the game fills the screen, the pad floats over it ----------
+         Turned sideways a phone has room to spare beside a 35:24 screen - measured at 126px
+         each side on an iPhone 13, 188 on a Pixel 5, 51 on an SE. So the canvas takes the full
+         height and the pad becomes a translucent overlay living in those gutters, column-wrapped
+         so it hugs the left and right edges rather than sitting across the instruments.
+
+         The page is still underneath: this only claims the first screenful, and scrolling still
+         reaches the article. Portrait is unaffected, and so is the desktop. */
+      @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+        #container { position: relative; height: 100svh; display: flex; padding: 0; }
+        .bezel {
+          flex: 1; min-width: 0; padding: 0; border: 0; border-radius: 0;
+          display: flex; align-items: center; justify-content: center; box-shadow: none;
+        }
+        #viewport { height: 100%; width: auto; max-width: 100%; border-radius: 0; }
+        /* The hint and the fullscreen button would only sit on top of the game. */
+        .tray { display: none; }
+
+        /*
+         * Two columns, pinned to the edges, with the game between them.
+         *
+         * Column-wrapped flex was tried first and wraps greedily: when the clusters did not all
+         * fit one column it made a third, in the middle, over the game. This places them
+         * instead - odd clusters left, even clusters right - so nothing can ever land in the
+         * centre however many a screen has.
+         */
+        #touch-controls {
+          position: absolute; inset: 0; margin: 0; padding: 6px;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-content: center;
+          justify-content: space-between;
+          gap: 6px;
+          /* Only the buttons take taps; everything between them is the game. */
+          pointer-events: none;
+        }
+        .touch-cluster:nth-child(odd) { grid-column: 1; }
+        .touch-cluster:nth-child(even) { grid-column: 3; }
+        .touch-cluster {
+          pointer-events: auto;
+          background: rgba(4, 10, 20, 0.42);
+          border-color: rgba(20, 207, 253, 0.4);
+          backdrop-filter: blur(3px);
+          -webkit-backdrop-filter: blur(3px);
+          padding: 6px;
+          gap: 4px;
+          max-width: 30vw;
+        }
+        /* The taller column has to fit the screen: three clusters split 2/1 however they are
+           dealt, and measured 380px against a 342 viewport, so the rows come down. */
+        .touch-cluster .label { font-size: 0.55rem; opacity: 0.8; line-height: 1.2; }
+        /* Three to a row, which is about height rather than width. Two-wide turned the
+           six-button clusters into three rows of 185px each, and two of those will not fit a
+           342px screen. Three-wide makes them two rows, and the extra width costs about six
+           pixels of overlap against the gutter. */
+        .touch-row { gap: 4px; }
+        .touch-control {
+          background: rgba(9, 43, 72, 0.55);
+          border-color: rgba(77, 182, 255, 0.55);
+          min-height: 36px;
+          padding: 4px 3px;
+          font-size: clamp(0.6rem, 2.2vw, 0.74rem);
+        }
+        .touch-control:active { background: rgba(0, 120, 180, 0.85); }
+        #cpu-panel { display: none; }
+      }
+
       @media (max-width: 720px) {
         /* The nav crowds the brand long before it wraps nicely, so stack it. */
         .top { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 0 10px; }
