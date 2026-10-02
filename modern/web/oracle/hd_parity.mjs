@@ -64,8 +64,25 @@ console.log('the streaks, rows 0-125:');
 console.log(`  disk ${diskStreaks} lit`);
 console.log(`  port over ${counts.length} runs: ${counts[0]} to ${counts[counts.length - 1]}, ` +
   `median ${counts[counts.length >> 1]}`);
-const inRange = diskStreaks >= counts[0] && diskStreaks <= counts[counts.length - 1];
-console.log(`  the disk's count is ${inRange ? 'inside' : 'OUTSIDE'} the port's range`);
+/**
+ * The disk's count against the middle of the port's, not against the ends of it.
+ *
+ * This used to require `diskStreaks` to fall between the smallest and largest of twelve port
+ * runs, and that is a coin flip rather than a test: the disk's figure is one fixed number and
+ * the twelve are redrawn every time, so the same value passes or fails on the port's luck.
+ * It mattered here because 10520 sits high in the port's spread - measured over six runs the
+ * port's median ran 10151 to 10582 and its maximum 10651 to 11158 - so a run whose twelve
+ * samples all came in low failed a port that was working.
+ *
+ * The median is stable to about +-2%, and the disk is within 3.6% of it at worst. Eight per
+ * cent leaves room for that without going blind: 175 lines is what line 20 draws, and drawing
+ * even a few dozen fewer moves the count by tens of per cent.
+ */
+const portMedian = counts[counts.length >> 1];
+const drift = Math.abs(diskStreaks - portMedian) / portMedian;
+const inRange = drift <= 0.08;
+console.log(`  the disk is ${(drift * 100).toFixed(1)}% off the port's median`
+  + ` - ${inRange ? 'within' : 'OUTSIDE'} the 8% the streaks vary by`);
 
 const at = (on, x, y) => (on[y * HGR_W + x] ? 1 : 0);
 let o = 0;
@@ -102,14 +119,14 @@ fs.writeFileSync('captured/hd/port.png', toPng(Uint8Array.from(runs[0])));
 console.log('');
 console.log('wrote captured/hd/port.png');
 
-// Line 20 draws 175 lines to `RND(1) * 279, RND(1) * 125`, so the streaks are a range and not
-// a picture: what is required is that the disk's own count falls inside twelve runs of the
+// Line 20 draws 175 lines to `RND(1) * 279, RND(1) * 125`, so the streaks are a distribution
+// and not a picture: what is required is that the disk's count sits near the middle of the
 // port's. The jump's arithmetic beside it is exact - D1, the energy it costs, the |Z| >= 7000
 // line 70 retries for, and the visited flag.
 console.log('');
 const cost = golden.before.energy - golden.after.energy;
 const hdOk = inRange && cost === d1 && Math.abs(golden.after.z) >= 7000 && golden.visited === 1;
 console.log(hdOk ? "hd parity: the streaks are in range and the jump's arithmetic is exact"
-  : `hd parity: streaks in range ${inRange}, energy cost ${cost} against D1 ${d1}, `
+  : `hd parity: streaks ${(drift * 100).toFixed(1)}% off the median, energy cost ${cost} against D1 ${d1}, `
     + `Z ${golden.after.z}, visited ${golden.visited}`);
 process.exit(hdOk && errors.length === 0 ? 0 : 1);
