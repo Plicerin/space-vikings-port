@@ -12,6 +12,10 @@ export async function startScene(
   scenes: SceneManager,
 ): Promise<void> {
   const { hires, state, input } = ctx;
+  // Every other scene announces itself and this one never did - it imported `setScene` and did
+  // not call it. Nothing depended on it until the touch pad, which builds from the current
+  // screen and so offered the title a CONTINUE button and no way to start a game.
+  setScene('start');
 
   // START.bas:60 — (N)ew or (O)ld game prompt
   // Original: HGR → GOSUB 7500 (title) → show prompt → wait for input

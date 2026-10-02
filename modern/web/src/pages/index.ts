@@ -23,6 +23,9 @@ import { parseShipBytecode, projectShipBytecode, drawShipWireframe,
   projectShipWorld, drawShipWorld, COCKPIT_SHIP_WIREFRAME_VIEW } from '../engine/shipBytecode';
 import { SceneManager } from '../engine/sceneManager';
 import { Input } from '../engine/input';
+import { onSceneChange } from '../engine/gameLog';
+import { touchLayoutFor } from '../engine/touchKeys';
+import type { TouchKey } from '../engine/touchKeys';
 import { Audio } from '../engine/audio';
 import { Loader } from '../engine/loader';
 import { GameState } from '../engine/gameState';
@@ -188,42 +191,81 @@ async function loadOptional(loader: Loader, path: string): Promise<void> {
   }
 }
 
-// ── Touch controls ────────────────────────────────────────────────────────
+// ── Touch controls ─────────────────────────────────────────────────
+/**
+ * The pad is rebuilt whenever the screen changes, from the keys that screen reads.
+ *
+ * It used to be three clusters of markup fixed in index.html, built for the cockpit, which left
+ * a phone unable to start a game at all - the title wants `N` and there was no `N` on it. See
+ * `engine/touchKeys.ts` for what each screen gets and where the list came from.
+ */
 function wireTouchControls(input: Input): void {
   const container = document.getElementById('touch-controls');
   if (!container) return;
+  const pad: HTMLElement = container;
 
+  /** Anything still held when the screen changes, so a key cannot stick down across scenes. */
   const held = new Set<string>();
+  const releaseAll = () => {
+    for (const code of held) input.releaseHold(code);
+    held.clear();
+  };
 
-  function bindButton(btn: HTMLButtonElement): void {
-    const code = btn.getAttribute('data-code');
-    if (!code) return;
-    const hold = btn.getAttribute('data-hold') === '1';
-
+  function bindButton(btn: HTMLButtonElement, key: TouchKey): void {
     const onStart = (e: Event) => {
       e.preventDefault();
-      if (hold) {
-        input.pressHold(code);
-        held.add(code);
+      if (key.hold) {
+        input.pressHold(key.code);
+        held.add(key.code);
       } else {
-        input.press(code);
+        input.press(key.code);
       }
     };
     const onEnd = (e: Event) => {
       e.preventDefault();
-      if (hold) {
-        input.releaseHold(code);
-        held.delete(code);
+      if (key.hold) {
+        input.releaseHold(key.code);
+        held.delete(key.code);
       }
     };
-
     btn.addEventListener('pointerdown', onStart);
     btn.addEventListener('pointerup', onEnd);
     btn.addEventListener('pointerleave', onEnd);
     btn.addEventListener('pointercancel', onEnd);
   }
 
-  container.querySelectorAll<HTMLButtonElement>('.touch-control').forEach(bindButton);
+  function build(scene: string): void {
+    releaseAll();
+    pad.textContent = '';
+    for (const group of touchLayoutFor(scene)) {
+      const cluster = document.createElement('div');
+      cluster.className = 'touch-cluster';
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = group.label;
+      cluster.appendChild(label);
+
+      // Three to a row, except a `wide` key, which takes a row to itself.
+      let row: HTMLDivElement | null = null;
+      for (const key of group.keys) {
+        if (key.wide || !row || row.childElementCount >= 3) {
+          row = document.createElement('div');
+          row.className = key.wide ? 'touch-row wide' : 'touch-row';
+          cluster.appendChild(row);
+        }
+        const btn = document.createElement('button');
+        btn.className = 'touch-control';
+        btn.type = 'button';
+        btn.textContent = key.label;
+        bindButton(btn, key);
+        row.appendChild(btn);
+        if (key.wide) row = null;
+      }
+      pad.appendChild(cluster);
+    }
+  }
+
+  onSceneChange(build);
 }
 
 // ── Start when DOM is ready ──────────────────────────────────────────────

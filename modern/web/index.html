@@ -221,19 +221,22 @@
 
       /* ---------- game shell bits the app drives ---------- */
       #touch-controls {
-        display: none; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px;
+        display: none; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px; margin-top: 14px; align-items: start;
       }
       .touch-cluster {
         background: linear-gradient(180deg, rgba(10, 24, 40, 0.9), rgba(5, 12, 22, 0.95));
         border: 1px solid rgba(20, 207, 253, 0.34);
         border-radius: 14px; padding: 12px; display: grid; gap: 9px;
       }
-      .touch-cluster:last-child { grid-column: 1 / -1; }
+      /* A cluster with a wide key in it wants the full width. */
+      .touch-cluster:has(.touch-row.wide) { grid-column: 1 / -1; }
       .touch-cluster .label {
         color: var(--ink-2); font-size: 0.76rem; letter-spacing: 0.12em;
         text-align: center; font-family: 'IBM Plex Mono', monospace;
       }
       .touch-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+      .touch-row.wide { grid-template-columns: 1fr; }
       .touch-control {
         border: 1px solid #2d7fa6; border-radius: 12px;
         background: linear-gradient(180deg, rgba(9, 43, 72, 0.92), rgba(7, 33, 55, 0.96));
@@ -329,52 +332,10 @@
             </div>
           </div>
 
-          <div id="touch-controls" aria-label="Touch game controls">
-            <div class="touch-cluster">
-              <div class="label">BANK / PITCH</div>
-              <div class="touch-row">
-                <span></span>
-                <button class="touch-control" data-code="ArrowUp" data-hold="1">▲</button>
-                <span></span>
-              </div>
-              <div class="touch-row">
-                <button class="touch-control" data-code="ArrowLeft" data-hold="1">◀</button>
-                <span></span>
-                <button class="touch-control" data-code="ArrowRight" data-hold="1">▶</button>
-              </div>
-              <div class="touch-row">
-                <span></span>
-                <button class="touch-control" data-code="ArrowDown" data-hold="1">▼</button>
-                <span></span>
-              </div>
-            </div>
-            <div class="touch-cluster">
-              <div class="label">FIRE / POWER</div>
-              <div class="touch-row">
-                <button class="touch-control" data-code="1">SPD-</button>
-                <button class="touch-control" data-code="3">SPD--</button>
-                <button class="touch-control" data-code=" ">FIRE</button>
-              </div>
-              <div class="touch-row">
-                <button class="touch-control" data-code="2">SPD+</button>
-                <button class="touch-control" data-code="4">SPD++</button>
-                <button class="touch-control" data-code="W">WEAPON</button>
-              </div>
-            </div>
-            <div class="touch-cluster">
-              <div class="label">SYSTEMS</div>
-              <div class="touch-row">
-                <button class="touch-control" data-code="A">AUTO</button>
-                <button class="touch-control" data-code="B">COND</button>
-                <button class="touch-control" data-code="S">SHLD</button>
-              </div>
-              <div class="touch-row">
-                <button class="touch-control" data-code="R">RADAR</button>
-                <button class="touch-control" data-code="H">HYPER</button>
-                <button class="touch-control" data-code="C">COM</button>
-              </div>
-            </div>
-          </div>
+          <!-- Built by src/pages/index.ts from the keys the current screen reads; see
+               engine/touchKeys.ts. It used to be three fixed clusters here, which meant a
+               phone could not start a game - the title wants N and there was no N on it. -->
+          <div id="touch-controls" aria-label="Touch game controls"></div>
 
           <div id="cpu-panel">
             <div class="panel-header">CPU PILOT STATUS</div>

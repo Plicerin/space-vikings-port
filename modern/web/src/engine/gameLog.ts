@@ -40,8 +40,19 @@ function saveToStorage() {
   }, 500);
 }
 
+/** Told when the scene changes, so the touch pad can show that screen's keys. */
+const sceneListeners = new Set<(name: string) => void>();
+
+export function onSceneChange(cb: (name: string) => void): () => void {
+  sceneListeners.add(cb);
+  cb(currentScene);
+  return () => sceneListeners.delete(cb);
+}
+
 export function setScene(name: string) {
+  const changed = currentScene !== name;
   currentScene = name;
+  if (changed) for (const cb of sceneListeners) cb(name);
   log('enter', name);
 }
 
