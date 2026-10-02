@@ -91,7 +91,11 @@ console.log('');
 
 // --- into flight ---------------------------------------------------------------------------
 await press('N');
-check('the title starts a game', await until('cockpit', 20000), `scene ${await scene()}`);
+// START 80's `GOSUB 1000` sits between the title and the game now - the grid, the credits and
+// the wordmark. Reaching flight means going through it, so this checks both halves.
+check('the title runs the opening', await until('opening', 20000), `scene ${await scene()}`);
+check('and the opening hands over to the game', await until('cockpit', 45000),
+  `scene ${await scene()}`);
 
 // --- re-entry ------------------------------------------------------------------------------
 // The shortcut: put the ship inside line 156's cube - `ABS(X) < 900 AND ABS(Y) < 900 AND

@@ -291,9 +291,20 @@ export class Hires {
   }
 
 
+  /**
+   * `HPLOT X,Y`, which on the Apple II **also sets the plotting position** - that is what makes
+   * the `HPLOT X,Y TO X2,Y2` form work at all.
+   *
+   * This did not move the pen, so a plot followed by an `hplotTo` drew from wherever the last
+   * `hplotTo` had finished. Nothing noticed until START's opening grid went in and the first
+   * line of it ran diagonally across the sky. The pen is set even when the point is off screen,
+   * because the ROM sets it before it clips.
+   */
   hplot(x: number, y: number): void {
     const ix = Math.round(x);
     const iy = Math.round(y);
+    this.penX = ix;
+    this.penY = iy;
     if (ix < 0 || ix >= W || iy < 0 || iy >= H) return;
     this.buf[iy * W + ix] = this.argbAt(ix);
     this.dirty = true;

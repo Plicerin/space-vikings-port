@@ -1,0 +1,96 @@
+{
+ "rows": [
+  100,
+  101,
+  102,
+  104,
+  106,
+  108,
+  111,
+  114,
+  118,
+  122,
+  126,
+  131,
+  136,
+  142,
+  148,
+  154,
+  161,
+  168,
+  176,
+  184
+ ],
+ "drawnRows": [
+  100,
+  101,
+  102,
+  104,
+  106,
+  108,
+  111,
+  114,
+  118,
+  122,
+  126,
+  131,
+  136,
+  142,
+  148,
+  154,
+  161,
+  168,
+  176,
+  184
+ ],
+ "below": 4973,
+ "above": 1382,
+ "logoBand": 1301,
+ "results": [
+  {
+   "what": "the horizontal lines land on the same rows",
+   "ok": true,
+   "detail": "20 rows"
+  },
+  {
+   "what": "and the spacing grows the way C = .4 makes it",
+   "ok": true,
+   "detail": "1 1 2 2 2 3 3 4 4 4 5 5 6 6 6 7 7 8 8"
+  },
+  {
+   "what": "the fan is twenty pairs and a centre line",
+   "ok": true,
+   "detail": "40 lines, centre at x 141"
+  },
+  {
+   "what": "the wordmark reads as 494 numbers",
+   "ok": true,
+   "detail": "494 values"
+  },
+  {
+   "what": "which walk into 164 strokes and a colour",
+   "ok": true,
+   "detail": "165 ops"
+  },
+  {
+   "what": "the grid on screen has the disk's rows",
+   "ok": true,
+   "detail": "20 rows"
+  },
+  {
+   "what": "the ground has the same amount of ink",
+   "ok": true,
+   "detail": "port 4973, disk 4975, 2 apart"
+  },
+  {
+   "what": "the stars come out at the same density",
+   "ok": true,
+   "detail": "port 81, disk 82"
+  },
+  {
+   "what": "the wordmark is finished and the right weight",
+   "ok": true,
+   "detail": "port 1301, disk 1268"
+  }
+ ]
+}

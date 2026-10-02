@@ -5,6 +5,7 @@ import { GameState } from '../engine/gameState';
 import { applySave, readSave, clearSave, clearGap, listSlots, SLOT_COUNT }
   from '../engine/diskSave';
 import { qolOn } from '../engine/qol';
+import { openingScene } from './opening';
 
 export async function startScene(
   ctx: SceneContext,
@@ -46,6 +47,9 @@ export async function startScene(
       // to 100.3, 2000, 10000. Nothing of the old game survives it.
       clearSave();
       clearGap();
+      // 80: `GOSUB 1000`, which is the opening - the grid, the credits and the wordmark -
+      // played while the game BLOADs itself. It comes after the answer, not before it.
+      await openingScene(ctx);
       return scenes.run('instruments');
     }
 
@@ -85,6 +89,8 @@ export async function startScene(
       applySave(restored, saved);
       Object.assign(state, restored);
       glog('start', `loaded saved game from slot ${slot}, planet ${saved.savedPlanet}`);
+      // 80 is reached whichever way 70 went, so an old game gets the opening too.
+      await openingScene(ctx);
       return scenes.run('instruments');
     }
   }

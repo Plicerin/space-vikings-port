@@ -82,7 +82,8 @@ console.log('');
 
 // --- a game worth saving ----------------------------------------------------------------
 await press('N');
-if (!await until('cockpit', 25000)) { await browser.close(); throw new Error('no cockpit'); }
+// 45s, not 25: the opening runs for 23 before flight starts.
+if (!await until('cockpit', 45000)) { await browser.close(); throw new Error('no cockpit'); }
 await put({
   x: 1234, y: 567, z: -890, heading: 64, pitch: 12,
   planetIndex: 7, atmosphere: 0, inOrbit: false,
@@ -132,7 +133,7 @@ check('38392 carries the planet we were at', parsed.savedPlanet === 7,
 
 // --- loading it, in the same run of the page ---------------------------------------------
 await press('2');                       // 110-120, continue
-await until('cockpit', 25000);
+await until('cockpit', 45000);
 await page.evaluate(() => window.location.assign(window.location.href));
 await page.waitForFunction(() => !!(window.__spaceVikings && window.__spaceVikingsState),
   null, { timeout: 30000 });
@@ -161,7 +162,7 @@ await page.evaluate(() => {
   };
 });
 await press('O');
-if (!await until('cockpit', 25000)) { await browser.close(); throw new Error('the load never reached flight'); }
+if (!await until('cockpit', 45000)) { await browser.close(); throw new Error('the load never reached flight'); }
 const loaded = await look();
 
 console.log('');
