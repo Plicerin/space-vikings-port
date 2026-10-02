@@ -10,3 +10,7 @@ dist/
 # The leading slash matters: it pins this to modern/web itself, so public/, oracle/captured/
 # and tools/screenshots/ - all of which hold PNGs on purpose - are untouched.
 /*.png
+
+# run_end_to_end.mjs writes these two next to the app. The .png is covered above; the log is
+# not, and an untracked file in the way is no better than a modified one.
+/end_to_end_result_log.json
