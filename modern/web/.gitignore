@@ -2,3 +2,11 @@ node_modules/
 dist/
 .vite/
 *.log
+
+# Screenshots dropped next to the app while debugging - browser-*, hermes-*, opening-* and
+# friends. Forty-two of them had accumulated here, and twenty-nine more are already tracked
+# from before this rule, which it does not affect.
+#
+# The leading slash matters: it pins this to modern/web itself, so public/, oracle/captured/
+# and tools/screenshots/ - all of which hold PNGs on purpose - are untouched.
+/*.png
