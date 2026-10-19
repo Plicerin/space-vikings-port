@@ -155,6 +155,15 @@ function boot(): void {
   // Wire up touch controls.
   wireTouchControls(input);
 
+  // Decide when the game holds the keyboard.
+  //
+  // Space fires and the arrows fly, and a browser scrolls a page with both - so on the landing
+  // page, firing scrolled the game off the screen. `Input` swallows those keys only while this
+  // says the game is engaged, and engaged means you can see it: at least half the screen in
+  // view. Scroll down to read and Space pages the article again, which is what someone reading
+  // expects. There is no click-to-focus step, because the page tells you to press N.
+  wireKeyboardEngagement(input);
+
   // ── Start the first scene ────────────────────────────────────────────
   console.log('[boot] about to call audio.resume()');
   void audio.resume().then(() => {
@@ -297,6 +306,26 @@ function wireTouchControls(input: Input): void {
   }
 
   onSceneChange(build);
+}
+
+/**
+ * The game takes the keyboard while it is at least half on screen.
+ *
+ * An IntersectionObserver rather than a scroll handler: it fires only when the answer changes
+ * and costs nothing in between. If the browser has no observer the game simply keeps the keys,
+ * which is the old behaviour and no worse than it was.
+ */
+function wireKeyboardEngagement(input: Input): void {
+  const stage = document.getElementById('viewport');
+  if (!stage || typeof IntersectionObserver === 'undefined') return;
+
+  let visible = true;
+  input.engaged = () => visible;
+
+  new IntersectionObserver(
+    (entries) => { for (const e of entries) visible = e.intersectionRatio >= 0.5; },
+    { threshold: [0, 0.25, 0.5, 0.75, 1] },
+  ).observe(stage);
 }
 
 // ── Start when DOM is ready ──────────────────────────────────────────────

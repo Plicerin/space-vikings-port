@@ -44,13 +44,38 @@ export class Input {
     '4': 0xb4,
   };
 
+  /**
+   * The keys the game uses that a browser would otherwise act on itself.
+   *
+   * Space is the fire button and scrolls a page down; the arrows fly the ship and scroll it in
+   * every direction. So on a page with the game embedded in it, firing scrolled the game off
+   * the screen. Page Up, Page Down, Home, End and Tab are deliberately not here - the game
+   * does not use them and the page should stay navigable.
+   */
+  private static readonly PAGE_KEYS = new Set([
+    'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  ]);
+
+  /**
+   * Whether the game should be taking the keyboard right now.
+   *
+   * The page sets this; by default the game takes it, which is what a bare canvas wants. On the
+   * landing page it is true while the game is on screen, so reading the article below still
+   * scrolls with Space and the arrows.
+   */
+  engaged: () => boolean = () => true;
+
   constructor() {
     window.addEventListener('keydown', e => {
+      if (Input.PAGE_KEYS.has(e.code) && this.engaged()) e.preventDefault();
       this.down.add(e.code);
       const code = this.translateKey(e.key, e.code);
       if (code !== null) this.pendingKey = code;
     });
-    window.addEventListener('keyup', e => this.down.delete(e.code));
+    window.addEventListener('keyup', e => {
+      if (Input.PAGE_KEYS.has(e.code) && this.engaged()) e.preventDefault();
+      this.down.delete(e.code);
+    });
   }
 
   private translateKey(key: string, code: string): number | null {
